@@ -14,7 +14,7 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 
 | Area | Status |
 |---|---|
-| Engine + unit tests | ✅ 46/46 passing (`npm test`) |
+| Engine + unit tests | ✅ 50/50 passing (`npm test`) |
 | Production deploy | ✅ https://scanmana.vercel.app (Vercel project `scanmana`) |
 | Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes; `npm run migrate` is idempotent) |
 | Cron | ✅ `/api/cron/scan` at `0 4 * * 2-6` UTC (midnight EDT / 11pm EST) + catch-up `30 5 * * 2-6` (1:30am EDT; skips if already scanned). Massive publishes the day's grouped bars after 9:30pm ET, so the first run must wait until at least midnight, auth via `CRON_SECRET` |
@@ -94,4 +94,4 @@ Confirm with `vercel ls --prod` → newest is Ready, and curl the prod URL.
 ## Out of scope (v1, deliberate)
 
 Intraday anything, real-time data, parabolic shorts, settings UI, journaling,
-multi-user/auth, TradingView integration.
+multi-user (sign-in exists, but one allowlisted account), TradingView integration.

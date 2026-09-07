@@ -7,6 +7,16 @@ breakout screens (momentum leaders in tight consolidations) with Darvas boxes
 and Livermore pivotal points drawn on each chart as entry-trigger / stop-zone
 overlays.
 
+## Screenshots
+
+| Deck | Analysis | Live watchlist |
+|---|---|---|
+| ![Deck: tonight's ranked setups with Darvas box, Livermore pivot and stop drawn on the chart](docs/screenshots/deck.png) | ![Analysis: rule-based Wait/Pass read per framework with the trade plan](docs/screenshots/analysis.png) | ![Live watchlist: starred names classified against their trigger in real time](docs/screenshots/watchlist-live.png) |
+
+| Symbol lookup | Help |
+|---|---|
+| ![Symbol lookup: the same card for any ticker plus the Scan fit checklist](docs/screenshots/symbol-lookup.png) | ![Help: every badge and chart line explained, with who each idea comes from](docs/screenshots/help.png) |
+
 ## How it works
 
 - A nightly Vercel cron (`/api/cron/scan`, weeknights ~midnight ET) pulls the whole

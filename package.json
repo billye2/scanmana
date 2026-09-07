@@ -1,6 +1,6 @@
 {
   "name": "scanmana",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -17,6 +17,7 @@
     "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.9.1",
     "@neondatabase/serverless": "^1.1.0",
     "html-to-image": "^1.11.13",
     "lightweight-charts": "^5.2.1",

@@ -1,4 +1,5 @@
 import { ListIcon, SearchIcon } from "@/components/Icons";
+import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
 import Link from "next/link";
 import IndexCharts from "@/components/IndexCharts";
@@ -220,7 +221,14 @@ export default async function Help() {
         Market</em> (1960); Livermore, <em>How to Trade in Stocks</em> (1940). Scanmana is an independent hobby
         project, not affiliated with or endorsed by Kristjan Kullamägi, Mark Minervini, or any publisher.
       </p>
-      <p className="mt-2 text-[11px] text-neutral-700">Scanmana v{APP_VERSION}</p>
+      <p className="mt-2 text-[11px] text-neutral-700">
+        Scanmana v{APP_VERSION} ·{" "}
+        <SignOutButton>
+          <button type="button" className="underline underline-offset-4 active:text-neutral-400">
+            Sign out on this device
+          </button>
+        </SignOutButton>
+      </p>
     </main>
   );
 }

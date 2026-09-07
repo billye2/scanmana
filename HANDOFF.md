@@ -19,7 +19,7 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 | Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes; `npm run migrate` is idempotent) |
 | Cron | ✅ `/api/cron/scan` at `0 4 * * 2-6` UTC (midnight EDT / 11pm EST) + catch-up `30 5 * * 2-6` (1:30am EDT; skips if already scanned). Massive publishes the day's grouped bars after 9:30pm ET, so the first run must wait until at least midnight, auth via `CRON_SECRET` |
 | Push | ✅ VAPID keys set on Vercel prod; iOS flow in `components/PushSetup.tsx` |
-| Access | ✅ single-password gate (`proxy.ts` + `/login`, cookie = HMAC keyed by `APP_PASSWORD`, 3-day). Public: `/api/cron/*` (own secret), manifest, sw.js, icons. Unset `APP_PASSWORD` = open. Change the password to log every device out. |
+| Access | ✅ Clerk email-code sign-in (`proxy.ts` = `clerkMiddleware`, `/sign-in` page, `ClerkProvider` in the root layout; since 2026-09-07). Only allowlisted emails can sign in (Clerk dashboard → Restrictions, sign-ups restricted); sessions 30 days (dashboard → Sessions); sign-out link in the `/help` footer. Public: `/api/cron/*` (own secret), manifest, sw.js, icons, `/sign-in`. Unauthenticated `/api/*` → 401 JSON; pages → `/sign-in` and back. |
 | PWA assets | ✅ mobile-first, full-window layout at ≥1024px (Tailwind `lg:`); manifest, sw.js, icons all serve 200 on prod; `/help` explains badges + overlays and charts QQQ/SPY/IWM with 10/20/50 SMAs; `/s/[ticker]` symbol page (watchlist rows link to it; builds the card from stored bars when the symbol isn't in tonight's deck) + **Scan fit** checklist (`explainScreen`, `components/ScreenFit.tsx`; includes an informational Minervini-VCP block via `explainVcp` — analysis lens, never decides deck membership); `/s` free-form lookup page (search icon in the header, `components/SymbolLookup.tsx`); **Live** watchlist section on `/watchlist` (`components/LiveWatch.tsx` → `GET /api/watchlist/live` → `lib/livewatch.ts`; buckets breaking/failed/stopped/approaching/quiet, polls 60s while visible, 60s shared TTL in market hours / 30-min off-hours); **Live** toggle on `/s/[ticker]` (`?live=1`, `lib/intraday.ts`: Finnhub free quotes for symbol + QQQ/SPY/IWM, 30-min shared cache in the `quotes` Neon table — global TTL across users/instances, provisional today-bar with volume assumed at the 20-day avg, market filter recomputed live; missing key/errors fall back to EOD with a note) — read-only, never changes the scan |
 | Market data | ✅ `MASSIVE_API_KEY` on Vercel; backfill done 2026-09-01 (1.32M bars, 251 dates, 5,692 tickers) |
 | First scan | ✅ 2026-09-01 via **↻ Run scan** (now labelled **Run scan for previous day**; `POST /api/scan/run`): date 2026-08-31, 60 setups (40 boxed, ranked first; parabolic guard added 2026-09-01 — ADR ≤ 15%, 1M ≤ +300%, ≥ $5 on every close of the last 21 sessions) |
@@ -47,10 +47,16 @@ re-fetches ~10 holiday dates (~2 min) before finding nothing new — harmless.
    or delete the others. Older deployments still exist at their immutable URLs.
 2. **`COIL_` env prefix is intentional legacy** (app was briefly named Coil).
    Don't rename without re-provisioning the integration.
-3. **Password gate and iOS**: the home-screen app has its own cookie jar — sign in
+3. **Sign-in and iOS**: the home-screen app has its own cookie jar — sign in
    once inside it, not just in Safari. `npm run scan:now` and the cron hit
    `/api/cron/scan`, which bypasses the gate (it checks `CRON_SECRET` itself).
-4. **`CRON_SECRET` and `VAPID_PRIVATE_KEY` are marked Sensitive on Vercel** —
+4. **Clerk runs as a development instance on purpose.** Clerk production keys
+   cannot be used on a `*.vercel.app` domain (they need DNS records on a domain
+   you own), so `scanmana.vercel.app` uses `pk_test_`/`sk_test_` keys. Clerk's
+   UI shows a "Development mode" badge and Clerk does not support dev instances
+   for production use; fine for one person. To upgrade: buy a domain, attach it
+   to the Vercel project, create a Clerk production instance, swap the keys.
+5. **`CRON_SECRET` and `VAPID_PRIVATE_KEY` are marked Sensitive on Vercel** —
    write-only, so `vercel env run` / `env pull` cannot read them. `npm run
    scan:now` explains the two workarounds (dashboard Cron → Run, or recreate
    `CRON_SECRET` as non-sensitive). Nightly cron is unaffected — Vercel injects
@@ -75,7 +81,7 @@ Confirm with `vercel ls --prod` → newest is Ready, and curl the prod URL.
 
 - **Secrets live only in Vercel env vars** (global rule in `~/.claude/CLAUDE.md`). `.env.local` holds public VAPID values only. Local commands (`npm run dev|migrate|backfill|scan:now`) inject secrets per-process via `vercel env run -e production` — never `vercel env pull`.
 - Vercel prod env: `CRON_SECRET`, `VAPID_*`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`,
-  `COIL_*` (Neon), `MASSIVE_API_KEY`, `APP_PASSWORD` (app gate, added 2026-09-01),
+  `COIL_*` (Neon), `MASSIVE_API_KEY`, `CLERK_SECRET_KEY` + `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (Clerk via Vercel Marketplace, resource `scanmana-auth`, 2026-09-07) + `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`,
   `FINNHUB_API_KEY` (Live mode on `/s/[ticker]`, added 2026-09-02), `VAPID_SUBJECT` (mailto: contact for push; required since 2026-09-07).
 
 ## Conventions

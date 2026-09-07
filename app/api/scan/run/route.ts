@@ -4,10 +4,9 @@ import { scanAndNotify } from "@/lib/scan-notify";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
-// Backs the "Run scan" button. Unauthenticated by design (single-user app with
-// no login), but never forces: if today's scan already exists it returns
-// "skipped", so the worst an outsider can do is trigger the scan the nightly
-// cron would run anyway.
+// Backs the "Run scan" button. Gated by the Clerk proxy like every /api route
+// except the cron, and never forces: if today's scan already exists it returns
+// "skipped".
 export async function POST() {
   try {
     return NextResponse.json(await scanAndNotify({ force: false }));

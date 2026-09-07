@@ -29,8 +29,8 @@ export const CONFIG = {
   HIGH_LOOKBACK: 126,
 
   // Watchlist cap: the live view spends (N + 3 indexes) Finnhub calls/min
-  // in market hours against a 60/min free tier — 40 leaves headroom for /s lookups.
-  WATCHLIST_CAP: 40,
+  // in market hours against a 60/min free tier — 20 leaves plenty for /s lookups.
+  WATCHLIST_CAP: 20,
 
   // Ranking: candidates with a Darvas box first (something to trade), then tightest first
   TIGHTNESS_WINDOW: 10, // (10-day range %) / ADR% — lower = tighter

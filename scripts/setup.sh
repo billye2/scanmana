@@ -270,13 +270,24 @@ else
   pause "Scan triggered?"
 fi
 
-# ── Stage 5: install on iPhone ────────────────────────────────────────────
+# ── Stage 5: sign-in ──────────────────────────────────────────────────────
+stage "Sign-in (Clerk)"
+say "The app is behind Clerk sign-in: Google or an email code, no password."
+step "Provision it: vercel integration add clerk  (adds the two CLERK_* keys to Vercel)."
+step "Add NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in and NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/ (vercel env add)."
+step "Clerk dashboard → Restrictions → Allowlist: add your email, enable allowlist-only sign-ups."
+step "Clerk dashboard → Sessions: pick the session lifetime (30 days here)."
+note "Google and email-code sign-in are on by default; the allowlist applies to both."
+note "Clerk runs as a development instance on vercel.app (production keys need your own domain)."
+pause "Clerk set up?"
+
+# ── Stage 6: install on iPhone ────────────────────────────────────────────
 stage "Install Scanmana on your iPhone"
 step "On your iPhone, open ${PROD_URL} in Safari."
 step "Tap Share → 'Add to Home Screen' → Add."
-step "Open Scanmana from the home-screen icon (required for iOS push)."
+step "Open Scanmana from the home-screen icon (required for iOS push) and sign in once inside it."
 step "Tap 'Enable nightly scan alerts' and allow notifications."
-note "The nightly cron runs weekdays ~9:30pm ET; you'll get one push per scan."
+note "The nightly cron runs weeknights at midnight ET (catch-up 1:30am); you'll get one push per scan."
 pause "Done on the phone?"
 
 finish

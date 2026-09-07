@@ -78,12 +78,13 @@ overlays.
   with a note. The Analysis modal for a symbol outside the scan
   is computed on the spot from stored bars and labelled "computed now, not
   stored". Read-only; never touches the nightly results.
-- Sign-in via Clerk (Vercel Marketplace): `proxy.ts` runs `clerkMiddleware`,
-  sends signed-out pages to `/sign-in` (email code, no password) and answers
-  signed-out API calls with 401. Only allowlisted emails can sign in (Clerk
-  dashboard → Restrictions). Cron, manifest, service worker and icons stay
-  public. Clerk runs as a development instance because production keys need a
-  custom domain — see HANDOFF gotcha 4.
+- Sign-in via Clerk (Vercel Marketplace): **Google** or an **email code**, no
+  password. `proxy.ts` runs `clerkMiddleware`, sends signed-out pages to
+  `/sign-in` and answers signed-out API calls with 401. Only allowlisted
+  emails can sign up (Clerk dashboard → Restrictions), so the app stays
+  single-user. Cron, manifest, service worker and icons stay public. Clerk
+  runs as a development instance because production keys need a custom
+  domain — see HANDOFF gotcha 4.
 - Versioning: taskmana-mobile scheme — 0–9 per segment, `npm run bump`
   advances `package.json` + the `/help` footer line together, release commit
   titles carry `(x.y.z)`. The footer line is how you check what a device runs.
@@ -110,15 +111,28 @@ API key, verifies it, runs the backfill, triggers the first scan, and prints
 the iPhone install steps. Manual equivalent:
 
 1. Secrets live only in Vercel env vars (`vercel env add <NAME> production`) — see `.env.example` for the list. Local commands pull them per-process with `vercel env run`; nothing goes in `.env.local`.
-   Sign-in: `vercel integration add clerk` provisions the Clerk keys; then in the Clerk dashboard enable email code, disable password, add your email to the allowlist and restrict sign-ups, and set the session lifetime.
-2. `npm run migrate` — creates tables (idempotent).
-3. `npm run backfill` — one year of daily bars, ~55 min on the free tier
+2. **Sign-in (Clerk).** `vercel integration add clerk` provisions
+   `CLERK_SECRET_KEY` and `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` on the Vercel
+   project; add `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in` and
+   `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/` yourself. Then in the
+   Clerk dashboard (open it from the Vercel integration page):
+   - Sign-in methods: **Google** and **email verification code** are on by
+     default; leave password off as a sign-in method.
+   - Restrictions → Allowlist: add your email and enable allowlist-only sign-ups
+     (also doable with the Backend API: `POST /v1/allowlist_identifiers`, then
+     `PATCH /v1/instance/restrictions {"allowlist":true}`). Google sign-in is
+     checked against the same allowlist.
+   - Sessions: set the lifetime you want (30 days here).
+   - Domains: the app's URL must be listed for the instance.
+3. `npm run migrate` — creates tables (idempotent).
+4. `npm run backfill` — one year of daily bars, ~55 min on the free tier
    (5 calls/min). Resume-safe; re-run if interrupted. Then `npm run
    seed:indices` for the market strip's ETF history (3 calls).
-4. Tap **↻ Run scan for previous day** in the app (or `npm run scan:now`, which calls `/api/cron/scan?force=1` with
+5. Tap **↻ Run scan for previous day** in the app (or `npm run scan:now`, which calls `/api/cron/scan?force=1` with
    `CRON_SECRET` injected from Vercel).
-5. On iPhone: open the deployed URL in Safari → Share → Add to Home Screen →
-   open Scanmana from the icon → tap "Enable nightly scan alerts".
+6. On iPhone: open the deployed URL in Safari → Share → Add to Home Screen →
+   open Scanmana from the icon → sign in once inside it (its cookie jar is
+   separate from Safari's) → tap "Enable nightly scan alerts".
 
 ## Commands
 

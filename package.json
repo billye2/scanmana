@@ -1,0 +1,45 @@
+{
+  "name": "scanmana",
+  "version": "1.1.4",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "vercel env run -e production -- next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "test": "vitest run",
+    "migrate": "vercel env run -e production -- tsx scripts/migrate.ts",
+    "backfill": "vercel env run -e production -- tsx scripts/backfill.ts",
+    "scan:now": "vercel env run -e production -- bash scripts/scan-now.sh",
+    "seed:indices": "vercel env run -e production -- tsx scripts/seed-indices.ts",
+    "analyze": "vercel env run -e production -- tsx scripts/analyze.ts",
+    "bump": "node scripts/bump-version.mjs"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "html-to-image": "^1.11.13",
+    "lightweight-charts": "^5.2.1",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/web-push": "^3.6.4",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.13",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "unrs-resolver@1.12.2": true
+  }
+}

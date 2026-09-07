@@ -2,7 +2,7 @@
 // password: it never reveals the password, and changing APP_PASSWORD logs every
 // device out. No sessions table, no library.
 export const AUTH_COOKIE = "scanmana_auth";
-export const AUTH_MAX_AGE = 60 * 60 * 24 * 365; // one year
+export const AUTH_MAX_AGE = 60 * 60 * 24 * 3; // three days
 
 /** Paths that must stay public: the cron (has its own secret), PWA install assets, the login flow itself. */
 export const PUBLIC_PATHS = ["/login", "/api/login", "/api/cron/", "/manifest.webmanifest", "/sw.js", "/icons/", "/favicon.ico", "/_next/"];

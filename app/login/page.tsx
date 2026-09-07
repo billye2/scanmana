@@ -27,7 +27,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
         {sp.error && <p className="text-xs text-red-300">Wrong password.</p>}
       </form>
       <p className="mt-6 text-[11px] leading-relaxed text-neutral-600">
-        You stay signed in on this device for a year. Sign in once inside the home-screen app on iPhone — it does not
+        You stay signed in on this device for three days. Sign in once inside the home-screen app on iPhone — it does not
         share Safari&apos;s cookies.
       </p>
     </main>

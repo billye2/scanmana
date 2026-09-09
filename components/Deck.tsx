@@ -18,9 +18,7 @@ import { verdictChip, verdictLabel } from "@/lib/verdict";
 import { APP_VERSION } from "@/lib/version";
 
 // Bottom bar items: one column each, the same icon size and colours as the top nav.
-const BAR_ITEM =
-  "flex flex-col items-center justify-center gap-0.5 py-1.5 text-neutral-400 active:text-neutral-100 disabled:opacity-30";
-const BAR_LABEL = "text-[10px] leading-none font-medium";
+const BAR_ITEM = "flex items-center justify-center py-2.5 text-neutral-400 active:text-neutral-100 disabled:opacity-30";
 
 function Badge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "green" | "amber" | "blue" }) {
   const tones = {
@@ -359,7 +357,7 @@ export default function Deck({
         )}
 
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).
-          Same line icons as the top nav — equal columns, icon over a small label — because the
+          Same line icons as the top nav, icon-only in equal columns, because the
           old text buttons (‹ › ☆ ★ ↗) rendered in mismatched fallback fonts on iPhone. */}
       <nav
         aria-label="Deck navigation"
@@ -368,7 +366,6 @@ export default function Deck({
         <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-5" : "grid-cols-4"}`}>
           <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
             <ChevronLeftIcon size={25} />
-            <span className={BAR_LABEL}>Prev</span>
           </button>
           <button
             onClick={toggleWatch}
@@ -377,21 +374,17 @@ export default function Deck({
             className={`${BAR_ITEM} ${isSaved ? "text-amber-400" : ""}`}
           >
             <StarIcon size={25} fill={isSaved ? "currentColor" : "none"} />
-            <span className={BAR_LABEL}>{isSaved ? "Watching" : "Watch"}</span>
           </button>
           {live && (
             <Link href="/deck" className={BAR_ITEM} aria-label="Tonight's deck — the whole list, grouped live">
               <ListIcon size={25} />
-              <span className={BAR_LABEL}>Deck</span>
             </Link>
           )}
           <a href={googleUrl} target="_blank" rel="noopener noreferrer" className={BAR_ITEM} aria-label="Google this symbol (opens a new tab)">
             <ExternalLinkIcon size={25} />
-            <span className={BAR_LABEL}>Google</span>
           </a>
           <button onClick={() => go(1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Next card">
             <ChevronRightIcon size={25} />
-            <span className={BAR_LABEL}>Next</span>
           </button>
         </div>
       </nav>

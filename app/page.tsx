@@ -2,7 +2,6 @@ import Link from "next/link";
 import Deck from "@/components/Deck";
 import MarketBar from "@/components/MarketBar";
 import PushSetup from "@/components/PushSetup";
-import RunScanButton from "@/components/RunScanButton";
 import { HelpCircleIcon, SearchIcon, StarIcon } from "@/components/Icons";
 import { getSql } from "@/lib/db";
 import { latestScan } from "@/lib/scan";
@@ -51,7 +50,8 @@ export default async function Home() {
         </p>
       ) : !payload ? (
         <p className="mt-16 text-center text-sm text-neutral-500">
-          No scan yet — tap <span className="text-neutral-300">↻ Run scan for previous day</span> below. (Needs the backfill first.)
+          No scan yet — tap <span className="text-neutral-300">↻ Run scan for previous day</span> on the{" "}
+          <Link href="/help" className="text-neutral-300 underline underline-offset-4">Help</Link> page. (Needs the backfill first.)
         </p>
       ) : (
         <>
@@ -60,14 +60,9 @@ export default async function Home() {
         </>
       )}
 
-      {/* Below the deck on purpose — the top of the screen belongs to the cards. */}
+      {/* Below the deck on purpose — the top of the screen belongs to the cards. The manual rescan lives on /help. */}
       <div className="mt-1 mb-1 flex flex-col gap-2">
         <PushSetup />
-        {!dbError && (
-          <div className="flex justify-center">
-            <RunScanButton />
-          </div>
-        )}
       </div>
     </main>
   );

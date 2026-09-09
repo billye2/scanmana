@@ -3,6 +3,7 @@ import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
 import Link from "next/link";
 import IndexCharts from "@/components/IndexCharts";
+import RunScanButton from "@/components/RunScanButton";
 import { CONFIG } from "@/lib/config";
 import { latestScan, loadBars } from "@/lib/scan";
 import type { Bar, MarketHealth } from "@/lib/types";
@@ -56,6 +57,9 @@ export default async function Help() {
         Swedish trader who published his breakout rules and numbers around 2019–2021. The chart overlays come from two
         much older sources: Nicolas Darvas (1950s) and Jesse Livermore (1920s–30s).
       </p>
+      <div className="mt-3 flex justify-center">
+        <RunScanButton />
+      </div>
 
       <H>The badges</H>
       <Term name="1M · 3M · 6M" who="Kullamägi">
@@ -169,7 +173,7 @@ export default async function Help() {
           <em>completed</em> session — the data provider publishes a day&apos;s bars only late that evening — which is why
           the deck you swipe in the morning is dated the previous trading day. If the date on the deck is older than that
           (the scheduled run was missed, or you want the deck before 1:30am), tap{" "}
-          <span className="text-neutral-100">↻ Run scan for previous day</span> below the deck. It is safe to tap any
+          <span className="text-neutral-100">↻ Run scan for previous day</span> at the top of this page. It is safe to tap any
           time: it skips if that day is already scanned, and it reports &ldquo;Skipped&rdquo; if the bars are not
           published yet — try again after midnight ET.
         </li>

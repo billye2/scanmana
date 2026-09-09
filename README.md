@@ -25,9 +25,10 @@ overlays.
   screens, stores the ranked result, and sends one web-push notification.
 - The PWA is a thin viewer: a swipeable deck of annotated candidate charts
   (wraps around: past the last card comes the first, and vice versa)
-  (lightweight-charts), a watchlist with "broke its box" alerts, a **↻ Run scan for
-  previous day** button (`POST /api/scan/run` — no secret, never forces, so it
-  can only run the scan the cron would), and a `/help` page.
+  (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
+  page that carries the **↻ Run scan for previous day** button
+  (`POST /api/scan/run` — no secret, never forces, so it can only run the scan
+  the cron would).
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. IWM shown for
@@ -138,7 +139,7 @@ the iPhone install steps. Manual equivalent:
 4. `npm run backfill` — one year of daily bars, ~55 min on the free tier
    (5 calls/min). Resume-safe; re-run if interrupted. Then `npm run
    seed:indices` for the market strip's ETF history (3 calls).
-5. Tap **↻ Run scan for previous day** in the app (or `npm run scan:now`, which calls `/api/cron/scan?force=1` with
+5. Tap **↻ Run scan for previous day** on the app's Help page (or `npm run scan:now`, which calls `/api/cron/scan?force=1` with
    `CRON_SECRET` injected from Vercel).
 6. On iPhone: open the deployed URL in Safari → Share → Add to Home Screen →
    open Scanmana from the icon → sign in once inside it (its cookie jar is

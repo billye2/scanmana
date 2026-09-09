@@ -164,14 +164,15 @@ export default async function Help() {
       <ol className="list-decimal space-y-2 pl-5 text-[13px] leading-relaxed text-neutral-300">
         <li>Check the market strip first. Not bullish means the deck is for watching, not buying.</li>
         <li>
-          Swipe the deck after each nightly scan. Tightest setups come first; most cards are a pass. On a keyboard:{" "}
+          Page through the deck with ‹ › in the bottom bar after each nightly scan; its <span className="text-neutral-100">Deck</span> button
+          opens the whole list, grouped live. Tightest setups come first; most cards are a pass. On a keyboard:{" "}
           <span className="text-neutral-100">←/→</span> or <span className="text-neutral-100">j/k</span> moves through the
           deck (it wraps around), <span className="text-neutral-100">space</span> opens the Google search for the card.
         </li>
         <li>
           The scan runs itself around midnight ET on weeknights (with a 1:30am retry). It always scores the most recent{" "}
           <em>completed</em> session — the data provider publishes a day&apos;s bars only late that evening — which is why
-          the deck you swipe in the morning is dated the previous trading day. If the date on the deck is older than that
+          the deck you open in the morning is dated the previous trading day. If the date on the deck is older than that
           (the scheduled run was missed, or you want the deck before 1:30am), tap{" "}
           <span className="text-neutral-100">↻ Run scan for previous day</span> at the top of this page. It is safe to tap any
           time: it skips if that day is already scanned, and it reports &ldquo;Skipped&rdquo; if the bars are not

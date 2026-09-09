@@ -23,7 +23,8 @@ overlays.
   US market's daily bars in **one** grouped-daily API call (Massive, formerly
   Polygon.io — free Basic tier), upserts them into Neon Postgres, runs the
   screens, stores the ranked result, and sends one web-push notification.
-- The PWA is a thin viewer: a swipeable deck of annotated candidate charts
+- The PWA is a thin viewer: a deck of annotated candidate charts, paged from a
+  fixed bottom bar (‹ · ☆ Watch · Deck list · Google ↗ · ›)
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
   page that carries the **↻ Run scan for previous day** button

@@ -381,7 +381,12 @@ export default function Deck({
         />
       )}
 
-      <div className="mt-3 mb-2 grid w-full grid-cols-[1fr_2fr_1.4fr_1fr] gap-2 lg:mx-auto lg:max-w-xl">
+      {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it). */}
+      <nav
+        aria-label="Deck navigation"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 px-4 pt-2 pb-[max(env(safe-area-inset-bottom),8px)] backdrop-blur"
+      >
+      <div className={`mx-auto grid w-full max-w-xl gap-2 ${live ? "grid-cols-[1fr_1.7fr_1.4fr_1.4fr_1fr]" : "grid-cols-[1fr_2fr_1.4fr_1fr]"}`}>
         <button
           onClick={() => go(-1)}
           disabled={candidates.length < 2}
@@ -398,6 +403,15 @@ export default function Deck({
         >
           {isSaved ? "★ Watching" : "☆ Watch"}
         </button>
+        {live && (
+          <button
+            onClick={() => setShowList(true)}
+            className="flex items-center justify-center gap-1.5 rounded-xl bg-neutral-800 py-3 text-sm font-semibold text-neutral-200 active:bg-neutral-700"
+            aria-label="Tonight's deck — list with live grouping"
+          >
+            <ListIcon size={16} /> Deck
+          </button>
+        )}
         <a
           href={googleUrl}
           target="_blank"
@@ -415,6 +429,7 @@ export default function Deck({
           ›
         </button>
       </div>
+      </nav>
 
       <ScreenFit checks={checks} vcp={vcpChecks} inDeck={date !== ""} />
     </div>

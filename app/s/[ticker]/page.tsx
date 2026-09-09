@@ -78,7 +78,7 @@ export default async function SymbolPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-none lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),8px)]">
+    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-none lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)]">
       <header className="mb-3 flex items-center justify-between">
         <h1 className="text-lg leading-tight font-bold tracking-tight">
           <span className="text-emerald-400">◎</span> {ticker}

@@ -53,7 +53,6 @@ export default function Deck({
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showList, setShowList] = useState(false);
   const [saved, setSaved] = useState<Set<string>>(new Set(savedTickers));
-  const touchX = useRef<number | null>(null);
   const shotRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const [snapping, setSnapping] = useState(false);
   // One poll serves the card chip and the list overlay. Budgeted server-side (CONFIG.LIVE).
@@ -253,17 +252,10 @@ export default function Deck({
   // one in-app sheet regardless. Decided 2026-09-01: keep Google, accept desktop new tabs.
   const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(`${c.ticker} stock`)}`;
 
+  // No swipe navigation: horizontal touch gestures misfired on phones (chart pans, scroll
+  // jitter), so the ‹ › buttons, the list and the keyboard are the only ways between cards (removed 2026-09-08).
   return (
-    <div
-      className="flex flex-1 flex-col"
-      onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
-      onTouchEnd={(e) => {
-        if (touchX.current === null) return;
-        const dx = e.changedTouches[0].clientX - touchX.current;
-        touchX.current = null;
-        if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
-      }}
-    >
+    <div className="flex flex-1 flex-col">
       {alerts.length > 0 && (
         <div className="mb-3 flex flex-wrap gap-2">
           {alerts.map((a) => {

@@ -47,7 +47,7 @@ overlays.
   `GET /api/analysis`. `npm run analyze` recomputes for the latest scan.
 - **List** icon (header, next to ★): every setup in tonight's deck on one screen
   with its Wait / Pass chip, price, box and ★ markers, and a tally at the
-  top — no need to swipe through each card. Tap a row to jump the deck to it.
+  top — no need to page through each card. Tap a row to jump the deck to it.
 - **Google ↗** (a chip beside the Analysis button and a button beside ☆ Watch) opens a `<symbol> stock` Google search in a new tab (Google's COOP header
   forbids single-tab reuse; the iOS PWA shows it in one in-app sheet anyway). On
   desktop, pressing space opens the search for the current card.

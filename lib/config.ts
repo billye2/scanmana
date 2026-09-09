@@ -30,9 +30,16 @@ export const CONFIG = {
   MAX_DIST_FROM_HIGH: 0.15, // within 15% of 6-month high
   HIGH_LOOKBACK: 126,
 
-  // Watchlist cap: the live view spends (N + 3 indexes) Finnhub calls/min
-  // in market hours against a 60/min free tier — 20 leaves plenty for /s lookups.
+  // Watchlist cap: 20 fits inside LIVE.WATCH_BUDGET, so every watched name
+  // refreshes on every poll.
   WATCHLIST_CAP: 20,
+
+  // Live quotes (Finnhub free tier: 60 calls/min, 30/sec). Each poll refetches at
+  // most BUDGET stale symbols, oldest first, and serves the rest from the shared
+  // cache with their age — so deck (30) + watchlist (25) + one /s lookup (4)
+  // stay under the minute even with every page open. A 60-name deck refreshes
+  // fully every 2 polls; smaller decks every poll. BATCH bounds concurrency.
+  LIVE: { APPROACH_PCT: 0.02, DECK_BUDGET: 30, WATCH_BUDGET: 25, BATCH: 10 },
 
   // Ranking: candidates with a Darvas box first (something to trade), then tightest first
   TIGHTNESS_WINDOW: 10, // (10-day range %) / ADR% — lower = tighter

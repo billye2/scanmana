@@ -6,11 +6,14 @@ import Link from "next/link";
 import AnalysisModal from "@/components/AnalysisModal";
 import Chart from "@/components/Chart";
 import DeckList from "@/components/DeckList";
+import LiveChip from "@/components/LiveChip";
 import ScreenFit from "@/components/ScreenFit";
+import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
 import { BellIcon, CameraIcon, ListIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
+import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { Analysis, Candidate, WatchlistAlert } from "@/lib/types";
 import { verdictChip, verdictLabel } from "@/lib/verdict";
 import { APP_VERSION } from "@/lib/version";
@@ -35,6 +38,7 @@ export default function Deck({
   savedTickers,
   date,
   analysisOverride,
+  live = false,
 }: {
   candidates: Candidate[];
   alerts: WatchlistAlert[];
@@ -42,6 +46,8 @@ export default function Deck({
   date: string;
   /** Symbol page, non-deck ticker: analysis computed at render time — the modal shows this instead of fetching (nothing is stored). */
   analysisOverride?: Analysis;
+  /** Home deck only: poll /api/scan/live and show each card's live read (chip + live distance to trigger). */
+  live?: boolean;
 }) {
   const [idx, setIdx] = useState(0);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -50,6 +56,8 @@ export default function Deck({
   const touchX = useRef<number | null>(null);
   const shotRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const [snapping, setSnapping] = useState(false);
+  // One poll serves the card chip and the list overlay. Budgeted server-side (CONFIG.LIVE).
+  const { data: liveDeck } = useLive<LiveDeckBundle>(live ? "/api/scan/live" : null);
 
   const go = useCallback(
     (delta: number) => {
@@ -97,6 +105,7 @@ export default function Deck({
 
   const c = candidates[idx];
   const isSaved = saved.has(c.ticker);
+  const liveRow = liveDeck?.rows.find((r) => r.ticker === c.ticker) ?? null;
   // Pure + cheap on the card's embedded bars; deck names pass every screen rule
   // by construction, so on the deck this reads as the numbers behind the ✓s.
   const checks = explainScreen(c, c.bars);
@@ -135,7 +144,8 @@ export default function Deck({
     }
   }
 
-  const toTrigger = c.box ? (c.box.top / c.price - 1) : null;
+  // Distance to the trigger from the live price when we have one, else from the stored close.
+  const toTrigger = c.box ? (c.box.top / (liveRow?.price ?? c.price) - 1) : null;
 
   /**
    * Snapshot the WHOLE page — header, card, chart, Scan fit / VCP blocks — as one
@@ -303,13 +313,19 @@ export default function Deck({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-semibold">{price(c.price)}</div>
-          <div className="text-[11px] text-neutral-500">{money(c.dollarVol)}/day</div>
+          <div className="text-lg font-semibold">{price(liveRow?.price ?? c.price)}</div>
+          <div className="text-[11px] text-neutral-500">
+            {liveRow && <>close {price(c.price)} · </>}
+            {money(c.dollarVol)}/day
+          </div>
         </div>
       </div>
       {showAnalysis && <AnalysisModal ticker={c.ticker} date={date} override={analysisOverride} onClose={() => setShowAnalysis(false)} />}
 
-      <div className="mt-2 flex flex-wrap gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        {liveRow && liveDeck && (
+          <LiveChip status={liveRow.status} muted={!liveDeck.live} />
+        )}
         <Badge label={`1M ${pct(c.ret1m)}`} tone={c.ret1m >= 0.25 ? "green" : "neutral"} />
         <Badge label={`3M ${pct(c.ret3m)}`} tone={c.ret3m >= 0.5 ? "green" : "neutral"} />
         <Badge label={`6M ${pct(c.ret6m)}`} tone={c.ret6m >= 1 ? "green" : "neutral"} />
@@ -326,7 +342,7 @@ export default function Deck({
         {c.box ? (
           <span>
             trigger <span className="font-semibold text-amber-400">{price(c.box.top)}</span>
-            {toTrigger !== null && <span className="text-neutral-500"> ({pct(toTrigger, 1)})</span>}
+            {toTrigger !== null && <span className="text-neutral-500"> ({pct(toTrigger, 1)}{liveRow ? " live" : ""})</span>}
             {" · "}stop <span className="font-semibold text-amber-400/80">{price(c.box.bottom)}</span>
           </span>
         ) : (
@@ -364,6 +380,7 @@ export default function Deck({
           candidates={candidates}
           current={idx}
           saved={saved}
+          live={liveDeck}
           onPick={(i) => {
             setIdx(i);
             setShowList(false);

@@ -1,15 +1,19 @@
-// Live watchlist: which watched names are actionable RIGHT NOW. Pull-based —
-// computed only when someone looks; the shared quotes table caps Finnhub usage.
+// Live status: which names are actionable RIGHT NOW, for the watchlist and for
+// tonight's deck. Pull-based — computed only when someone looks; the shared
+// quotes table plus a per-poll call budget (CONFIG.LIVE) cap Finnhub usage.
 import { CONFIG } from "./config";
 import { getSql } from "./db";
-import { assessMarket } from "./market";
-import { getQuotes, LOOKUP_TTL_MS, WATCH_TTL_MS, type Quote } from "./intraday";
-import type { MarketHealth } from "./types";
+import { getQuotes, LOOKUP_TTL_MS, WATCH_TTL_MS, type CachedQuote, type Quote } from "./intraday";
+import { latestScan } from "./scan";
+import type { Candidate, Verdict } from "./types";
 
 export type WatchStatus = "breaking" | "failed" | "stopped" | "approaching" | "quiet";
 
+/** Fixed display order: what needs a look first. */
+export const BUCKET_ORDER: WatchStatus[] = ["breaking", "failed", "stopped", "approaching", "quiet"];
+
 /**
- * Classify one watched name from its live quote. Pure; exported for tests.
+ * Classify one name from its live quote. Pure; exported for tests.
  * failed = closed above the trigger yesterday (prev close) but trades back under it now —
  * Kullamägi reads a break that does not carry as a failing move.
  */
@@ -18,7 +22,7 @@ export function classifyWatch(q: Quote, boxTop: number | null, boxBottom: number
   if (q.c >= boxTop) return "breaking";
   if (q.pc > boxTop) return "failed";
   if (boxBottom !== null && q.c < boxBottom) return "stopped";
-  if (q.c >= boxTop * 0.98) return "approaching";
+  if (q.c >= boxTop * (1 - CONFIG.LIVE.APPROACH_PCT)) return "approaching";
   return "quiet";
 }
 
@@ -37,6 +41,15 @@ export function inMarketHours(d: Date): boolean {
   return mins >= 9 * 60 + 25 && mins <= 16 * 60 + 5;
 }
 
+/** What the live read needs to know about a name: its trigger and stop. */
+export interface LiveEntry {
+  ticker: string;
+  boxTop: number | null;
+  boxBottom: number | null;
+  name?: string;
+  verdict?: Verdict;
+}
+
 export interface LiveWatchRow {
   ticker: string;
   status: WatchStatus;
@@ -46,27 +59,31 @@ export interface LiveWatchRow {
   toTriggerPct: number | null; // (boxTop/price - 1); negative when above
   aboveOpen: boolean;
   dayRangePos: number; // 0 = at low, 1 = at high
+  ageSec: number; // how old this quote is (budget-skipped rows carry an older one)
+  name?: string;
+  verdict?: Verdict;
 }
 
 export interface LiveWatchBundle {
   rows: LiveWatchRow[];
-  market: MarketHealth["verdict"] | null;
   asOf: string;
   live: boolean; // false outside market hours (quotes served at the lookup TTL)
 }
 
-export async function watchlistLive(): Promise<LiveWatchBundle> {
-  const sql = getSql();
-  const watch = (await sql`
-    SELECT ticker, box_top AS "boxTop", box_bottom AS "boxBottom" FROM watchlist ORDER BY added_at DESC
-  `) as { ticker: string; boxTop: number | null; boxBottom: number | null }[];
-  const live = inMarketHours(new Date());
-  const indices = [...CONFIG.MARKET.INDICES];
-  const symbols = [...new Set([...watch.map((w) => w.ticker), ...indices])];
-  // Off-hours the prices cannot move, so serve the long TTL and spend no calls.
-  const quotes = await getQuotes(symbols, live ? WATCH_TTL_MS : LOOKUP_TTL_MS);
+/** Deck candidates carry a box or a bare pivot; the trigger is whichever exists (same rule as ☆ Watch). Pure; exported for tests. */
+export function toLiveEntries(candidates: Candidate[]): LiveEntry[] {
+  return candidates.map((c) => ({
+    ticker: c.ticker,
+    boxTop: c.box?.top ?? c.pivot ?? null,
+    boxBottom: c.box?.bottom ?? null,
+    name: c.name,
+    verdict: c.verdict,
+  }));
+}
 
-  const rows: LiveWatchRow[] = watch.flatMap((w) => {
+/** Rows from entries + quotes, bucket order first, input order within a bucket. Names without a quote are dropped. Pure; exported for tests. */
+export function buildLiveRows(entries: LiveEntry[], quotes: Map<string, CachedQuote>, now: number): LiveWatchRow[] {
+  const rows = entries.flatMap((w): LiveWatchRow[] => {
     const q = quotes.get(w.ticker);
     if (!q) return [];
     const range = q.h - q.l;
@@ -79,16 +96,43 @@ export async function watchlistLive(): Promise<LiveWatchBundle> {
       toTriggerPct: w.boxTop !== null ? w.boxTop / q.c - 1 : null,
       aboveOpen: q.c >= q.o,
       dayRangePos: range > 0 ? (q.c - q.l) / range : 0.5,
+      ageSec: Math.max(0, Math.round((now - q.fetchedAt) / 1000)),
+      ...(w.name !== undefined ? { name: w.name } : {}),
+      ...(w.verdict !== undefined ? { verdict: w.verdict } : {}),
     }];
   });
-  const order: WatchStatus[] = ["breaking", "failed", "stopped", "approaching", "quiet"];
-  rows.sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
+  rows.sort((a, b) => BUCKET_ORDER.indexOf(a.status) - BUCKET_ORDER.indexOf(b.status)); // stable: keeps input order inside a bucket
+  return rows;
+}
 
-  // Market verdict from index quotes alone would need bars; reuse the simple leaders check:
-  // above previous close on both QQQ and SPY is NOT the filter — leave verdict to the stored
-  // scan unless bars are loaded. Cheap live proxy intentionally avoided; see /s live mode.
+/** Shared engine: live rows for any list of names within a Finnhub call budget. */
+export async function liveRows(entries: LiveEntry[], budget: number): Promise<LiveWatchBundle> {
+  const live = inMarketHours(new Date());
+  const symbols = [...new Set(entries.map((e) => e.ticker))];
+  // Off-hours the prices cannot move, so serve the long TTL and spend no calls.
+  const quotes = await getQuotes(symbols, live ? WATCH_TTL_MS : LOOKUP_TTL_MS, { maxFetch: budget });
+  const now = Date.now();
   const asOf = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit" })
-    .format(new Date());
-  void assessMarket; // market strip on this page uses the nightly verdict; full live market lives on /s
-  return { rows, market: null, asOf: `${asOf} ET`, live };
+    .format(new Date(now));
+  return { rows: buildLiveRows(entries, quotes, now), asOf: `${asOf} ET`, live };
+}
+
+export async function watchlistLive(): Promise<LiveWatchBundle> {
+  const sql = getSql();
+  const watch = (await sql`
+    SELECT ticker, box_top AS "boxTop", box_bottom AS "boxBottom" FROM watchlist ORDER BY added_at DESC
+  `) as LiveEntry[];
+  return liveRows(watch, CONFIG.LIVE.WATCH_BUDGET);
+}
+
+export interface LiveDeckBundle extends LiveWatchBundle {
+  date: string | null; // scan date the rows belong to
+}
+
+/** Tonight's deck against live quotes — the same read as the watchlist, for every card. */
+export async function deckLive(): Promise<LiveDeckBundle> {
+  const scan = await latestScan();
+  if (!scan) return { rows: [], asOf: "", live: false, date: null };
+  const bundle = await liveRows(toLiveEntries(scan.candidates), CONFIG.LIVE.DECK_BUDGET);
+  return { ...bundle, date: scan.date };
 }

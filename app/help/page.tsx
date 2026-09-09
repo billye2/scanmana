@@ -202,7 +202,9 @@ export default async function Help() {
           alerts you the night a stock closes above its box — tap the alert pill above the deck to jump to that card, or to
           its lookup page if it isn&apos;t in tonight&apos;s deck. During the day its <span className="text-neutral-100">Live</span>{" "}
           section shows each starred name against its trigger in real time — ⚡ breaking out is the moment his playbook
-          says to act.
+          says to act. The deck gets the same read: each card shows its live chip and price, and the list icon&apos;s{" "}
+          <span className="text-neutral-100">Live</span> toggle groups tonight&apos;s names by what price is doing. Quotes
+          refresh within a minute or two (a free-tier budget, oldest first); off-hours the chips show the close.
         </li>
         <li>
           Buy the break of the <Amber>trigger</Amber>, ideally in the first hour on rising volume. Stop just under the{" "}

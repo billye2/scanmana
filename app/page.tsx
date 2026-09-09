@@ -56,7 +56,7 @@ export default async function Home() {
       ) : (
         <>
           <MarketBar market={payload.market} />
-          <Deck candidates={payload.candidates} alerts={payload.watchlistAlerts} savedTickers={savedTickers} date={payload.date} />
+          <Deck candidates={payload.candidates} alerts={payload.watchlistAlerts} savedTickers={savedTickers} date={payload.date} live />
         </>
       )}
 

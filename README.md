@@ -58,6 +58,16 @@ overlays.
   open. Polls every 60s while the page is open; quotes are cached in a shared
   Neon `quotes` table, so every device and function instance shares one
   fetch per symbol per minute (30 min off-hours).
+- **Live deck** (home page, `GET /api/scan/live`): the same read for every
+  card in tonight's deck — a chip beside the badges, the live price with the
+  stored close under it, and the trigger distance from the live price. The
+  list icon's overlay gets a **Live** toggle that groups the deck breaking /
+  failed / stopped / approaching / quiet with a tally. Finnhub's free tier is
+  60 calls/min, so each poll refetches at most a budget of stale symbols,
+  oldest first (`CONFIG.LIVE`: deck 30, watchlist 25), and serves the rest
+  from the cache with their age; a 60-name deck is fully fresh every two
+  polls. One bad symbol drops only itself and a 429 halts the refresh
+  instead of failing it.
 - **Camera** icon in the top nav (home and symbol pages): captures the whole
   page — header, card, chart, and the Scan fit + Minervini VCP checklists —
   as one tall PNG (html-to-image; falls back to a chart-only capture) and
@@ -152,14 +162,16 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
   `db.ts`, `push.ts`
 - `app/` — deck (`/`), `/watchlist`, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
-  (`cron/scan`, `scan/run`, `analysis`, `watchlist`, `push/subscribe`)
+  (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
+  `watchlist/live`, `push/subscribe`)
 - `proxy.ts` — Clerk gate; `lib/auth.ts` — public-path list; `app/sign-in/` — Clerk sign-in page
 - `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `seed-indices`,
   `analyze`, `scan-now.sh`, `gen-icons.py`
 - `tests/` — vitest suite with synthetic fixtures
 
-Out of scope (v1, deliberate): intraday anything, real-time data, parabolic
-shorts, settings UI, journaling, multi-user.
+Out of scope (v1, deliberate): intraday entries or verdicts (the live reads
+are display-only — the scan and its Wait/Pass never change during the day),
+parabolic shorts, settings UI, journaling, multi-user.
 
 ## License
 

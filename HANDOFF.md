@@ -31,7 +31,9 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 Everything runs on its own now. Remaining checks: confirm the nightly push
 lands on the iPhone after the next cron (Mon–Fri ~midnight ET, catch-up ~1:30am
 ET), and eyeball the deck quality (60 setups on the first scan may be loose —
-thresholds live in `lib/config.ts`). Manual rescan: **↻ Run scan for previous day** in the app
+thresholds live in `lib/config.ts`; 2026-09-08 the price floor went $5 → $10
+and the 20-day dollar-volume floor $1M → $20M to keep penny stocks out — check
+the next deck is not too thin). Manual rescan: **↻ Run scan for previous day** in the app
 header (`POST /api/scan/run`, no secret, never forces) or `npm run scan:now`
 (secret path, `force=1`).
 

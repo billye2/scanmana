@@ -89,7 +89,7 @@ export default async function Help() {
         from its high is &ldquo;extended&rdquo; or broken and is dropped before ranking.
         <span className="mt-1 block">
           <span className="text-neutral-100">Parabolic guard:</span> ADR above {CONFIG.MAX_ADR_PCT}% or more than +
-          {CONFIG.MAX_RET_1M * 100}% in a month is rejected — a shell that went from $0.80 to $9 in three weeks
+          {CONFIG.MAX_RET_1M * 100}% in a month is rejected — a shell that went from $1 to $18 in three weeks
           passes every floor above on today&apos;s numbers, but it is the vertical leg of a spike, not a setup.
           The deck ranks names with a box first, then by tightness.
         </span>

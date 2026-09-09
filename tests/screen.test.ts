@@ -20,17 +20,17 @@ describe("screenTicker", () => {
     expect(screenTicker("SLOW", "Slow Inc", bars)).toBeNull();
   });
 
-  it("rejects sub-$5 stocks", () => {
+  it("rejects sub-$10 stocks even with the dollar volume to pass", () => {
     resetDays();
-    const bars = [...flatBars(140, 2, 0.05), ...trendBars(60, 2, 4.5, 0.06)];
+    // $4 → $9 on 5M shares/day ($45M traded): momentum and volume pass, price does not.
+    const bars = [...flatBars(140, 4, 0.05, 5_000_000), ...trendBars(60, 4, 9, 0.06, 5_000_000)];
     expect(screenTicker("PENNY", "Penny Co", bars)).toBeNull();
   });
 
-  it("rejects thin dollar volume", () => {
+  it("rejects thin dollar volume ($11M/day at $44 is under the $20M floor)", () => {
     resetDays();
-    const base = flatBars(120, 20, 0.05, 20_000);
-    resetDays.call(null);
-    const bars = [...base, ...trendBars(80, 20, 44, 0.06, 20_000)];
+    const base = flatBars(120, 20, 0.05, 250_000);
+    const bars = [...base, ...trendBars(80, 20, 44, 0.06, 250_000)];
     expect(screenTicker("THIN", "Thin Co", bars)).toBeNull();
   });
 
@@ -58,12 +58,12 @@ describe("parabolic guard and ranking", () => {
   function pump(): Bar[] {
     const bars: Bar[] = [];
     for (let i = 0; i < 120; i++) bars.push({ date: `2026-01-${String((i % 28) + 1).padStart(2, "0")}`, o: 1, h: 1.05, l: 0.97, c: 1 + (i % 3) * 0.01, v: 50_000 });
-    [2.8, 2.0, 3.1, 3.6, 5.3, 5.5, 5.9, 7.4, 8.5, 9.1].forEach((c, i) =>
+    [5.6, 4.0, 6.2, 7.2, 10.6, 11.0, 11.8, 14.8, 17.0, 18.2].forEach((c, i) =>
       bars.push({ date: `2026-08-${String(10 + i).padStart(2, "0")}`, o: c * 0.8, h: c * 1.1, l: c * 0.72, c, v: 20_000_000 }),
     );
     return bars;
   }
-  it("rejects a sub-$5 shell that spiked to $9 even though today's numbers pass every floor", () => {
+  it("rejects a $1 shell that spiked to $18 even though today's numbers pass every floor", () => {
     const c = buildCandidate("PUMP", "Pump", pump())!;
     expect(c.price).toBeGreaterThan(CONFIG.MIN_PRICE);
     expect(c.adrPct).toBeGreaterThan(CONFIG.MAX_ADR_PCT);

@@ -1,18 +1,20 @@
 // All screen thresholds live here (deliberately hardcoded — no settings UI).
-// Numbers follow Qullamaggie's published defaults.
+// Numbers follow Qullamaggie's published defaults, except the price and
+// dollar-volume floors, which sit above his ($5 / $1M) to keep penny stocks and
+// thinly traded names out of the deck (raised 2026-09-08).
 
 // Parabolic guard, shared by the screen (hard filter) and the analysis (verdict).
 // A stock above these is in the vertical leg of a spike, not a swing setup.
 const PARABOLIC = {
   MAX_ADR_PCT: 15, // avg daily range above this = not tradeable with a sane stop
   MAX_RET_1M: 3.0, // +300% in 21 sessions = no base underneath
-  MIN_PRICE_WINDOW: 21, // every close in this window must be >= MIN_PRICE (no sub-$5 shells)
+  MIN_PRICE_WINDOW: 21, // every close in this window must be >= MIN_PRICE (no sub-$10 shells)
 } as const;
 
 export const CONFIG = {
   // Universe hard filters
-  MIN_PRICE: 5,
-  MIN_DOLLAR_VOLUME: 1_000_000, // 20-day avg of close * volume
+  MIN_PRICE: 10,
+  MIN_DOLLAR_VOLUME: 20_000_000, // 20-day avg of close * volume
 
   // Momentum qualifier — ANY of these passes
   MOMENTUM: { M1: 0.25, M3: 0.5, M6: 1.0 },

@@ -94,12 +94,12 @@ overlays.
 
 ## Screens (lib/config.ts)
 
-Hard filters: price > $5 on every close of the last 21 sessions · 20d avg
-dollar volume > $1M · US common stock/ADR · momentum (1M ≥ +25% OR 3M ≥ +50%
+Hard filters: price > $10 on every close of the last 21 sessions · 20d avg
+dollar volume > $20M · US common stock/ADR · momentum (1M ≥ +25% OR 3M ≥ +50%
 OR 6M ≥ +100%) · ADR% between 3.5 and 15 · 1M return ≤ +300% · close above
 rising 10/20 SMA · within 15% of 6-month high. The ADR ceiling, return cap
 and 21-session price floor are the parabolic guard: a sub-dollar shell that
-spiked to $9 passes every floor on today's numbers alone. Ranked with boxed
+spiked to $18 passes every floor on today's numbers alone. Ranked with boxed
 setups first (there is a level to trade), then by consolidation tightness
 (10-day range ÷ ADR). EP badge = 10%+ gap on 3× volume in the last 5
 sessions.

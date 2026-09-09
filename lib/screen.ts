@@ -12,7 +12,7 @@ import {
   tightness,
 } from "./indicators";
 import { findPivot } from "./livermore";
-import type { Bar, Candidate } from "./types";
+import type { Bar, Candidate, DeckCard } from "./types";
 
 /**
  * Compute every Candidate field for a ticker without applying the screen's
@@ -64,7 +64,7 @@ const th = (n: number) => `${(n * 100).toFixed(0)}%`; // unsigned, for threshold
  * numbers behind each verdict. `screenTicker` is exactly "all of these pass" —
  * the symbol page uses the list to show WHY a name is or isn't in the deck.
  */
-export function explainScreen(c: Candidate, bars: Bar[]): ScreenCheck[] {
+export function explainScreen(c: DeckCard, bars: Bar[]): ScreenCheck[] {
   const smaFast = sma(bars, CONFIG.SMA_FAST);
   const smaSlow = sma(bars, CONFIG.SMA_SLOW);
   const lowClose = Math.min(...bars.slice(-CONFIG.MIN_PRICE_WINDOW).map((b) => b.c));

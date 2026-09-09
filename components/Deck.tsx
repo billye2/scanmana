@@ -13,7 +13,7 @@ import { explainVcp } from "@/lib/minervini";
 import { BellIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
-import type { Analysis, Candidate, WatchlistAlert } from "@/lib/types";
+import type { Analysis, Bar, DeckCard, WatchlistAlert } from "@/lib/types";
 import { verdictChip, verdictLabel } from "@/lib/verdict";
 import { APP_VERSION } from "@/lib/version";
 
@@ -43,7 +43,7 @@ export default function Deck({
   live = false,
   initialIndex = 0,
 }: {
-  candidates: Candidate[];
+  candidates: DeckCard[];
   alerts: WatchlistAlert[];
   savedTickers: string[];
   date: string;
@@ -59,6 +59,35 @@ export default function Deck({
   const [saved, setSaved] = useState<Set<string>>(new Set(savedTickers));
   const shotRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const [snapping, setSnapping] = useState(false);
+  // Bars per card. The page embeds bars for the first card(s) only; the rest arrive
+  // from /api/scan/bars as you page, the neighbours fetched ahead so › never waits.
+  const [barsByTicker, setBarsByTicker] = useState<Record<string, Bar[]>>(() =>
+    Object.fromEntries(candidates.filter((c) => c.bars).map((c) => [c.ticker, c.bars!])),
+  );
+  const [barsErrors, setBarsErrors] = useState<Record<string, string>>({});
+  const barsInflight = useRef(new Set<string>());
+  const loadBars = useCallback(
+    (ticker: string) => {
+      if (barsByTicker[ticker] || barsInflight.current.has(ticker)) return;
+      barsInflight.current.add(ticker);
+      const q = new URLSearchParams({ ticker });
+      if (date) q.set("date", date);
+      fetch(`/api/scan/bars?${q}`)
+        .then(async (r) => (r.ok ? (r.json() as Promise<Bar[]>) : Promise.reject(new Error((await r.json().catch(() => ({}))).error ?? r.statusText))))
+        .then((bars) => {
+          setBarsByTicker((prev) => ({ ...prev, [ticker]: bars }));
+          setBarsErrors(({ [ticker]: _gone, ...rest }) => (void _gone, rest));
+        })
+        .catch((e) => setBarsErrors((prev) => ({ ...prev, [ticker]: e instanceof Error ? e.message : String(e) })))
+        .finally(() => barsInflight.current.delete(ticker));
+    },
+    [date, barsByTicker],
+  );
+  useEffect(() => {
+    const n = candidates.length;
+    if (n === 0) return;
+    for (const d of [0, 1, -1]) loadBars(candidates[(idx + d + n) % n].ticker);
+  }, [idx, candidates, loadBars]);
   // Live chip + live trigger distance on the card. Budgeted server-side (CONFIG.LIVE); /deck polls the same route.
   const { data: liveDeck } = useLive<LiveDeckBundle>(live ? "/api/scan/live" : null);
 
@@ -104,10 +133,11 @@ export default function Deck({
   const c = candidates[idx];
   const isSaved = saved.has(c.ticker);
   const liveRow = liveDeck?.rows.find((r) => r.ticker === c.ticker) ?? null;
-  // Pure + cheap on the card's embedded bars; deck names pass every screen rule
+  const bars = barsByTicker[c.ticker] ?? null;
+  // Pure + cheap on the card's bars; deck names pass every screen rule
   // by construction, so on the deck this reads as the numbers behind the ✓s.
-  const checks = explainScreen(c, c.bars);
-  const vcpChecks = explainVcp(c.bars);
+  const checks = bars ? explainScreen(c, bars) : [];
+  const vcpChecks = bars ? explainVcp(bars) : [];
 
   async function toggleWatch() {
     const next = new Set(saved);
@@ -326,7 +356,13 @@ export default function Deck({
       </div>
 
       <div className="relative mt-3 min-h-[300px] flex-1 lg:min-h-[480px]">
-        <Chart key={c.ticker} bars={c.bars} box={c.box} pivot={c.pivot} shotRef={shotRef} />
+        {bars ? (
+          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} shotRef={shotRef} />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-600">
+            {barsErrors[c.ticker] ? `Chart unavailable — ${barsErrors[c.ticker]}` : "Loading chart…"}
+          </div>
+        )}
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-neutral-400">
@@ -389,7 +425,7 @@ export default function Deck({
         </div>
       </nav>
 
-      <ScreenFit checks={checks} vcp={vcpChecks} inDeck={date !== ""} />
+      {bars && <ScreenFit checks={checks} vcp={vcpChecks} inDeck={date !== ""} />}
     </div>
   );
 }

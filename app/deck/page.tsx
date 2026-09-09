@@ -1,7 +1,7 @@
 import DeckLiveList from "@/components/DeckLiveList";
 import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
-import { latestScan } from "@/lib/scan";
+import { latestScan, slimDeck } from "@/lib/scan";
 import type { ScanPayload } from "@/lib/types";
 
 export const metadata = { title: "Tonight's deck — Scanmana" };
@@ -28,7 +28,7 @@ export default async function DeckPage() {
       {!payload || payload.candidates.length === 0 ? (
         <p className="mt-16 text-center text-sm text-neutral-500">No scan yet — nothing to list.</p>
       ) : (
-        <DeckLiveList candidates={payload.candidates} saved={saved} />
+        <DeckLiveList candidates={slimDeck(payload.candidates, [])} saved={saved} />
       )}
     </main>
   );

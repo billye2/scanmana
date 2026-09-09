@@ -5,7 +5,7 @@ import { analyzeCandidate } from "./analysis";
 import { assessMarket } from "./market";
 import { fetchGroupedDaily, fetchTickers, sleep, type GroupedBar } from "./massive";
 import { rankCandidates, screenTicker } from "./screen";
-import type { Analysis, Bar, Candidate, ScanPayload, WatchlistAlert } from "./types";
+import type { DeckCard, Analysis, Bar, Candidate, ScanPayload, WatchlistAlert } from "./types";
 
 const TICKER_REFRESH_DAYS = 7;
 const MIN_MARKET_BARS = 1000; // fewer grouped rows than this => holiday / data not ready
@@ -226,4 +226,32 @@ export async function latestScan(): Promise<ScanPayload | null> {
     SELECT payload FROM scan_results ORDER BY date DESC LIMIT 1
   `) as { payload: ScanPayload }[];
   return rows[0]?.payload ?? null;
+}
+
+/**
+ * Strip bars from every card except the indices in `keep` (wrapped into range),
+ * so a page embeds only the charts it will show first. See `DeckCard`.
+ */
+export function slimDeck(candidates: Candidate[], keep: Iterable<number>): DeckCard[] {
+  const n = candidates.length;
+  const keepSet = new Set([...keep].map((i) => ((i % n) + n) % n));
+  return candidates.map((c, i) => {
+    if (keepSet.has(i)) return c;
+    const { bars: _bars, ...rest } = c;
+    void _bars;
+    return rest;
+  });
+}
+
+/** The bars one deck card was scanned with (the chart must match the scan, not a later day). Latest scan when `date` is omitted. */
+export async function candidateBars(ticker: string, date: string | null): Promise<Bar[] | null> {
+  const sql = getSql();
+  const rows = (date
+    ? await sql`
+        SELECT c->'bars' AS bars FROM scan_results s, jsonb_array_elements(s.payload->'candidates') c
+        WHERE s.date = ${date} AND c->>'ticker' = ${ticker}`
+    : await sql`
+        SELECT c->'bars' AS bars FROM scan_results s, jsonb_array_elements(s.payload->'candidates') c
+        WHERE s.date = (SELECT max(date) FROM scan_results) AND c->>'ticker' = ${ticker}`) as { bars: Bar[] }[];
+  return rows[0]?.bars ?? null;
 }

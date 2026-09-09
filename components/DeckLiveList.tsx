@@ -6,7 +6,7 @@ import LiveChip, { LIVE_CHIP } from "@/components/LiveChip";
 import { useLive } from "@/components/useLive";
 import { price, pct } from "@/lib/format";
 import { BUCKET_ORDER, type LiveDeckBundle, type LiveWatchRow, type WatchStatus } from "@/lib/livewatch";
-import type { Candidate, Verdict } from "@/lib/types";
+import type { DeckCard, Verdict } from "@/lib/types";
 import { VERDICTS, verdictChip, verdictLabel } from "@/lib/verdict";
 
 const LIVE_PREF = "scanmana.deckListLive";
@@ -25,7 +25,7 @@ function readPref(): boolean {
  * are available — grouped live by what price is doing (breaking / failed /
  * stopped / approaching / quiet). Tap a row to open that card on the home deck.
  */
-export default function DeckLiveList({ candidates, saved }: { candidates: Candidate[]; saved: string[] }) {
+export default function DeckLiveList({ candidates, saved }: { candidates: DeckCard[]; saved: string[] }) {
   const { data: live, err } = useLive<LiveDeckBundle>("/api/scan/live");
   const [liveView, setLiveView] = useState(readPref);
   const savedSet = new Set(saved);
@@ -39,7 +39,7 @@ export default function DeckLiveList({ candidates, saved }: { candidates: Candid
   };
 
   const indexOf = new Map(candidates.map((c, i) => [c.ticker, i]));
-  const row = (c: Candidate, i: number, r?: LiveWatchRow) => (
+  const row = (c: DeckCard, i: number, r?: LiveWatchRow) => (
     <li key={c.ticker}>
       <Link href={`/?i=${i}`} className="flex w-full items-center gap-3 px-1 py-2.5 text-left active:bg-neutral-800">
         <span className="w-6 shrink-0 text-right text-[11px] tabular-nums text-neutral-600">{i + 1}</span>
@@ -70,7 +70,7 @@ export default function DeckLiveList({ candidates, saved }: { candidates: Candid
   );
 
   // Live view: group by bucket in the watchlist's order; names without a quote trail at the end.
-  const groups: { status: WatchStatus | null; rows: { c: Candidate; i: number; r?: LiveWatchRow }[] }[] = [];
+  const groups: { status: WatchStatus | null; rows: { c: DeckCard; i: number; r?: LiveWatchRow }[] }[] = [];
   if (showLive && live) {
     const seen = new Set<string>();
     for (const status of BUCKET_ORDER) {

@@ -38,6 +38,14 @@ export interface Candidate {
   verdict?: Verdict; // overall analysis verdict, stamped at scan time (lib/analysis.ts)
 }
 
+/**
+ * A candidate as the pages ship it to the browser: bars are optional because
+ * they are ~96% of a deck's weight, so the home page embeds them only for the
+ * card on screen and its neighbours and the deck fetches the rest per card
+ * (`GET /api/scan/bars`). `Candidate` is assignable to `DeckCard`.
+ */
+export type DeckCard = Omit<Candidate, "bars"> & { bars?: Bar[] };
+
 export interface WatchlistAlert {
   ticker: string;
   boxTop: number;

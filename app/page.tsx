@@ -4,7 +4,7 @@ import MarketBar from "@/components/MarketBar";
 import PushSetup from "@/components/PushSetup";
 import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
-import { latestScan } from "@/lib/scan";
+import { latestScan, slimDeck } from "@/lib/scan";
 import type { ScanPayload } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
       ) : (
         <>
           <MarketBar market={payload.market} />
-          <Deck candidates={payload.candidates} alerts={payload.watchlistAlerts} savedTickers={savedTickers} date={payload.date} live initialIndex={initialIndex} />
+          <Deck candidates={slimDeck(payload.candidates, [initialIndex - 1, initialIndex, initialIndex + 1])} alerts={payload.watchlistAlerts} savedTickers={savedTickers} date={payload.date} live initialIndex={initialIndex} />
         </>
       )}
 

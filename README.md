@@ -23,7 +23,10 @@ overlays.
   US market's daily bars in **one** grouped-daily API call (Massive, formerly
   Polygon.io — free Basic tier), upserts them into Neon Postgres, runs the
   screens, stores the ranked result, and sends one web-push notification.
-- The PWA is a thin viewer: a deck of annotated candidate charts, paged from a
+- The PWA is a thin viewer: a deck of annotated candidate charts (the page
+  embeds bars only for the card on screen and its neighbours — ~12 KB gzipped
+  instead of ~75 KB — and fetches the rest per card from `GET /api/scan/bars`
+  as you page, neighbours prefetched), paged from a
   fixed bottom bar of line icons (prev · watch · deck list · Google · next)
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
@@ -171,7 +174,7 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
 - `app/` — deck (`/`), `/deck` list, `/watchlist`, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
-  `watchlist/live`, `push/subscribe`, `push/test`)
+  `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`)
 - `proxy.ts` — Clerk gate; `lib/auth.ts` — public-path list; `app/sign-in/` — Clerk sign-in page
 - `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `seed-indices`,
   `analyze`, `scan-now.sh`, `gen-icons.py`

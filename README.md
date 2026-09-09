@@ -30,6 +30,10 @@ overlays.
   page that carries the **↻ Run scan for previous day** button
   (`POST /api/scan/run` — no secret, never forces, so it can only run the scan
   the cron would).
+- **One top nav on every page** (`components/TopNav.tsx`): the ◎ Scanmana logo
+  always goes home, a page line sits under it, and the same four icons sit on
+  the right — Help, symbol lookup, ★ Watchlist, deck list — with the current
+  page's icon lit. The symbol page adds its Live toggle beside them.
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. IWM shown for

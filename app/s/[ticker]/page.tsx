@@ -1,3 +1,4 @@
+import TopNav from "@/components/TopNav";
 import Link from "next/link";
 import Deck from "@/components/Deck";
 import { getSql } from "@/lib/db";
@@ -79,29 +80,17 @@ export default async function SymbolPage({
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-none lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)]">
-      <header className="mb-3 flex items-center justify-between">
-        <h1 className="text-lg leading-tight font-bold tracking-tight">
-          <span className="text-emerald-400">◎</span> {ticker}
-          <span className="block text-xs font-normal text-neutral-500">
-            {inDeck ? `in tonight's deck · ${scanDate}` : "not in tonight's deck — built from stored bars"}
-          </span>
-        </h1>
-        <div className="flex items-center gap-3 text-sm">
-          <span id="deck-camera-slot" className="flex items-center empty:hidden" />
+      <TopNav
+        subtitle={`${ticker} · ${inDeck ? `in tonight's deck · ${scanDate}` : "not in tonight's deck — built from stored bars"}`}
+        extra={
           <Link
             href={live ? `/s/${ticker}` : `/s/${ticker}?live=1`}
-            className={live ? "font-semibold text-emerald-400" : "text-neutral-400 active:text-neutral-200"}
+            className={`text-sm ${live ? "font-semibold text-emerald-400" : "text-neutral-400 active:text-neutral-200"}`}
           >
             {live ? "● Live" : "Live"}
           </Link>
-          <Link href="/watchlist" className="text-neutral-400 active:text-neutral-200">
-            ★
-          </Link>
-          <Link href="/" className="text-neutral-400 active:text-neutral-200">
-            Deck
-          </Link>
-        </div>
-      </header>
+        }
+      />
 
       <div className="mb-3">
         <SymbolLookup placeholder="Look up another symbol…" />

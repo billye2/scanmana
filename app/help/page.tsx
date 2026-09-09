@@ -1,8 +1,8 @@
 import { ListIcon, SearchIcon } from "@/components/Icons";
 import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
-import Link from "next/link";
 import IndexCharts from "@/components/IndexCharts";
+import TopNav from "@/components/TopNav";
 import RunScanButton from "@/components/RunScanButton";
 import { CONFIG } from "@/lib/config";
 import { latestScan, loadBars } from "@/lib/scan";
@@ -41,14 +41,7 @@ export default async function Help() {
   }
   return (
     <main className="mx-auto w-full max-w-xl px-4 lg:max-w-4xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
-      <header className="mb-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold tracking-tight">
-          <span className="text-emerald-400">◎</span> Help
-        </h1>
-        <Link href="/" className="text-sm text-neutral-400 underline-offset-4 active:text-neutral-200">
-          ← Deck
-        </Link>
-      </header>
+      <TopNav current="/help" subtitle="Help" />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">
         Scanmana runs one screen every night after the close: find the market&apos;s strongest stocks, keep only

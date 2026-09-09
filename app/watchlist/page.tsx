@@ -1,5 +1,5 @@
-import Link from "next/link";
 import LiveWatch from "@/components/LiveWatch";
+import TopNav from "@/components/TopNav";
 import WatchlistAdd from "@/components/WatchlistAdd";
 import WatchlistView, { type WatchlistItem } from "@/components/WatchlistView";
 import { getSql } from "@/lib/db";
@@ -28,12 +28,7 @@ export default async function WatchlistPage() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-4">
-      <header className="mb-3 flex items-center justify-between">
-        <h1 className="text-lg font-bold tracking-tight">★ Watchlist</h1>
-        <Link href="/" className="text-sm text-neutral-400 underline-offset-4 active:text-neutral-200">
-          ← Deck
-        </Link>
-      </header>
+      <TopNav current="/watchlist" subtitle="★ Watchlist" />
       <WatchlistAdd />
       {items.length > 0 && <LiveWatch />}
       <WatchlistView items={items} />

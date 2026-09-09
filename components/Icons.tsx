@@ -83,3 +83,32 @@ export function StarIcon(p: P) {
     </Svg>
   );
 }
+
+/** Chevron left: previous card. */
+export function ChevronLeftIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="m15 18-6-6 6-6" />
+    </Svg>
+  );
+}
+
+/** Chevron right: next card. */
+export function ChevronRightIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="m9 18 6-6-6-6" />
+    </Svg>
+  );
+}
+
+/** Box with an arrow out: opens in another tab (the Google search). */
+export function ExternalLinkIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="M15 3h6v6" />
+      <path d="M10 14 21 3" />
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+    </Svg>
+  );
+}

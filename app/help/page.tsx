@@ -157,7 +157,7 @@ export default async function Help() {
       <ol className="list-decimal space-y-2 pl-5 text-[13px] leading-relaxed text-neutral-300">
         <li>Check the market strip first. Not bullish means the deck is for watching, not buying.</li>
         <li>
-          Page through the deck with ‹ › in the bottom bar after each nightly scan; its <span className="text-neutral-100">Deck</span> button
+          Page through the deck with the <span className="text-neutral-100">Prev</span> / <span className="text-neutral-100">Next</span> arrows in the bottom bar after each nightly scan; its <span className="text-neutral-100">Deck</span> button
           opens the whole list as a page, grouped live. Tightest setups come first; most cards are a pass. On a keyboard:{" "}
           <span className="text-neutral-100">←/→</span> or <span className="text-neutral-100">j/k</span> moves through the
           deck (it wraps around), <span className="text-neutral-100">space</span> opens the Google search for the card.

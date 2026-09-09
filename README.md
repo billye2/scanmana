@@ -24,7 +24,7 @@ overlays.
   Polygon.io — free Basic tier), upserts them into Neon Postgres, runs the
   screens, stores the ranked result, and sends one web-push notification.
 - The PWA is a thin viewer: a deck of annotated candidate charts, paged from a
-  fixed bottom bar (‹ · ☆ Watch · Deck list · Google ↗ · ›)
+  fixed bottom bar of line icons (prev · watch · deck list · Google · next)
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
   page that carries the **↻ Run scan for previous day** button

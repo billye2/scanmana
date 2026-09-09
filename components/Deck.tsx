@@ -10,12 +10,17 @@ import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
-import { BellIcon, CameraIcon, ListIcon } from "@/components/Icons";
+import { BellIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { Analysis, Candidate, WatchlistAlert } from "@/lib/types";
 import { verdictChip, verdictLabel } from "@/lib/verdict";
 import { APP_VERSION } from "@/lib/version";
+
+// Bottom bar items: one column each, the same icon size and colours as the top nav.
+const BAR_ITEM =
+  "flex flex-col items-center justify-center gap-0.5 py-1.5 text-neutral-400 active:text-neutral-100 disabled:opacity-30";
+const BAR_LABEL = "text-[10px] leading-none font-medium";
 
 function Badge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "green" | "amber" | "blue" }) {
   const tones = {
@@ -353,54 +358,42 @@ export default function Deck({
           cameraSlot,
         )}
 
-      {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it). */}
+      {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).
+          Same line icons as the top nav — equal columns, icon over a small label — because the
+          old text buttons (‹ › ☆ ★ ↗) rendered in mismatched fallback fonts on iPhone. */}
       <nav
         aria-label="Deck navigation"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 px-4 pt-2 pb-[max(env(safe-area-inset-bottom),8px)] backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
       >
-      <div className={`mx-auto grid w-full max-w-xl gap-2 ${live ? "grid-cols-[1fr_1.7fr_1.4fr_1.4fr_1fr]" : "grid-cols-[1fr_2fr_1.4fr_1fr]"}`}>
-        <button
-          onClick={() => go(-1)}
-          disabled={candidates.length < 2}
-          className="rounded-xl bg-neutral-800 py-3 text-lg font-semibold text-neutral-300 active:bg-neutral-700 disabled:opacity-30"
-          aria-label="previous"
-        >
-          ‹
-        </button>
-        <button
-          onClick={toggleWatch}
-          className={`rounded-xl py-3 text-sm font-semibold active:opacity-80 ${
-            isSaved ? "bg-amber-500/90 text-neutral-950" : "bg-neutral-800 text-neutral-200"
-          }`}
-        >
-          {isSaved ? "★ Watching" : "☆ Watch"}
-        </button>
-        {live && (
-          <Link
-            href="/deck"
-            className="flex items-center justify-center gap-1.5 rounded-xl bg-neutral-800 py-3 text-sm font-semibold text-neutral-200 active:bg-neutral-700"
-            aria-label="Tonight's deck — the whole list, grouped live"
+        <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-5" : "grid-cols-4"}`}>
+          <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
+            <ChevronLeftIcon size={25} />
+            <span className={BAR_LABEL}>Prev</span>
+          </button>
+          <button
+            onClick={toggleWatch}
+            aria-pressed={isSaved}
+            aria-label={isSaved ? "Watching — tap to remove from the watchlist" : "Watch — add to the watchlist"}
+            className={`${BAR_ITEM} ${isSaved ? "text-amber-400" : ""}`}
           >
-            <ListIcon size={16} /> Deck
-          </Link>
-        )}
-        <a
-          href={googleUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center rounded-xl bg-neutral-800 py-3 text-sm font-semibold text-neutral-200 active:bg-neutral-700"
-        >
-          Google ↗
-        </a>
-        <button
-          onClick={() => go(1)}
-          disabled={candidates.length < 2}
-          className="rounded-xl bg-neutral-800 py-3 text-lg font-semibold text-neutral-300 active:bg-neutral-700 disabled:opacity-30"
-          aria-label="next"
-        >
-          ›
-        </button>
-      </div>
+            <StarIcon size={25} fill={isSaved ? "currentColor" : "none"} />
+            <span className={BAR_LABEL}>{isSaved ? "Watching" : "Watch"}</span>
+          </button>
+          {live && (
+            <Link href="/deck" className={BAR_ITEM} aria-label="Tonight's deck — the whole list, grouped live">
+              <ListIcon size={25} />
+              <span className={BAR_LABEL}>Deck</span>
+            </Link>
+          )}
+          <a href={googleUrl} target="_blank" rel="noopener noreferrer" className={BAR_ITEM} aria-label="Google this symbol (opens a new tab)">
+            <ExternalLinkIcon size={25} />
+            <span className={BAR_LABEL}>Google</span>
+          </a>
+          <button onClick={() => go(1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Next card">
+            <ChevronRightIcon size={25} />
+            <span className={BAR_LABEL}>Next</span>
+          </button>
+        </div>
       </nav>
 
       <ScreenFit checks={checks} vcp={vcpChecks} inDeck={date !== ""} />

@@ -165,7 +165,7 @@ export default async function Help() {
         <li>Check the market strip first. Not bullish means the deck is for watching, not buying.</li>
         <li>
           Page through the deck with ‹ › in the bottom bar after each nightly scan; its <span className="text-neutral-100">Deck</span> button
-          opens the whole list, grouped live. Tightest setups come first; most cards are a pass. On a keyboard:{" "}
+          opens the whole list as a page, grouped live. Tightest setups come first; most cards are a pass. On a keyboard:{" "}
           <span className="text-neutral-100">←/→</span> or <span className="text-neutral-100">j/k</span> moves through the
           deck (it wraps around), <span className="text-neutral-100">space</span> opens the Google search for the card.
         </li>
@@ -185,8 +185,8 @@ export default async function Help() {
           &ldquo;Take&rdquo;: end-of-day data can only tell you what to watch tomorrow, never to buy now.
         </li>
         <li>
-          Tap the <span className="text-neutral-100">list</span> icon <ListIcon size={13} className="inline -mt-0.5" /> in the header (next to ★) to see the whole deck on one screen
-          with each card&apos;s Wait / Pass, so you can skip straight to the ones worth a look.
+          Tap the <span className="text-neutral-100">list</span> icon <ListIcon size={13} className="inline -mt-0.5" /> in the header (or <span className="text-neutral-100">Deck</span> in the bottom bar) for the whole deck on one page
+          with each card&apos;s Wait / Pass, so you can skip straight to the ones worth a look. Tap a row to open that card.
         </li>
         <li>
           Curious about a name that isn&apos;t in the deck? Tap the <span className="text-neutral-100">search</span> icon <SearchIcon size={13} className="inline -mt-0.5" /> and type it.
@@ -207,7 +207,7 @@ export default async function Help() {
           alerts you the night a stock closes above its box — tap the alert pill above the deck to jump to that card, or to
           its lookup page if it isn&apos;t in tonight&apos;s deck. During the day its <span className="text-neutral-100">Live</span>{" "}
           section shows each starred name against its trigger in real time — ⚡ breaking out is the moment his playbook
-          says to act. The deck gets the same read: each card shows its live chip and price, and the list icon&apos;s{" "}
+          says to act. The deck gets the same read: each card shows its live chip and price, and the deck page&apos;s{" "}
           <span className="text-neutral-100">Live</span> toggle groups tonight&apos;s names by what price is doing. Quotes
           refresh within a minute or two (a free-tier budget, oldest first); off-hours the chips show the close.
         </li>

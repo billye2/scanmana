@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import AnalysisModal from "@/components/AnalysisModal";
 import Chart from "@/components/Chart";
-import DeckList from "@/components/DeckList";
 import LiveChip from "@/components/LiveChip";
 import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
@@ -39,6 +38,7 @@ export default function Deck({
   date,
   analysisOverride,
   live = false,
+  initialIndex = 0,
 }: {
   candidates: Candidate[];
   alerts: WatchlistAlert[];
@@ -48,14 +48,15 @@ export default function Deck({
   analysisOverride?: Analysis;
   /** Home deck only: poll /api/scan/live and show each card's live read (chip + live distance to trigger). */
   live?: boolean;
+  /** Card to open first (the /deck page links back with ?i=). */
+  initialIndex?: number;
 }) {
-  const [idx, setIdx] = useState(0);
+  const [idx, setIdx] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, candidates.length - 1)));
   const [showAnalysis, setShowAnalysis] = useState(false);
-  const [showList, setShowList] = useState(false);
   const [saved, setSaved] = useState<Set<string>>(new Set(savedTickers));
   const shotRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const [snapping, setSnapping] = useState(false);
-  // One poll serves the card chip and the list overlay. Budgeted server-side (CONFIG.LIVE).
+  // Live chip + live trigger distance on the card. Budgeted server-side (CONFIG.LIVE); /deck polls the same route.
   const { data: liveDeck } = useLive<LiveDeckBundle>(live ? "/api/scan/live" : null);
 
   const go = useCallback(
@@ -66,12 +67,7 @@ export default function Deck({
     [candidates.length],
   );
 
-  // Header slots (home + symbol page) — the headers are server components, the deck state lives here.
-  const listSlot = useSyncExternalStore(
-    () => () => {},
-    () => document.getElementById("deck-list-slot"),
-    () => null,
-  );
+  // Header slot (home + symbol page) — the headers are server components, the deck state lives here.
   const cameraSlot = useSyncExternalStore(
     () => () => {},
     () => document.getElementById("deck-camera-slot"),
@@ -356,30 +352,6 @@ export default function Deck({
           </button>,
           cameraSlot,
         )}
-      {listSlot &&
-        createPortal(
-          <button
-            onClick={() => setShowList(true)}
-            className="flex text-neutral-400 active:text-neutral-200"
-            aria-label="List all setups"
-          >
-            <ListIcon size={25} />
-          </button>,
-          listSlot,
-        )}
-      {showList && (
-        <DeckList
-          candidates={candidates}
-          current={idx}
-          saved={saved}
-          live={liveDeck}
-          onPick={(i) => {
-            setIdx(i);
-            setShowList(false);
-          }}
-          onClose={() => setShowList(false)}
-        />
-      )}
 
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it). */}
       <nav
@@ -404,13 +376,13 @@ export default function Deck({
           {isSaved ? "★ Watching" : "☆ Watch"}
         </button>
         {live && (
-          <button
-            onClick={() => setShowList(true)}
+          <Link
+            href="/deck"
             className="flex items-center justify-center gap-1.5 rounded-xl bg-neutral-800 py-3 text-sm font-semibold text-neutral-200 active:bg-neutral-700"
-            aria-label="Tonight's deck — list with live grouping"
+            aria-label="Tonight's deck — the whole list, grouped live"
           >
             <ListIcon size={16} /> Deck
-          </button>
+          </Link>
         )}
         <a
           href={googleUrl}

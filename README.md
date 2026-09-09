@@ -63,8 +63,9 @@ overlays.
 - **Live deck** (home page, `GET /api/scan/live`): the same read for every
   card in tonight's deck — a chip beside the badges, the live price with the
   stored close under it, and the trigger distance from the live price. The
-  list icon's overlay gets a **Live** toggle that groups the deck breaking /
-  failed / stopped / approaching / quiet with a tally. Finnhub's free tier is
+  `/deck` page (list icon in the header, **Deck** in the bottom bar) lists
+  the whole deck with a **Live** toggle that groups it breaking / failed /
+  stopped / approaching / quiet with a tally; tap a row to open that card. Finnhub's free tier is
   60 calls/min, so each poll refetches at most a budget of stale symbols,
   oldest first (`CONFIG.LIVE`: deck 30, watchlist 25), and serves the rest
   from the cache with their age; a 60-name deck is fully fresh every two
@@ -162,7 +163,7 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
   `market`, `analysis`), `scan.ts` orchestrator, `scan-notify.ts` (scan + push, shared by
   cron and button), `massive.ts` API client (retries, pre-EOD fallback),
   `db.ts`, `push.ts`
-- `app/` — deck (`/`), `/watchlist`, `/s/[ticker]` symbol page (same card for
+- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
   `watchlist/live`, `push/subscribe`)

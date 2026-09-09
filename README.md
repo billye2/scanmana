@@ -171,7 +171,7 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
 - `app/` — deck (`/`), `/deck` list, `/watchlist`, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
-  `watchlist/live`, `push/subscribe`)
+  `watchlist/live`, `push/subscribe`, `push/test`)
 - `proxy.ts` — Clerk gate; `lib/auth.ts` — public-path list; `app/sign-in/` — Clerk sign-in page
 - `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `seed-indices`,
   `analyze`, `scan-now.sh`, `gen-icons.py`

@@ -18,7 +18,7 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 | Production deploy | ✅ https://scanmana.vercel.app (Vercel project `scanmana`) |
 | Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes; `npm run migrate` is idempotent) |
 | Cron | ✅ `/api/cron/scan` at `0 4 * * 2-6` UTC (midnight EDT / 11pm EST) + catch-up `30 5 * * 2-6` (1:30am EDT; skips if already scanned). Massive publishes the day's grouped bars after 9:30pm ET, so the first run must wait until at least midnight, auth via `CRON_SECRET` |
-| Push | ✅ VAPID keys set on Vercel prod; iOS flow in `components/PushSetup.tsx` |
+| Push | ✅ VAPID keys set on Vercel prod; iOS flow in `components/PushSetup.tsx` — every step reports on screen, subscribed devices get **Send test alert** (`POST /api/push/test`, that device only); verified on the iPhone 2026-09-09 (Apple endpoint in `push_subscriptions` beside the desktop-Chrome one) |
 | Access | ✅ Clerk sign-in — Google or email code, no password (`proxy.ts` = `clerkMiddleware`, `/sign-in` page, `ClerkProvider` in the root layout; since 2026-09-07). Only allowlisted emails can sign in (Clerk dashboard → Restrictions, sign-ups restricted); sessions 30 days (dashboard → Sessions); sign-out link in the `/help` footer. Public: `/api/cron/*` (own secret), manifest, sw.js, icons, `/sign-in`. Unauthenticated `/api/*` → 401 JSON; pages → `/sign-in` and back. |
 | PWA assets | ✅ mobile-first, full-window layout at ≥1024px (Tailwind `lg:`); manifest, sw.js, icons all serve 200 on prod; `/help` explains badges + overlays and charts QQQ/SPY/IWM with 10/20/50 SMAs; `/s/[ticker]` symbol page (watchlist rows link to it; builds the card from stored bars when the symbol isn't in tonight's deck) + **Scan fit** checklist (`explainScreen`, `components/ScreenFit.tsx`; includes an informational Minervini-VCP block via `explainVcp` — analysis lens, never decides deck membership); `/s` free-form lookup page (search icon in the header, `components/SymbolLookup.tsx`); **Live** watchlist section on `/watchlist` (`components/LiveWatch.tsx` → `GET /api/watchlist/live` → `lib/livewatch.ts`; buckets breaking/failed/stopped/approaching/quiet, polls 60s while visible, 60s shared TTL in market hours / 30-min off-hours); **Live** toggle on `/s/[ticker]` (`?live=1`, `lib/intraday.ts`: Finnhub free quotes for symbol + QQQ/SPY/IWM, 30-min shared cache in the `quotes` Neon table — global TTL across users/instances, provisional today-bar with volume assumed at the 20-day avg, market filter recomputed live; missing key/errors fall back to EOD with a note); **Live deck** (since 2026-09-08): `Deck` polls `GET /api/scan/live` → `deckLive()` in `lib/livewatch.ts`, chip + live price on each card, list overlay **Live** toggle groups by bucket. Finnhub budget: `getQuotes(symbols, ttl, { maxFetch })` refetches the oldest stale symbols first up to `CONFIG.LIVE` (deck 30 + watchlist 25 + a /s lookup 4 < 60/min), batches of 10, per-symbol `allSettled`, a 429 halts the refresh and serves stale rows with `ageSec` — read-only, never changes the scan |
 | Market data | ✅ `MASSIVE_API_KEY` on Vercel; backfill done 2026-09-01 (1.32M bars, 251 dates, 5,692 tickers) |
@@ -28,9 +28,9 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 
 ## Next step (user-driven)
 
-Everything runs on its own now. Remaining checks: confirm the nightly push
-lands on the iPhone after the next cron (Mon–Fri ~midnight ET, catch-up ~1:30am
-ET), and eyeball the deck quality (60 setups on the first scan may be loose —
+Everything runs on its own now. The test alert reached the iPhone 2026-09-09;
+the first real nightly one lands after the next cron (Mon–Fri ~midnight ET,
+catch-up ~1:30am ET). Remaining checks: eyeball the deck quality (60 setups on the first scan may be loose —
 thresholds live in `lib/config.ts`; 2026-09-08 the price floor went $5 → $10
 and the 20-day dollar-volume floor $1M → $20M to keep penny stocks out — check
 the next deck is not too thin). Manual rescan: **↻ Run scan for previous day** on `/help`

@@ -149,7 +149,8 @@ the iPhone install steps. Manual equivalent:
    `CRON_SECRET` injected from Vercel).
 6. On iPhone: open the deployed URL in Safari → Share → Add to Home Screen →
    open Scanmana from the icon → sign in once inside it (its cookie jar is
-   separate from Safari's) → tap "Enable nightly scan alerts".
+   separate from Safari's) → tap "Enable nightly scan alerts" → tap "Send test
+   alert" to see one arrive (`POST /api/push/test` pushes to that device only).
 
 ## Commands
 

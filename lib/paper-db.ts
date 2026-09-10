@@ -14,6 +14,7 @@ import {
   type EngineExit,
   type EngineOrder,
   type EnginePosition,
+  type OrderKind,
   type Track,
   type TrackStats,
   type TrailMode,
@@ -31,7 +32,9 @@ interface OrderRow {
   ticker: string;
   trigger: number;
   stop: number;
+  kind: OrderKind;
   status: EngineOrder["status"];
+  late: boolean;
   armed_date: string;
   cancelled_reason: string | null;
 }
@@ -41,7 +44,9 @@ const toOrder = (r: OrderRow): EngineOrder => ({
   ticker: r.ticker,
   trigger: r.trigger,
   stop: r.stop,
+  kind: r.kind,
   status: r.status,
+  late: r.late,
   armedDate: r.armed_date,
   cancelledReason: r.cancelled_reason,
 });
@@ -90,14 +95,14 @@ const toPosition = (r: PositionRow, exits: EngineExit[]): EnginePosition => ({
   exits,
 });
 
-const ORDER_COLS = `id, track, ticker, trigger_price AS trigger, stop_price AS stop, status, armed_date::text AS armed_date, cancelled_reason`;
+const ORDER_COLS = `id, track, ticker, trigger_price AS trigger, stop_price AS stop, kind, status, late, armed_date::text AS armed_date, cancelled_reason`;
 const POSITION_COLS = `id, track, ticker, order_id, entry_date::text AS entry_date, entry_price, shares, initial_stop, current_stop,
   trail_mode, trail_param, pending_sell_shares, peak_close, mfe, mae, late, split_flagged, status, closed_date::text AS closed_date`;
 
 async function liveOrders(userId: string): Promise<EngineOrder[]> {
   const sql = getSql();
   const rows = (await sql.query(
-    `SELECT ${ORDER_COLS} FROM paper_orders WHERE user_id = $1 AND status IN ('armed', 'armed_late') ORDER BY id`,
+    `SELECT ${ORDER_COLS} FROM paper_orders WHERE user_id = $1 AND status = 'armed' ORDER BY id`,
     [userId],
   )) as OrderRow[];
   return rows.map(toOrder);
@@ -291,11 +296,11 @@ async function armTonight(userId: string, date: string): Promise<{ armed: number
   for (const a of arm) {
     const existing = liveByTicker.get(a.ticker);
     if (existing) {
-      await sql`UPDATE paper_orders SET trigger_price = ${a.trigger}, stop_price = ${a.stop}, armed_date = ${date}, updated_at = now() WHERE id = ${existing.id}`;
+      await sql`UPDATE paper_orders SET trigger_price = ${a.trigger}, stop_price = ${a.stop}, kind = ${a.kind}, armed_date = ${date}, updated_at = now() WHERE id = ${existing.id}`;
     } else {
       await sql`
-        INSERT INTO paper_orders (user_id, track, ticker, trigger_price, stop_price, status, source, armed_date)
-        VALUES (${userId}, 'auto', ${a.ticker}, ${a.trigger}, ${a.stop}, 'armed', 'auto', ${date})
+        INSERT INTO paper_orders (user_id, track, ticker, trigger_price, stop_price, kind, status, source, armed_date)
+        VALUES (${userId}, 'auto', ${a.ticker}, ${a.trigger}, ${a.stop}, ${a.kind}, 'armed', 'auto', ${date})
       `;
     }
   }
@@ -314,37 +319,58 @@ export type Outcome = { ok: true } | { ok: false; status: number; error: string 
 export async function manualTakenTickers(userId: string): Promise<string[]> {
   const sql = getSql();
   const rows = (await sql`
-    SELECT ticker FROM paper_orders WHERE user_id = ${userId} AND track = 'manual' AND status IN ('armed', 'armed_late')
+    SELECT ticker FROM paper_orders WHERE user_id = ${userId} AND track = 'manual' AND status = 'armed'
     UNION SELECT ticker FROM paper_positions WHERE user_id = ${userId} AND track = 'manual' AND status = 'open'
   `) as { ticker: string }[];
   return rows.map((r) => r.ticker);
 }
 
-/** Place the manual buy-stop. Refuses when one share exceeds the notional or the cash on hand; late when the auto order already filled. */
-export async function takeSignal(userId: string, ticker: string, trigger: number, stop: number): Promise<Outcome> {
+/**
+ * Place the manual order. A buy-stop at the trigger while the last close is still
+ * under it; a market buy at the next open when price is already above it (a broker
+ * rejects a buy-stop below the market) — either way with the given stop. Refuses when
+ * one share exceeds the notional or the cash on hand; `late` when the auto order
+ * already filled, so the record shows the take came after the signal.
+ */
+export async function takeSignal(userId: string, ticker: string, trigger: number, stop: number, lastClose: number | null): Promise<Outcome> {
   if (!(stop < trigger)) return { ok: false, status: 400, error: "the stop must sit below the trigger" };
   await ensureAccounts(userId);
   const sql = getSql();
-  const shares = sizeShares(trigger);
-  if (shares === 0) return { ok: false, status: 400, error: `one share at ${trigger.toFixed(2)} costs more than the $${P.NOTIONAL} notional` };
+  const kind: OrderKind = lastClose !== null && lastClose > trigger ? "market" : "buy_stop";
+  const est = kind === "market" ? lastClose! : trigger; // the price the fill will be near
+  if (!(stop < est)) return { ok: false, status: 400, error: `the stop must sit below the last close (${est.toFixed(2)})` };
+  const shares = sizeShares(est);
+  if (shares === 0) return { ok: false, status: 400, error: `one share at ${est.toFixed(2)} costs more than the $${P.NOTIONAL} notional` };
   const cash = (await loadCash(userId)).manual;
-  const cost = shares * trigger;
+  const cost = shares * est;
   if (cost > cash) return { ok: false, status: 400, error: `insufficient cash: ${shares} shares need $${cost.toFixed(0)}, you have $${cash.toFixed(0)}` };
   const autoOpen = (await sql`
     SELECT 1 FROM paper_positions WHERE user_id = ${userId} AND track = 'auto' AND ticker = ${ticker} AND status = 'open'
   `) as unknown[];
-  const status = autoOpen.length > 0 ? "armed_late" : "armed";
+  const late = autoOpen.length > 0;
   const scan = (await sql`SELECT max(date)::text AS date FROM scan_results`) as { date: string | null }[];
   const armedDate = scan[0]?.date ?? etToday();
   try {
     await sql`
-      INSERT INTO paper_orders (user_id, track, ticker, trigger_price, stop_price, status, source, armed_date)
-      VALUES (${userId}, 'manual', ${ticker}, ${trigger}, ${stop}, ${status}, 'take', ${armedDate})
+      INSERT INTO paper_orders (user_id, track, ticker, trigger_price, stop_price, kind, status, late, source, armed_date)
+      VALUES (${userId}, 'manual', ${ticker}, ${trigger}, ${stop}, ${kind}, 'armed', ${late}, 'take', ${armedDate})
     `;
   } catch (err) {
     if ((err as { code?: string }).code === "23505") return { ok: false, status: 409, error: `${ticker} is already taken` };
     throw err;
   }
+  return { ok: true };
+}
+
+/** Cancel an armed manual order by hand. Auto orders are never cancelled by hand — armDecisions owns them. */
+export async function cancelOrder(userId: string, orderId: number): Promise<Outcome> {
+  const sql = getSql();
+  const rows = (await sql`
+    UPDATE paper_orders SET status = 'cancelled', cancelled_reason = 'removed by hand', updated_at = now()
+    WHERE id = ${orderId} AND user_id = ${userId} AND track = 'manual' AND status = 'armed'
+    RETURNING id
+  `) as unknown[];
+  if (rows.length === 0) return { ok: false, status: 404, error: "no armed manual order with that id" };
   return { ok: true };
 }
 
@@ -412,7 +438,8 @@ export interface BookOrder {
   ticker: string;
   trigger: number;
   stop: number;
-  status: "armed" | "armed_late";
+  kind: OrderKind;
+  late: boolean;
   armedDate: string;
   lastClose: number | null;
 }
@@ -511,7 +538,8 @@ export async function getBook(userId: string): Promise<Book> {
           ticker: o.ticker,
           trigger: o.trigger,
           stop: o.stop,
-          status: o.status as BookOrder["status"],
+          kind: o.kind,
+          late: o.late,
           armedDate: o.armedDate,
           lastClose: last.get(o.ticker)?.c ?? null,
         })),

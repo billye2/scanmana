@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS paper_orders (
   ticker text NOT NULL,
   trigger_price double precision NOT NULL,
   stop_price double precision NOT NULL,
-  status text NOT NULL DEFAULT 'armed' CHECK (status IN ('armed', 'armed_late', 'filled', 'cancelled')),
+  kind text NOT NULL DEFAULT 'buy_stop' CHECK (kind IN ('buy_stop', 'market')),
+  status text NOT NULL DEFAULT 'armed' CHECK (status IN ('armed', 'filled', 'cancelled')),
+  late boolean NOT NULL DEFAULT false,
   source text NOT NULL CHECK (source IN ('auto', 'take')),
   armed_date date NOT NULL,
   cancelled_reason text,
@@ -77,7 +79,11 @@ CREATE TABLE IF NOT EXISTS paper_orders (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS paper_orders_live_idx ON paper_orders (user_id, track, ticker) WHERE status IN ('armed', 'armed_late');
+ALTER TABLE paper_orders ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'buy_stop' CHECK (kind IN ('buy_stop', 'market'));
+
+ALTER TABLE paper_orders ADD COLUMN IF NOT EXISTS late boolean NOT NULL DEFAULT false;
+
+CREATE UNIQUE INDEX IF NOT EXISTS paper_orders_live_idx ON paper_orders (user_id, track, ticker) WHERE status = 'armed';
 
 CREATE TABLE IF NOT EXISTS paper_positions (
   id bigserial PRIMARY KEY,

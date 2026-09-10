@@ -223,7 +223,10 @@ export default async function Help() {
         reaches it (at the open if it gapped past), stops out at the box bottom, and trails the stop up to the lowest low of the last 10
         sessions. Nobody touches it: it measures the scanner. <span className="text-neutral-100">Manual</span> is a $10,000 account, $500
         per position, cash binds: tap <span className="text-neutral-100">Take</span> on a card or a watchlist row to arm the same
-        buy-stop (a pivot-only name asks you to type a stop). Raise the stop by hand (raise only), pick a trail (percent under the peak
+        buy-stop (a pivot-only name asks you to type a stop). When price already sits above the trigger a buy-stop would be under
+        the market, which no broker accepts, so the button reads <span className="text-neutral-100">Take at open</span>: a market buy
+        at the next open with the same stop — the auto book does the same on the day a card breaks its box. An armed manual order
+        can be removed from the paper page until it fills. Raise the stop by hand (raise only), pick a trail (percent under the peak
         close, or an N-session low), or queue a sell of some shares at the next open. An entry day that also touches the stop counts as
         stopped out that day. Everything takes effect at the next nightly run, so the book you see is as of the last processed session.
       </p>

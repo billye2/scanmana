@@ -109,9 +109,15 @@ export default function WatchlistView({ items, taken = [] }: { items: WatchlistI
               onClick={() => take(w)}
               disabled={takenSet.has(w.ticker)}
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${takenSet.has(w.ticker) ? "bg-neutral-800 text-neutral-500" : "bg-emerald-700 text-white active:bg-emerald-600"}`}
-              aria-label={takenSet.has(w.ticker) ? "Taken into the manual paper book" : "Take — arm this buy-stop in the manual paper book"}
+              aria-label={
+                takenSet.has(w.ticker)
+                  ? "Taken into the manual paper book"
+                  : w.lastClose !== null && w.lastClose > w.boxTop
+                    ? "Take — buy at the next open in the manual paper book (price is already above the trigger)"
+                    : "Take — arm this buy-stop in the manual paper book"
+              }
             >
-              {takenSet.has(w.ticker) ? "Taken" : "Take"}
+              {takenSet.has(w.ticker) ? "Taken" : w.lastClose !== null && w.lastClose > w.boxTop ? "Take at open" : "Take"}
             </button>
           )}
           <button

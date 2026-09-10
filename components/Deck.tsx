@@ -213,7 +213,10 @@ export default function Deck({
     }
   }
   const isTaken = taken.has(c.ticker);
-  const canTake = (c.box?.top ?? c.pivot ?? null) !== null;
+  const takeTrigger = c.box?.top ?? c.pivot ?? null;
+  const canTake = takeTrigger !== null;
+  // Already above the trigger: a buy-stop would sit under the market, so the take is a market buy at the next open.
+  const takeAtOpen = takeTrigger !== null && c.price > takeTrigger;
 
   // Distance to the trigger from the live price when we have one, else from the stored close.
   const toTrigger = c.box ? (c.box.top / (liveRow?.price ?? c.price) - 1) : null;
@@ -443,9 +446,15 @@ export default function Deck({
                 disabled={isTaken}
                 aria-pressed={isTaken}
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${isTaken ? "bg-neutral-800 text-neutral-500" : "bg-emerald-700 text-white active:bg-emerald-600"}`}
-                aria-label={isTaken ? "Taken into the manual paper book" : "Take — arm this buy-stop in the manual paper book"}
+                aria-label={
+                  isTaken
+                    ? "Taken into the manual paper book"
+                    : takeAtOpen
+                      ? "Take — buy at the next open in the manual paper book (price is already above the trigger)"
+                      : "Take — arm this buy-stop in the manual paper book"
+                }
               >
-                {isTaken ? "Taken" : "Take"}
+                {isTaken ? "Taken" : takeAtOpen ? "Take at open" : "Take"}
               </button>
             </>
           )}

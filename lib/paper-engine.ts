@@ -14,7 +14,9 @@ import type { Bar, Candidate } from "./types";
 const P = CONFIG.PAPER;
 
 export type Track = "auto" | "manual";
-export type OrderStatus = "armed" | "armed_late" | "filled" | "cancelled";
+export type OrderStatus = "armed" | "filled" | "cancelled";
+/** buy_stop waits for the trigger; market buys at the next open (price already above the trigger — a broker rejects a buy-stop below the market). */
+export type OrderKind = "buy_stop" | "market";
 export type TrailMode = "none" | "percent" | "lowestlow";
 export type ExitReason = "stop" | "manual_sell";
 
@@ -24,7 +26,10 @@ export interface EngineOrder {
   ticker: string;
   trigger: number;
   stop: number;
+  kind: OrderKind;
   status: OrderStatus;
+  /** Manual take placed after the auto order had already filled — recorded on the position. */
+  late: boolean;
   armedDate: string;
   cancelledReason: string | null;
 }
@@ -112,7 +117,7 @@ function closeOut(p: EnginePosition, exit: EngineExit): void {
 /**
  * Advance the book through one session's bars. Per ticker, in order: pending
  * manual sells at the open; stop-outs (low <= stop, filled at min(open, stop));
- * order fills (armed: first high >= trigger at max(open, trigger); armed_late:
+ * order fills (buy_stop: first high >= trigger at max(open, trigger); market:
  * at the open) with sizing and cash; entry-day worst case (a bar that touches
  * both trigger and stop is a same-day stop-out); then peak/MFE/MAE, trails
  * (ratchet up only) and the split flag. Mutates copies, never the inputs.
@@ -169,14 +174,14 @@ export function processSession(input: SessionInput): SessionResult {
 
   // 2. Live orders.
   for (const o of orders) {
-    if (o.status !== "armed" && o.status !== "armed_late") continue;
+    if (o.status !== "armed") continue;
     const bars = input.bars.get(o.ticker);
     const bar = bars?.[bars.length - 1];
     if (!bar || bar.date !== date) continue;
 
     // A manual order whose setup failed (closed under its own stop) is cancelled;
     // auto orders are re-decided from tonight's deck by armDecisions instead.
-    if (o.track === "manual" && bar.c < o.stop && bar.h < o.trigger) {
+    if (o.track === "manual" && o.kind === "buy_stop" && bar.c < o.stop && bar.h < o.trigger) {
       o.status = "cancelled";
       o.cancelledReason = "closed below the stop before triggering";
       events.push({ type: "cancel", track: o.track, ticker: o.ticker, reason: o.cancelledReason });
@@ -185,7 +190,7 @@ export function processSession(input: SessionInput): SessionResult {
     if (openFor(o.track, o.ticker)) continue; // one open position per ticker per track
 
     let fill: number | null = null;
-    if (o.status === "armed_late") fill = bar.o;
+    if (o.kind === "market") fill = bar.o;
     else if (bar.h >= o.trigger) fill = Math.max(bar.o, o.trigger);
     if (fill === null) continue;
 
@@ -204,7 +209,7 @@ export function processSession(input: SessionInput): SessionResult {
       continue;
     }
     cash[o.track] -= cost;
-    const late = o.status === "armed_late";
+    const late = o.late;
     o.status = "filled";
     const p: EnginePosition = {
       id: null,
@@ -250,6 +255,7 @@ export interface ArmDecision {
   ticker: string;
   trigger: number;
   stop: number;
+  kind: OrderKind;
 }
 
 /** Why a deck candidate is not an auto order tonight, or null when it is. */
@@ -263,9 +269,10 @@ export function armBlocker(c: Candidate): string | null {
 }
 
 /**
- * Tonight's auto orders: arm (or refresh) a buy-stop at the box top with the stop
- * at the box bottom for every boxed "wait" candidate that has not already left
- * the box, skipping tickers with an open auto position. Every live auto order
+ * Tonight's auto orders: arm (or refresh) an order at the box top with the stop
+ * at the box bottom for every boxed "wait" candidate — a buy-stop while price is
+ * still inside the box, a market buy at the next open on the day it breaks —
+ * skipping names that broke out earlier and tickers with an open auto position. Every live auto order
  * whose ticker is not in that set is cancelled with the reason.
  */
 export function armDecisions(
@@ -282,7 +289,10 @@ export function armDecisions(
     }
     const why = armBlocker(c);
     if (why) blocked.set(c.ticker, why);
-    else arm.push({ ticker: c.ticker, trigger: c.box!.top, stop: c.box!.bottom });
+    // Broke the box today (close above the top): a buy-stop at the top would sit under
+    // the market, so it is a market buy at tomorrow's open — the app's own "buy tomorrow's
+    // open if it holds" rule — with the stop still at the box bottom.
+    else arm.push({ ticker: c.ticker, trigger: c.box!.top, stop: c.box!.bottom, kind: breakingOut(c) ? "market" : "buy_stop" });
   }
   const armed = new Set(arm.map((a) => a.ticker));
   const cancel: { ticker: string; reason: string }[] = [];

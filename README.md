@@ -44,8 +44,10 @@ overlays.
   last 10 sessions — hands off, it measures the scanner. *Manual* is a $10k
   account, $500 per position, cash binds: **Take** on a card or watchlist row arms
   the same buy-stop; raise the stop, pick a percent or N-session-low trail, or
-  queue a partial sell at the next open. Fills: first session whose high reaches
-  the trigger (at the open if it gapped past); stops: any session whose low
+  queue a partial sell at the next open. Price already above the trigger (the
+  breakout-day cards, or a late Take) means a market buy at the next open with
+  the same stop — a buy-stop under the market is not an order a broker takes.
+  Fills: first session whose high reaches the trigger (at the open if it gapped past); stops: any session whose low
   touches it (at the open if it gapped under); an entry day that also touches the
   stop is a same-day stop-out. No commissions, no slippage; a 40%+ overnight gap
   is flagged "check for a split". Win rate, expectancy in R, profit factor and a
@@ -189,7 +191,7 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
   `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`,
-  `paper/book|take|sell|stop|trail`)
+  `paper/book|take|sell|stop|trail|order`)
 - `proxy.ts` — Clerk gate; `lib/auth.ts` — public-path list; `app/sign-in/` — Clerk sign-in page
 - `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `seed-indices`,
   `analyze`, `scan-now.sh`, `gen-icons.py`

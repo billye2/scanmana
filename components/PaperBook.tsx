@@ -15,16 +15,25 @@ const money = (x: number) => `${x < 0 ? "−" : ""}$${Math.abs(x).toFixed(0)}`;
 const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : ""}${x.toFixed(2)}R`);
 const pnlTone = (x: number | null) => (x === null ? "text-neutral-400" : x > 0 ? "text-emerald-400" : x < 0 ? "text-red-400" : "text-neutral-300");
 
-async function post(path: string, body: unknown): Promise<string | null> {
-  const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+async function post(path: string, body: unknown, method = "POST"): Promise<string | null> {
+  const res = await fetch(path, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   if (res.ok) return null;
   const j = (await res.json().catch(() => ({}))) as { error?: string };
   return j.error ?? `${res.status}`;
 }
 
 export default function PaperBook({ book }: { book: Book }) {
+  const router = useRouter();
   const [track, setTrack] = useState<Track>("manual");
+  const [orderMsg, setOrderMsg] = useState<string | null>(null);
   const t = book[track];
+
+  async function removeOrder(orderId: number) {
+    setOrderMsg(null);
+    const err = await post("/api/paper/order", { orderId }, "DELETE");
+    if (err) setOrderMsg(err);
+    else router.refresh();
+  }
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-2">
@@ -55,14 +64,25 @@ export default function PaperBook({ book }: { book: Book }) {
               <li key={o.id} className="flex items-center justify-between py-2 text-xs">
                 <Link href={`/s/${o.ticker}`} className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">{o.ticker}</Link>
                 <span className="text-neutral-400">
-                  buy stop <span className="text-amber-400">{price(o.trigger)}</span> · stop <span className="text-amber-400/80">{price(o.stop)}</span>
+                  {o.kind === "market" ? (
+                    <>buy at the next open <span className="text-neutral-500">(above the {price(o.trigger)} trigger)</span></>
+                  ) : (
+                    <>buy stop <span className="text-amber-400">{price(o.trigger)}</span></>
+                  )}
+                  {" · "}stop <span className="text-amber-400/80">{price(o.stop)}</span>
                   {o.lastClose !== null && <> · last {price(o.lastClose)}</>}
-                  {o.status === "armed_late" && <span className="ml-1 text-neutral-500">(late: fills at the open)</span>}
+                  {o.late && <span className="ml-1 text-neutral-500">(late: the auto order already filled)</span>}
                 </span>
+                {track === "manual" && (
+                  <button onClick={() => removeOrder(o.id)} className={`${BTN} ml-2 shrink-0`} aria-label={`Remove the ${o.ticker} order`}>
+                    Remove
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
+        {orderMsg && <p className="mt-1 text-xs text-red-300">{orderMsg}</p>}
       </Section>
       <Section title={`Open · ${t.open.length}`}>
         {t.open.length === 0 ? <Empty>No open positions.</Empty> : t.open.map((p) => <OpenPosition key={p.id} p={p} editable={track === "manual"} />)}

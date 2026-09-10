@@ -18,7 +18,9 @@ const order = (over: Partial<EngineOrder> = {}): EngineOrder => ({
   ticker: "X",
   trigger: 50,
   stop: 45,
+  kind: "buy_stop",
   status: "armed",
+  late: false,
   armedDate: "2026-01-01",
   cancelledReason: null,
   ...over,
@@ -99,10 +101,16 @@ describe("processSession — fills", () => {
     expect(realized(p)).toEqual({ pnl: -50, r: -1 });
   });
 
-  it("a late manual take fills at the open regardless of the trigger", () => {
-    const r = run({ orders: [order({ track: "manual", status: "armed_late" })] }, bar(48, 49, 47.5, 48.5));
+  it("a market order fills at the open regardless of the trigger, and carries the late flag onto the position", () => {
+    const r = run({ orders: [order({ track: "manual", kind: "market", late: true })] }, bar(48, 49, 47.5, 48.5));
     expect(r.positions[0]).toMatchObject({ entryPrice: 48, late: true, track: "manual" });
     expect(r.cash.manual).toBe(10_000 - 48 * 10);
+  });
+
+  it("a market order is not cancelled by a close under its stop — it buys at the open like a broker would", () => {
+    const r = run({ orders: [order({ track: "manual", kind: "market" })] }, bar(46, 46.5, 43, 44));
+    expect(r.orders[0].status).toBe("filled");
+    expect(r.positions[0].status).toBe("closed"); // entry day touched the stop: same-day stop-out
   });
 
   it("skips and cancels when one share costs more than the notional", () => {
@@ -245,7 +253,9 @@ describe("armDecisions", () => {
     ];
     const d = armDecisions(cs, live, new Set(["OPEN"]));
     expect(d.arm.map((a) => a.ticker)).toEqual(["OK", "TODAY"]);
-    expect(d.arm[0]).toEqual({ ticker: "OK", trigger: 50, stop: 45 });
+    expect(d.arm[0]).toEqual({ ticker: "OK", trigger: 50, stop: 45, kind: "buy_stop" });
+    // Broke the box today: price is above the trigger, so it is a market buy at tomorrow's open, not a buy-stop.
+    expect(d.arm[1]).toEqual({ ticker: "TODAY", trigger: 50, stop: 45, kind: "market" });
     expect(d.cancel).toEqual([
       { ticker: "PASS", reason: "verdict pass" },
       { ticker: "GONE", reason: "dropped from the scan" },

@@ -14,8 +14,7 @@ const ICONS: { href: string; label: string; Icon: typeof ListIcon }[] = [
  * The one top navigation for every signed-in page: the Scanmana logo always
  * links home, a page line sits under it, and the same five icons sit on the
  * right (the current page's icon is lit). `extra` slots page-specific controls
- * before the icons (the symbol page's Live toggle); the camera slot is where
- * `Deck` portals its snapshot button on card pages.
+ * before the icons (the symbol page's Live toggle).
  */
 export default function TopNav({ subtitle, current, extra }: { subtitle?: ReactNode; current?: string; extra?: ReactNode }) {
   return (
@@ -28,7 +27,6 @@ export default function TopNav({ subtitle, current, extra }: { subtitle?: ReactN
       </h1>
       <div className="flex shrink-0 items-center gap-3">
         {extra}
-        <span id="deck-camera-slot" className="flex items-center empty:hidden" />
         {ICONS.map(({ href, label, Icon }) => (
           <Link
             key={href}

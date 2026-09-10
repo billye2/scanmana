@@ -93,12 +93,6 @@ overlays.
   from the cache with their age; a 60-name deck is fully fresh every two
   polls. One bad symbol drops only itself and a 429 halts the refresh
   instead of failing it.
-- **Camera** icon in the top nav (home and symbol pages): captures the whole
-  page — header, card, chart, and the Scan fit + Minervini VCP checklists —
-  as one tall PNG (html-to-image; falls back to a chart-only capture) and
-  opens the native share sheet — on iOS that includes Print and Save Image;
-  desktop downloads the file. The standalone PWA has no browser chrome, so
-  this is the print path.
 - **Look up any symbol** (search icon in the header → `/s`): type AAPL or NVDA and get the
   same card the deck shows plus a **Scan fit** checklist — each hard rule of
   the nightly screen (`explainScreen` in `lib/screen.ts`, the same list

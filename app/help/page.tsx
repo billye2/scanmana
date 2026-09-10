@@ -191,10 +191,6 @@ export default async function Help() {
           It reads the bar store only; the nightly results are untouched.
         </li>
         <li>
-          The camera icon in the header captures the whole page (chart, checklists and all) as one image and opens the share sheet — that&apos;s
-          also how you print from the home-screen app (the sheet includes Print).
-        </li>
-        <li>
           <Amber>☆ Watch</Amber> the ones with a clean box just below price — or type any symbol into the watchlist&apos;s
           Add field (its trigger is computed from stored bars). The watchlist remembers the trigger and
           alerts you the night a stock closes above its box — tap the alert pill above the deck to jump to that card, or to

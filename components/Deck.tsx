@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AnalysisModal from "@/components/AnalysisModal";
 import Chart from "@/components/Chart";
@@ -10,7 +9,7 @@ import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
-import { BellIcon, BriefcaseIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
+import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { Analysis, Bar, DeckCard, WatchlistAlert } from "@/lib/types";
@@ -63,8 +62,6 @@ export default function Deck({
   const [taken, setTaken] = useState<Set<string>>(new Set(takenTickers));
   const [takeStop, setTakeStop] = useState<string | null>(null); // pivot-only card: the typed stop, while the input is open
   const [takeError, setTakeError] = useState<string | null>(null);
-  const shotRef = useRef<(() => HTMLCanvasElement) | null>(null);
-  const [snapping, setSnapping] = useState(false);
   // Bars per card. The page embeds bars for the first card(s) only; the rest arrive
   // from /api/scan/bars as you page, the neighbours fetched ahead so › never waits.
   const [barsByTicker, setBarsByTicker] = useState<Record<string, Bar[]>>(() =>
@@ -103,13 +100,6 @@ export default function Deck({
       setIdx((i) => (i + delta + candidates.length) % candidates.length);
     },
     [candidates.length],
-  );
-
-  // Header slot (home + symbol page) — the headers are server components, the deck state lives here.
-  const cameraSlot = useSyncExternalStore(
-    () => () => {},
-    () => document.getElementById("deck-camera-slot"),
-    () => null,
   );
 
   useEffect(() => {
@@ -221,107 +211,6 @@ export default function Deck({
   // Distance to the trigger from the live price when we have one, else from the stored close.
   const toTrigger = c.box ? (c.box.top / (liveRow?.price ?? c.price) - 1) : null;
 
-  /**
-   * Snapshot the WHOLE page — header, card, chart, Scan fit / VCP blocks — as one
-   * tall PNG and hand it to the native share sheet (iOS: includes Print); desktop
-   * falls back to a download. If DOM serialization fails, falls back to a
-   * chart-only capture composed with a header band.
-   */
-  async function snapshot() {
-    if (snapping) return;
-    setSnapping(true);
-    try {
-      const main = document.querySelector("main");
-      if (main) {
-        const { toCanvas } = await import("html-to-image");
-        const opts = {
-          backgroundColor: getComputedStyle(document.body).backgroundColor || "#0a0a0a",
-          pixelRatio: Math.min(window.devicePixelRatio || 1, 2), // iOS canvas memory cap
-          filter: (node: HTMLElement) => node.tagName !== "NEXTJS-PORTAL", // dev overlay
-        };
-        // iOS Safari often returns a blank image on the first serialization — warm up once.
-        if (/iP(hone|ad|od)/.test(navigator.userAgent)) await toCanvas(main, opts);
-        const page = await toCanvas(main, opts);
-        // iOS sometimes rasterizes before the chart's big pane canvas decodes, leaving it
-        // blank in the clone — paint the chart's own screenshot over its exact spot.
-        const shot = shotRef.current?.();
-        const chartEl = main.querySelector(".tv-lightweight-charts");
-        if (shot && chartEl) {
-          const mr = main.getBoundingClientRect();
-          const cr = chartEl.getBoundingClientRect();
-          const scale = page.width / mr.width;
-          page
-            .getContext("2d")!
-            .drawImage(shot, (cr.left - mr.left) * scale, (cr.top - mr.top) * scale, cr.width * scale, cr.height * scale);
-        }
-        const blob = await new Promise<Blob | null>((res) => page.toBlob(res, "image/png"));
-        if (blob) {
-          await deliver(blob, `${c.ticker}-${date || new Date().toISOString().slice(0, 10)}.png`);
-          return;
-        }
-      }
-      await chartOnlySnapshot(); // fallback
-    } catch {
-      await chartOnlySnapshot().catch(() => {});
-    } finally {
-      setSnapping(false);
-    }
-  }
-
-  /** Share via the native sheet when possible, else download. */
-  async function deliver(blob: Blob, name: string) {
-    const file = new File([blob], name, { type: "image/png" });
-    if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: `${c.ticker} — Scanmana` });
-        return;
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return; // user closed the sheet
-      }
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  /** Fallback: chart canvas only, with a composed header band. */
-  async function chartOnlySnapshot() {
-    const shot = shotRef.current?.();
-    if (!shot) return;
-    // Scale from the screenshot's own width — takeScreenshot() may return CSS or device pixels.
-    const u = shot.width / 400;
-    const header = Math.round(56 * u);
-    const out = document.createElement("canvas");
-    out.width = shot.width;
-    out.height = shot.height + header;
-    const ctx = out.getContext("2d")!;
-    ctx.fillStyle = "#0a0f14";
-    ctx.fillRect(0, 0, out.width, out.height);
-    ctx.drawImage(shot, 0, header);
-    const pad = 12 * u;
-    ctx.fillStyle = "#f5f5f5";
-    ctx.font = `bold ${17 * u}px -apple-system, system-ui, sans-serif`;
-    ctx.fillText(c.ticker, pad, 22 * u);
-    ctx.textAlign = "right";
-    ctx.fillText(price(c.price), out.width - pad, 22 * u);
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#9ca3af";
-    ctx.font = `${11 * u}px -apple-system, system-ui, sans-serif`;
-    const verdict = verdictLabel(c.verdict);
-    const plan = c.box ? `trigger ${price(c.box.top)} · stop ${price(c.box.bottom)}` : "no box";
-    const stamp = `Scanmana v${APP_VERSION}${date ? ` · ${date}` : ""}`;
-    const stampW = ctx.measureText(stamp).width;
-    // maxWidth clamps the info line so it never runs under the right-aligned stamp
-    ctx.fillText(`${verdict ? `${verdict} · ` : ""}${plan}`, pad, 42 * u, out.width - 2 * pad - stampW - 8 * u);
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#4b5563";
-    ctx.fillText(stamp, out.width - pad, 42 * u);
-    const blob = await new Promise<Blob | null>((res) => out.toBlob(res, "image/png"));
-    if (blob) await deliver(blob, `${c.ticker}-${date || "chart"}.png`);
-  }
   // target=_blank by choice: Google's COOP header wipes a named tab's name, so single-tab
   // reuse is impossible with google.com (works with Bing/DDG). The iOS PWA shows externals in
   // one in-app sheet regardless. Decided 2026-09-01: keep Google, accept desktop new tabs.
@@ -403,7 +292,7 @@ export default function Deck({
 
       <div className="relative mt-3 min-h-[300px] flex-1 lg:min-h-[480px]">
         {bars ? (
-          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} shotRef={shotRef} />
+          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-600">
             {barsErrors[c.ticker] ? `Chart unavailable — ${barsErrors[c.ticker]}` : "Loading chart…"}
@@ -464,18 +353,6 @@ export default function Deck({
         </span>
       </div>
       {takeError && <p className="mt-1 text-xs text-red-300">{takeError}</p>}
-      {cameraSlot &&
-        createPortal(
-          <button
-            onClick={snapshot}
-            disabled={snapping}
-            aria-label="Snapshot — share or print this page"
-            className="flex text-neutral-400 active:text-neutral-200 disabled:opacity-40"
-          >
-            <CameraIcon size={25} />
-          </button>,
-          cameraSlot,
-        )}
 
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).
           Same line icons as the top nav, icon-only in equal columns, because the

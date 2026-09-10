@@ -8,7 +8,7 @@ import {
   LineStyle,
   type IChartApi,
 } from "lightweight-charts";
-import { useEffect, useRef, type MutableRefObject } from "react";
+import { useEffect, useRef } from "react";
 import type { Bar, DarvasBox } from "@/lib/types";
 
 function smaSeries(bars: Bar[], period: number): { time: string; value: number }[] {
@@ -29,14 +29,11 @@ export default function Chart({
   box,
   pivot,
   smas = [10, 20],
-  shotRef,
 }: {
   bars: Bar[];
   box: DarvasBox | null;
   pivot: number | null;
   smas?: readonly number[];
-  /** Filled with a () => canvas snapshot of the chart (lightweight-charts takeScreenshot) while mounted. */
-  shotRef?: MutableRefObject<(() => HTMLCanvasElement) | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -118,13 +115,11 @@ export default function Chart({
     const ro = new ResizeObserver(() => chart.timeScale().fitContent());
     ro.observe(el);
 
-    if (shotRef) shotRef.current = () => chart.takeScreenshot();
     return () => {
-      if (shotRef) shotRef.current = null;
       ro.disconnect();
       chart.remove();
     };
-  }, [bars, box, pivot, smas, shotRef]);
+  }, [bars, box, pivot, smas]);
 
   // absolute inset-0: the parent is a flex-1 item whose height comes from flex
   // layout, not an explicit value, so a percentage height would resolve to 0.

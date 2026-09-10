@@ -212,20 +212,72 @@ export default async function Help() {
       </ol>
 
       <H>Paper trading</H>
-      <p className="text-[13px] leading-relaxed text-neutral-300">
-        The <span className="text-neutral-100">briefcase</span> icon <BriefcaseIcon size={13} className="inline -mt-0.5" /> opens the paper book: two ledgers, both
-        priced on the same end-of-day bars the scan uses, nothing live. <span className="text-neutral-100">Auto</span> arms a buy-stop at
-        the box top of every boxed Wait card each night ($500 each, whole shares, no cash cap), fills it on the first session whose high
-        reaches it (at the open if it gapped past), stops out at the box bottom, and trails the stop up to the lowest low of the last 10
-        sessions. Nobody touches it: it measures the scanner. <span className="text-neutral-100">Manual</span> is a $10,000 account, $500
-        per position, cash binds: tap <span className="text-neutral-100">Take</span> on a card or a watchlist row to arm the same
-        buy-stop (a pivot-only name asks you to type a stop). When price already sits above the trigger a buy-stop would be under
-        the market, which no broker accepts, so the button reads <span className="text-neutral-100">Take at open</span>: a market buy
-        at the next open with the same stop — the auto book does the same on the day a card breaks its box. An armed manual order
-        can be removed from the paper page until it fills. Raise the stop by hand (raise only), pick a trail (percent under the peak
-        close, or an N-session low), or queue a sell of some shares at the next open. An entry day that also touches the stop counts as
-        stopped out that day. Everything takes effect at the next nightly run, so the book you see is as of the last processed session.
+      <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
+        The <span className="text-neutral-100">briefcase</span> icon <BriefcaseIcon size={13} className="inline -mt-0.5" /> opens the paper
+        book: two ledgers that trade the deck on paper, priced on the same end-of-day bars the scan uses — nothing live, no
+        broker. <span className="text-neutral-100">Auto</span> takes every qualifying card by rule and nobody touches it, so it
+        measures the scanner. <span className="text-neutral-100">Manual</span> holds only the names you take, so it measures your
+        selection on top of the scanner. Both use the same fill rules and the same $500 per position, so their numbers compare.
       </p>
+
+      <Term name="What arms, and when">
+        The nightly scan runs the paper book right after it stores the deck (weeknights ~midnight ET). It first settles the day just
+        closed — fills, stops, queued sells, trails — then arms tonight&apos;s orders. The Auto ledger arms one order per card that has
+        a box <em>and</em> a Wait verdict: a buy-stop at the <Amber>trigger</Amber> (solid amber) with the stop at the{" "}
+        <Amber>stop</Amber> line (dashed amber). Pass cards and pivot-only cards never arm. A card that closed above its box top
+        today is a market buy at tomorrow&apos;s open instead (a buy-stop under the market is not an order a broker takes); one that
+        broke out days ago is skipped — the app&apos;s own rule is that only a pullback to the box gives an entry then. Orders follow
+        the deck: a card that reappears with a new box gets the new numbers, a card that drops out or closes under its box is
+        cancelled. The book you see is always <em>as of the last processed session</em>; nothing changes during the day.
+      </Term>
+
+      <Term name="How fills work">
+        A buy-stop fills on the first session whose high reaches the trigger, at the trigger — or at the open if the stock gapped past
+        it. A stop fills on any session whose low touches it, at the stop — or at the open if it gapped under. If the entry day also
+        touches the stop, the trade counts as stopped out that same day: the order of the two touches is unknowable, so the book
+        assumes the worse one. $500 per position in whole shares, so a name above $500 a share is skipped and listed under Skipped.
+        No commissions, no slippage, dividends and splits ignored; a 40%+ overnight gap is flagged &ldquo;check for a split&rdquo;.
+      </Term>
+
+      <Term name="Auto ledger">
+        No cash cap — every armed signal gets its $500, because a cap would make the record depend on which names happened to
+        trigger first. The stop starts at the box bottom and each night moves up to the lowest low of the last 10 sessions if that is
+        higher; it never moves down. That trail is the only exit. MFE / MAE on each trade show the best and worst price seen while it
+        was open, so you can tell what was available versus what the rule captured.
+      </Term>
+
+      <Term name="Manual ledger">
+        $10,000 to start, $500 per position, and cash binds — a take that does not fit is refused with the reason. Tap{" "}
+        <span className="text-neutral-100">Take</span> on a deck card or a watchlist row to arm the same trigger and stop the card
+        shows; a pivot-only name has no stop line, so it asks you to type one. When price is already above the trigger the button reads{" "}
+        <span className="text-neutral-100">Take at open</span>: a market buy at the next open with the same stop. If the Auto
+        ledger already filled that name before you took it, your fill is at the next open and the trade is marked{" "}
+        <em>late</em>. An armed order can be removed from the paper page until it fills. One open position per name; after it
+        closes, a fresh signal can be taken again.
+      </Term>
+
+      <Term name="Managing an open manual position">
+        <span className="text-neutral-100">Stop</span>: raise it by hand (raise only — never lower). The chips offer the entry day&apos;s
+        low and the current box bottom as one-tap levels. <span className="text-neutral-100">Trail</span>: none by default; choose a
+        percent under the highest close since entry, or the lowest low of the last N sessions — evaluated at each close, only ever
+        raising the stop, switchable any time. <span className="text-neutral-100">Sell</span>: queue any number of shares (default
+        half) to sell at the next open, the way you would size down into strength; the stop stays on the rest. Every change takes
+        effect at the next nightly run.
+      </Term>
+
+      <Term name="Reading the numbers">
+        <span className="text-neutral-100">R</span> is the trade&apos;s result divided by the risk taken at entry (entry price minus the
+        initial stop, times shares): −1R is a full stop-out, +2R made twice the risk. Win rate, average win and loss in R,{" "}
+        <span className="text-neutral-100">expectancy</span> (average R per trade — the number that matters) and profit factor
+        (gross wins ÷ gross losses) are computed from closed trades only, per ledger. A position with several exits is one trade at a
+        blended exit price. Equity is cash plus open positions at the last close.
+      </Term>
+
+      <Term name="Getting started">
+        Open the paper page once — that creates your ledgers, and the next nightly scan arms the Auto book. The morning after, the Auto
+        tab shows the armed orders and the push notification carries a &ldquo;Paper:&rdquo; line. Fills, if any, show up the
+        night after that, once the session they happened in has closed.
+      </Term>
 
       <p className="mt-8 text-[11px] leading-relaxed text-neutral-600">
         Thresholds are fixed in <code>lib/config.ts</code>. End-of-day data only; nothing here is investment advice.

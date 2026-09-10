@@ -1,14 +1,19 @@
+import { auth } from "@clerk/nextjs/server";
 import LiveWatch from "@/components/LiveWatch";
 import TopNav from "@/components/TopNav";
 import WatchlistAdd from "@/components/WatchlistAdd";
 import WatchlistView, { type WatchlistItem } from "@/components/WatchlistView";
 import { getSql } from "@/lib/db";
+import { manualTakenTickers } from "@/lib/paper-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function WatchlistPage() {
   let items: WatchlistItem[] = [];
+  let taken: string[] = [];
   try {
+    const { userId } = await auth();
+    if (userId) taken = await manualTakenTickers(userId).catch(() => []);
     const sql = getSql();
     items = (await sql`
       SELECT w.ticker,
@@ -31,7 +36,7 @@ export default async function WatchlistPage() {
       <TopNav current="/watchlist" subtitle="★ Watchlist" />
       <WatchlistAdd />
       {items.length > 0 && <LiveWatch />}
-      <WatchlistView items={items} />
+      <WatchlistView items={items} taken={taken} />
     </main>
   );
 }

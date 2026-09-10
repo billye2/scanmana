@@ -27,7 +27,7 @@ overlays.
   embeds bars only for the card on screen and its neighbours — ~12 KB gzipped
   instead of ~75 KB — and fetches the rest per card from `GET /api/scan/bars`
   as you page, neighbours prefetched), paged from a
-  fixed bottom bar of line icons (prev · watch · deck list · Google · next)
+  fixed bottom bar of line icons (prev · watch · deck list · paper book · Google · next)
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
   page that carries the **↻ Run scan for previous day** button
@@ -35,8 +35,21 @@ overlays.
   the cron would).
 - **One top nav on every page** (`components/TopNav.tsx`): the ◎ Scanmana logo
   always goes home, a page line sits under it, and the same four icons sit on
-  the right — Help, symbol lookup, ★ Watchlist, deck list — with the current
+  the right — Help, symbol lookup, ★ Watchlist, paper book, deck list — with the current
   page's icon lit. The symbol page adds its Live toggle beside them.
+- **Paper trading** (`/paper`, `lib/paper-engine.ts` + `lib/paper-db.ts`): two
+  ledgers priced on the same end-of-day bars, run right after each nightly scan.
+  *Auto* arms a buy-stop at the box top of every boxed Wait card (stop at the box
+  bottom, $500 each, no cash cap) and trails the stop up to the lowest low of the
+  last 10 sessions — hands off, it measures the scanner. *Manual* is a $10k
+  account, $500 per position, cash binds: **Take** on a card or watchlist row arms
+  the same buy-stop; raise the stop, pick a percent or N-session-low trail, or
+  queue a partial sell at the next open. Fills: first session whose high reaches
+  the trigger (at the open if it gapped past); stops: any session whose low
+  touches it (at the open if it gapped under); an entry day that also touches the
+  stop is a same-day stop-out. No commissions, no slippage; a 40%+ overnight gap
+  is flagged "check for a split". Win rate, expectancy in R, profit factor and a
+  realized equity curve per ledger.
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. IWM shown for
@@ -122,7 +135,8 @@ and 21-session price floor are the parabolic guard: a sub-dollar shell that
 spiked to $18 passes every floor on today's numbers alone. Ranked with boxed
 setups first (there is a level to trade), then by consolidation tightness
 (10-day range ÷ ADR). EP badge = 10%+ gap on 3× volume in the last 5
-sessions.
+sessions. Paper trading (`CONFIG.PAPER`): $500 notional per position, $10,000
+manual start cash, 10-session trail lookback, 40% split-flag gap.
 
 ## Setup
 
@@ -168,21 +182,23 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
 ## Layout
 
 - `lib/` — pure engine (`indicators`, `screen`, `darvas`, `livermore`,
-  `market`, `analysis`), `scan.ts` orchestrator, `scan-notify.ts` (scan + push, shared by
-  cron and button), `massive.ts` API client (retries, pre-EOD fallback),
+  `market`, `analysis`, `paper-engine`), `scan.ts` orchestrator, `scan-notify.ts` (scan + push + paper night, shared by
+  cron and button), `paper-db.ts` (paper book persistence), `massive.ts` API client (retries, pre-EOD fallback),
   `db.ts`, `push.ts`
-- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/s/[ticker]` symbol page (same card for
+- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
-  `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`)
+  `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`,
+  `paper/book|take|sell|stop|trail`)
 - `proxy.ts` — Clerk gate; `lib/auth.ts` — public-path list; `app/sign-in/` — Clerk sign-in page
 - `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `seed-indices`,
   `analyze`, `scan-now.sh`, `gen-icons.py`
 - `tests/` — vitest suite with synthetic fixtures
 
 Out of scope (v1, deliberate): intraday entries or verdicts (the live reads
-are display-only — the scan and its Wait/Pass never change during the day),
-parabolic shorts, settings UI, journaling, multi-user.
+are display-only — the scan and its Wait/Pass never change during the day, and
+paper fills are decided on daily bars only), parabolic shorts, settings UI,
+journaling, multi-user.
 
 ## License
 

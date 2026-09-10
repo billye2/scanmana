@@ -1,4 +1,4 @@
-import { ListIcon, SearchIcon } from "@/components/Icons";
+import { BriefcaseIcon, ListIcon, SearchIcon } from "@/components/Icons";
 import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
 import IndexCharts from "@/components/IndexCharts";
@@ -214,6 +214,19 @@ export default async function Help() {
         </li>
         <li>If a breakout closes back inside the box, it failed. Take the small loss; there is another deck tomorrow.</li>
       </ol>
+
+      <H>Paper trading</H>
+      <p className="text-[13px] leading-relaxed text-neutral-300">
+        The <span className="text-neutral-100">briefcase</span> icon <BriefcaseIcon size={13} className="inline -mt-0.5" /> opens the paper book: two ledgers, both
+        priced on the same end-of-day bars the scan uses, nothing live. <span className="text-neutral-100">Auto</span> arms a buy-stop at
+        the box top of every boxed Wait card each night ($500 each, whole shares, no cash cap), fills it on the first session whose high
+        reaches it (at the open if it gapped past), stops out at the box bottom, and trails the stop up to the lowest low of the last 10
+        sessions. Nobody touches it: it measures the scanner. <span className="text-neutral-100">Manual</span> is a $10,000 account, $500
+        per position, cash binds: tap <span className="text-neutral-100">Take</span> on a card or a watchlist row to arm the same
+        buy-stop (a pivot-only name asks you to type a stop). Raise the stop by hand (raise only), pick a trail (percent under the peak
+        close, or an N-session low), or queue a sell of some shares at the next open. An entry day that also touches the stop counts as
+        stopped out that day. Everything takes effect at the next nightly run, so the book you see is as of the last processed session.
+      </p>
 
       <p className="mt-8 text-[11px] leading-relaxed text-neutral-600">
         Thresholds are fixed in <code>lib/config.ts</code>. End-of-day data only; nothing here is investment advice.

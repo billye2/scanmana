@@ -15,6 +15,13 @@ function worst(...v: Verdict[]): Verdict {
   return v.includes("pass") ? "pass" : "wait";
 }
 
+/** Closed above the box top today, having closed inside it yesterday — the break is one session old. */
+export function breakingOut(c: Candidate): boolean {
+  const last = c.bars[c.bars.length - 1];
+  const prev = c.bars[c.bars.length - 2];
+  return !!c.box && !!last && !!prev && last.c > c.box.top && prev.c <= c.box.top;
+}
+
 /** Facts every framework looks at, computed once. */
 function facts(c: Candidate, market: MarketHealth | undefined) {
   const bars = c.bars;
@@ -33,11 +40,10 @@ function facts(c: Candidate, market: MarketHealth | undefined) {
   const sinceHigh = bars.slice(-CONFIG.HIGH_LOOKBACK).length - 1 - hiIdx;
   const parabolic = c.adrPct > A.MAX_ADR_PCT || c.ret1m > A.MAX_RET_1M || low21 < CONFIG.MIN_PRICE;
   const restDays = c.box ? sessionsSince(bars, c.box.startDate) : 0;
-  const breakingOut = !!c.box && last.c > c.box.top && prev.c <= c.box.top;
   const marketOk = market?.verdict === "bullish";
   return {
     bars, last, prev, s10, s20, s50, low21, spike, vol5, vol20, hi126, sinceHigh,
-    parabolic, restDays, breakingOut, marketOk,
+    parabolic, restDays, breakingOut: breakingOut(c), marketOk,
     rising10: smaRising(bars, 10, CONFIG.SMA_SLOPE_LOOKBACK),
     rising20: smaRising(bars, 20, CONFIG.SMA_SLOPE_LOOKBACK),
     rising50: s50 !== null && smaRising(bars, 50, CONFIG.SMA_SLOPE_LOOKBACK),

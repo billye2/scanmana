@@ -10,7 +10,7 @@ import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
-import { BellIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
+import { BellIcon, BriefcaseIcon, CameraIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { Analysis, Bar, DeckCard, WatchlistAlert } from "@/lib/types";
@@ -38,6 +38,7 @@ export default function Deck({
   candidates,
   alerts,
   savedTickers,
+  takenTickers = [],
   date,
   analysisOverride,
   live = false,
@@ -46,6 +47,8 @@ export default function Deck({
   candidates: DeckCard[];
   alerts: WatchlistAlert[];
   savedTickers: string[];
+  /** Tickers with a live manual paper order or open manual position (the Take control shows "Taken"). */
+  takenTickers?: string[];
   date: string;
   /** Symbol page, non-deck ticker: analysis computed at render time — the modal shows this instead of fetching (nothing is stored). */
   analysisOverride?: Analysis;
@@ -57,6 +60,9 @@ export default function Deck({
   const [idx, setIdx] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, candidates.length - 1)));
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [saved, setSaved] = useState<Set<string>>(new Set(savedTickers));
+  const [taken, setTaken] = useState<Set<string>>(new Set(takenTickers));
+  const [takeStop, setTakeStop] = useState<string | null>(null); // pivot-only card: the typed stop, while the input is open
+  const [takeError, setTakeError] = useState<string | null>(null);
   const shotRef = useRef<(() => HTMLCanvasElement) | null>(null);
   const [snapping, setSnapping] = useState(false);
   // Bars per card. The page embeds bars for the first card(s) only; the rest arrive
@@ -171,6 +177,43 @@ export default function Deck({
       }
     }
   }
+
+  /**
+   * Take the card into the manual paper book: the same buy-stop as ☆ Watch (box
+   * top, else the bare pivot) with the box bottom as the stop. A pivot-only card
+   * has no stop line, so the first tap opens an input for one.
+   */
+  async function take() {
+    const trigger = c.box?.top ?? c.pivot ?? null;
+    if (trigger === null) return;
+    let stop: number | null = c.box?.bottom ?? null;
+    if (stop === null) {
+      if (takeStop === null) {
+        setTakeStop("");
+        return;
+      }
+      stop = Number(takeStop);
+      if (!(stop > 0 && stop < trigger)) {
+        setTakeError("stop must be a price below the trigger");
+        return;
+      }
+    }
+    setTakeError(null);
+    const res = await fetch("/api/paper/take", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker: c.ticker, stop }),
+    });
+    if (res.ok) {
+      setTaken((cur) => new Set(cur).add(c.ticker));
+      setTakeStop(null);
+    } else {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      setTakeError(j.error ?? `take failed (${res.status})`);
+    }
+  }
+  const isTaken = taken.has(c.ticker);
+  const canTake = (c.box?.top ?? c.pivot ?? null) !== null;
 
   // Distance to the trigger from the live price when we have one, else from the stored close.
   const toTrigger = c.box ? (c.box.top / (liveRow?.price ?? c.price) - 1) : null;
@@ -365,20 +408,53 @@ export default function Deck({
         )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-xs text-neutral-400">
+      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-neutral-400">
         {c.box ? (
           <span>
             trigger <span className="font-semibold text-amber-400">{price(c.box.top)}</span>
             {toTrigger !== null && <span className="text-neutral-500"> ({pct(toTrigger, 1)}{liveRow ? " live" : ""})</span>}
             {" · "}stop <span className="font-semibold text-amber-400/80">{price(c.box.bottom)}</span>
           </span>
+        ) : c.pivot !== null ? (
+          <span>
+            pivot <span className="font-semibold text-sky-400">{price(c.pivot)}</span>
+            <span className="text-neutral-600"> · no box, no stop line</span>
+          </span>
         ) : (
           <span className="text-neutral-600">no box — already extended or basing loosely</span>
         )}
-        <span className="text-neutral-600">
-          {idx + 1}/{candidates.length}
+        <span className="flex shrink-0 items-center gap-2">
+          {canTake && (
+            <>
+              {takeStop !== null && !isTaken && (
+                <input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  placeholder="stop"
+                  value={takeStop}
+                  onChange={(e) => setTakeStop(e.target.value)}
+                  className="w-20 rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100"
+                  aria-label="Stop price for the paper order"
+                />
+              )}
+              <button
+                onClick={take}
+                disabled={isTaken}
+                aria-pressed={isTaken}
+                className={`rounded-lg px-2.5 py-1 text-xs font-semibold ${isTaken ? "bg-neutral-800 text-neutral-500" : "bg-emerald-700 text-white active:bg-emerald-600"}`}
+                aria-label={isTaken ? "Taken into the manual paper book" : "Take — arm this buy-stop in the manual paper book"}
+              >
+                {isTaken ? "Taken" : "Take"}
+              </button>
+            </>
+          )}
+          <span className="text-neutral-600">
+            {idx + 1}/{candidates.length}
+          </span>
         </span>
       </div>
+      {takeError && <p className="mt-1 text-xs text-red-300">{takeError}</p>}
       {cameraSlot &&
         createPortal(
           <button
@@ -399,7 +475,7 @@ export default function Deck({
         aria-label="Deck navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
       >
-        <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-5" : "grid-cols-4"}`}>
+        <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-6" : "grid-cols-5"}`}>
           <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
             <ChevronLeftIcon size={25} />
           </button>
@@ -416,6 +492,9 @@ export default function Deck({
               <ListIcon size={25} />
             </Link>
           )}
+          <Link href="/paper" className={BAR_ITEM} aria-label="Paper trading book">
+            <BriefcaseIcon size={25} />
+          </Link>
           <a href={googleUrl} target="_blank" rel="noopener noreferrer" className={BAR_ITEM} aria-label="Google this symbol (opens a new tab)">
             <ExternalLinkIcon size={25} />
           </a>

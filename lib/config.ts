@@ -83,6 +83,17 @@ export const CONFIG = {
     SPIKE_LOOKBACK: 40, // sessions to look back for the last EP-style gap
   },
 
+  // Paper trading (lib/paper-engine.ts): two ledgers priced on the stored EOD
+  // bars. Flat notional per position on both tracks; only the manual account
+  // has cash that binds. The auto track exits on the lowest low of the last
+  // TRAIL_LOOKBACK sessions, ratcheting up only.
+  PAPER: {
+    NOTIONAL: 500, // $ per position, whole shares floored (5% of the manual account)
+    MANUAL_START_CASH: 10_000,
+    TRAIL_LOOKBACK: 10, // sessions; auto trail and the manual "lowest low" trail default
+    SPLIT_GAP_PCT: 0.4, // open this far from the prior close = flag "check for a split"
+  },
+
   // Data requirements
   MIN_BARS: 127, // 6-month return needs 126 bars of history + today
   CHART_BARS: 130, // bars embedded in the scan payload per candidate

@@ -14,9 +14,9 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 
 | Area | Status |
 |---|---|
-| Engine + unit tests | ✅ 56/56 passing (`npm test`) |
+| Engine + unit tests | ✅ 78/78 passing (`npm test`) |
 | Production deploy | ✅ https://scanmana.vercel.app (Vercel project `scanmana`) |
-| Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes; `npm run migrate` is idempotent) |
+| Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes, paper_*; `npm run migrate` is idempotent) |
 | Cron | ✅ `/api/cron/scan` at `0 4 * * 2-6` UTC (midnight EDT / 11pm EST) + catch-up `30 5 * * 2-6` (1:30am EDT; skips if already scanned). Massive publishes the day's grouped bars after 9:30pm ET, so the first run must wait until at least midnight, auth via `CRON_SECRET` |
 | Push | ✅ VAPID keys set on Vercel prod; iOS flow in `components/PushSetup.tsx` — every step reports on screen, subscribed devices get **Send test alert** (`POST /api/push/test`, that device only); verified on the iPhone 2026-09-09 (Apple endpoint in `push_subscriptions` beside the desktop-Chrome one) |
 | Access | ✅ Clerk sign-in — Google or email code, no password (`proxy.ts` = `clerkMiddleware`, `/sign-in` page, `ClerkProvider` in the root layout; since 2026-09-07). Only allowlisted emails can sign in (Clerk dashboard → Restrictions, sign-ups restricted); sessions 30 days (dashboard → Sessions); sign-out link in the `/help` footer. Public: `/api/cron/*` (own secret), manifest, sw.js, icons, `/sign-in`. Unauthenticated `/api/*` → 401 JSON; pages → `/sign-in` and back. |
@@ -24,9 +24,18 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 | Market data | ✅ `MASSIVE_API_KEY` on Vercel; backfill done 2026-09-01 (1.32M bars, 251 dates, 5,692 tickers) |
 | First scan | ✅ 2026-09-01 via **↻ Run scan** (now labelled **Run scan for previous day**; `POST /api/scan/run`): date 2026-08-31, 60 setups (40 boxed, ranked first; parabolic guard added 2026-09-01 — ADR ≤ 15%, 1M ≤ +300%, ≥ $5 on every close of the last 21 sessions) |
 | Analysis | ✅ rule-based Kullamägi/Livermore/Darvas/Minervini-VCP read per candidate (`lib/analysis.ts`, VCP geometry in `lib/minervini.ts`; analyses stored before 2026-09-01 lack the minervini field — UI guards), stored in `analyses` at scan time; **Analysis (Wait/Pass)** button under the symbol (no Take verdict — EOD can't justify an entry, dropped 2026-09-01) (verdict stamped on each payload candidate); **list** icon in the header (and **Deck** in the bottom bar) opens `/deck` — a page (not a popup, Billy's call 2026-09-08) listing the whole deck with verdict chips + tally and a **Live** toggle that groups by bucket (`components/DeckLiveList.tsx`); tap a row → `/?i=N` opens that card; 2026-08-31 (after VCP framework, 2026-09-01 recompute): 33 wait / 27 pass |
+| Paper trading | ✅ (since 2026-09-10) `/paper` (briefcase icon, top nav + bottom bar): two ledgers priced on the stored EOD bars, keyed by Clerk user id. **auto** = every boxed Wait card armed nightly as a buy-stop at the box top / stop at the box bottom, $500 each, no cash cap, stop trails the 10-session low; **manual** = $10k, $500 per position, cash binds, **Take** on a deck card or watchlist row, raise-only stop, optional percent / N-session-low trail, partial sells at the next open. Engine is pure (`lib/paper-engine.ts`, 18 tests); `lib/paper-db.ts` runs it from `scanAndNotify` right after the scan persists (`runPaperNight`: every unprocessed bar date since the user's last one, then arm from tonight's payload; `paper_processed_dates` makes a forced rescan a no-op; a paper failure is logged and never blocks the push). Tables: paper_accounts, paper_orders, paper_positions, paper_exits, paper_skips, paper_processed_dates (`npm run migrate`). The nightly job serves only users with a `paper_accounts` row, created on the first visit to `/paper` — so the ledger starts the night after that visit. Push line: `Paper: N filled, M stopped, K armed`. |
 | Market strip | ✅ Kullamägi index filter (QQQ/SPY 10>20, price > 20/50, 10/20/50 rising → Bullish, else Not bullish); ETF bars seeded via `npm run seed:indices`, kept current by the scan |
 
 ## Next step (user-driven)
+
+Paper trading shipped 2026-09-10: run `npm run migrate`, open `/paper` once on
+the phone (creates the accounts), and the next nightly scan arms the auto book.
+Check the morning after: `/paper` → Auto shows armed orders for the boxed Wait
+cards; the push carried a `Paper:` line. Deferred: a Live overlay on `/paper`
+(Finnhub budget is at 59/60 per minute already), an equity-curve chart (the
+data is in `GET /api/paper/book` → `stats.equityCurve`), stats split by which
+framework said Wait.
 
 Everything runs on its own now. The test alert reached the iPhone 2026-09-09;
 the first real nightly one lands after the next cron (Mon–Fri ~midnight ET,
@@ -96,6 +105,7 @@ Confirm with `vercel ls --prod` → newest is Ready, and curl the prod URL.
 ## Out of scope (v1, deliberate)
 
 Intraday entries or verdicts (live reads on `/s`, the watchlist and the deck are
-display-only; the scan and its Wait/Pass never change during the day), parabolic
+display-only; the scan and its Wait/Pass never change during the day; paper fills
+are decided on daily bars only), parabolic
 shorts, settings UI, journaling, multi-user (sign-in exists, but one allowlisted
 account), TradingView integration.

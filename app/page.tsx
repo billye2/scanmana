@@ -1,9 +1,11 @@
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import Deck from "@/components/Deck";
 import MarketBar from "@/components/MarketBar";
 import PushSetup from "@/components/PushSetup";
 import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
+import { manualTakenTickers } from "@/lib/paper-db";
 import { latestScan, slimDeck } from "@/lib/scan";
 import type { ScanPayload } from "@/lib/types";
 
@@ -13,12 +15,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
   const initialIndex = Number((await searchParams).i ?? 0) || 0;
   let payload: ScanPayload | null = null;
   let savedTickers: string[] = [];
+  let takenTickers: string[] = [];
   let dbError = false;
   try {
     payload = await latestScan();
     const sql = getSql();
     const rows = (await sql`SELECT ticker FROM watchlist`) as { ticker: string }[];
     savedTickers = rows.map((r) => r.ticker);
+    const { userId } = await auth();
+    if (userId) takenTickers = await manualTakenTickers(userId).catch(() => []);
   } catch {
     dbError = true;
   }
@@ -39,7 +44,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
       ) : (
         <>
           <MarketBar market={payload.market} />
-          <Deck candidates={slimDeck(payload.candidates, [initialIndex - 1, initialIndex, initialIndex + 1])} alerts={payload.watchlistAlerts} savedTickers={savedTickers} date={payload.date} live initialIndex={initialIndex} />
+          <Deck candidates={slimDeck(payload.candidates, [initialIndex - 1, initialIndex, initialIndex + 1])} alerts={payload.watchlistAlerts} savedTickers={savedTickers} takenTickers={takenTickers} date={payload.date} live initialIndex={initialIndex} />
         </>
       )}
 

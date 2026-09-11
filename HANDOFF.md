@@ -14,7 +14,7 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 
 | Area | Status |
 |---|---|
-| Engine + unit tests | ✅ 78/78 passing (`npm test`) |
+| Engine + unit tests | ✅ 79/79 passing (`npm test`) |
 | Production deploy | ✅ https://scanmana.vercel.app (Vercel project `scanmana`) |
 | Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes, paper_*; `npm run migrate` is idempotent) |
 | Cron | ✅ `/api/cron/scan` at `0 4 * * 2-6` UTC (midnight EDT / 11pm EST) + catch-up `30 5 * * 2-6` (1:30am EDT; skips if already scanned). Massive publishes the day's grouped bars after 9:30pm ET, so the first run must wait until at least midnight, auth via `CRON_SECRET` |
@@ -29,10 +29,15 @@ and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 
 ## Next step (user-driven)
 
-Paper trading shipped 2026-09-10: run `npm run migrate`, open `/paper` once on
-the phone (creates the accounts), and the next nightly scan arms the auto book.
-Check the morning after: `/paper` → Auto shows armed orders for the boxed Wait
-cards; the push carried a `Paper:` line. Deferred: a Live overlay on `/paper`
+Paper trading shipped 2026-09-10 (1.2.5 → 1.2.8: order kind buy_stop|market,
+Remove on manual orders, camera icon gone, full help section). Migration is
+applied and the accounts exist (Billy opened `/paper` 2026-09-10 00:53 PDT), but
+the 2026-09-09 scan had already run before the code deployed, so **the first
+auto arming is the 2026-09-10 scan (21:00 PDT)**. Check the morning after:
+`/paper` → Auto shows armed orders for the boxed Wait cards (5 would have armed
+from the 09-09 deck: OMER, DK, LFST, MMED, OKTA), the push carried a `Paper:`
+line, `paper_processed_dates` has a row. Two manual buy-stops (OKTA, NUTX) are
+armed and get evaluated that night too. Deferred: a Live overlay on `/paper`
 (Finnhub budget is at 59/60 per minute already), an equity-curve chart (the
 data is in `GET /api/paper/book` → `stats.equityCurve`), stats split by which
 framework said Wait.

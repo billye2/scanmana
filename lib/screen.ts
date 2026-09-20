@@ -15,6 +15,32 @@ import { findPivot } from "./livermore";
 import type { Bar, Candidate, DeckCard } from "./types";
 
 /**
+ * The four hard floors the research sweep (research/sweep.py) moves. The scan
+ * screens every ticker once with LOOSE_LIMITS and records the metrics in
+ * scan_history, so any tighter setting can be replayed as a filter later
+ * without re-running the engine. CONFIG holds the real deck's values.
+ */
+export interface ScreenLimits {
+  MIN_PRICE: number;
+  MIN_DOLLAR_VOLUME: number;
+  MIN_ADR_PCT: number;
+  MAX_DIST_FROM_HIGH: number;
+}
+export const BASE_LIMITS: ScreenLimits = {
+  MIN_PRICE: CONFIG.MIN_PRICE,
+  MIN_DOLLAR_VOLUME: CONFIG.MIN_DOLLAR_VOLUME,
+  MIN_ADR_PCT: CONFIG.MIN_ADR_PCT,
+  MAX_DIST_FROM_HIGH: CONFIG.MAX_DIST_FROM_HIGH,
+};
+/** Loosest value of every sweep grid (research/sweep.py GRIDS) — keep the two in step. */
+export const LOOSE_LIMITS: ScreenLimits = {
+  MIN_PRICE: 5,
+  MIN_DOLLAR_VOLUME: 5_000_000,
+  MIN_ADR_PCT: 2.5,
+  MAX_DIST_FROM_HIGH: 0.3,
+};
+
+/**
  * Compute every Candidate field for a ticker without applying the screen's
  * hard filters. Null only when there isn't enough history. Used by the symbol
  * page for watchlisted names that aren't in tonight's deck.
@@ -64,23 +90,24 @@ const th = (n: number) => `${(n * 100).toFixed(0)}%`; // unsigned, for threshold
  * numbers behind each verdict. `screenTicker` is exactly "all of these pass" —
  * the symbol page uses the list to show WHY a name is or isn't in the deck.
  */
-export function explainScreen(c: DeckCard, bars: Bar[]): ScreenCheck[] {
+export function explainScreen(c: DeckCard, bars: Bar[], limits: ScreenLimits = BASE_LIMITS): ScreenCheck[] {
   const smaFast = sma(bars, CONFIG.SMA_FAST);
   const smaSlow = sma(bars, CONFIG.SMA_SLOW);
   const lowClose = Math.min(...bars.slice(-CONFIG.MIN_PRICE_WINDOW).map((b) => b.c));
+  const L = limits;
   const momentumOk = c.ret1m >= CONFIG.MOMENTUM.M1 || c.ret3m >= CONFIG.MOMENTUM.M3 || c.ret6m >= CONFIG.MOMENTUM.M6;
   return [
-    { label: `Price ≥ $${CONFIG.MIN_PRICE}`, ok: c.price >= CONFIG.MIN_PRICE, detail: usd(c.price) },
-    { label: `Dollar volume ≥ ${usd(CONFIG.MIN_DOLLAR_VOLUME)}/day`, ok: c.dollarVol >= CONFIG.MIN_DOLLAR_VOLUME, detail: `${usd(c.dollarVol)}/day (20-day avg)` },
+    { label: `Price ≥ $${L.MIN_PRICE}`, ok: c.price >= L.MIN_PRICE, detail: usd(c.price) },
+    { label: `Dollar volume ≥ ${usd(L.MIN_DOLLAR_VOLUME)}/day`, ok: c.dollarVol >= L.MIN_DOLLAR_VOLUME, detail: `${usd(c.dollarVol)}/day (20-day avg)` },
     {
       label: `Momentum: 1M ≥ ${th(CONFIG.MOMENTUM.M1)} or 3M ≥ ${th(CONFIG.MOMENTUM.M3)} or 6M ≥ ${th(CONFIG.MOMENTUM.M6)}`,
       ok: momentumOk,
       detail: `1M ${pc(c.ret1m)} · 3M ${pc(c.ret3m)} · 6M ${pc(c.ret6m)}`,
     },
-    { label: `ADR ≥ ${CONFIG.MIN_ADR_PCT}% (moves enough to pay)`, ok: c.adrPct >= CONFIG.MIN_ADR_PCT, detail: `ADR ${c.adrPct.toFixed(1)}%` },
+    { label: `ADR ≥ ${L.MIN_ADR_PCT}% (moves enough to pay)`, ok: c.adrPct >= L.MIN_ADR_PCT, detail: `ADR ${c.adrPct.toFixed(1)}%` },
     { label: `ADR ≤ ${CONFIG.MAX_ADR_PCT}% (not parabolic)`, ok: c.adrPct <= CONFIG.MAX_ADR_PCT, detail: `ADR ${c.adrPct.toFixed(1)}%` },
     { label: `1M return ≤ ${th(CONFIG.MAX_RET_1M)} (has a base)`, ok: c.ret1m <= CONFIG.MAX_RET_1M, detail: `1M ${pc(c.ret1m)}` },
-    { label: `Every close of the last ${CONFIG.MIN_PRICE_WINDOW} sessions ≥ $${CONFIG.MIN_PRICE}`, ok: lowClose >= CONFIG.MIN_PRICE, detail: `lowest close ${usd(lowClose)}` },
+    { label: `Every close of the last ${CONFIG.MIN_PRICE_WINDOW} sessions ≥ $${L.MIN_PRICE}`, ok: lowClose >= L.MIN_PRICE, detail: `lowest close ${usd(lowClose)}` },
     {
       label: `Price above the ${CONFIG.SMA_FAST}- and ${CONFIG.SMA_SLOW}-day averages`,
       ok: smaFast !== null && smaSlow !== null && c.price > smaFast && c.price > smaSlow,
@@ -91,7 +118,7 @@ export function explainScreen(c: DeckCard, bars: Bar[]): ScreenCheck[] {
       ok: smaRising(bars, CONFIG.SMA_FAST, CONFIG.SMA_SLOPE_LOOKBACK) && smaRising(bars, CONFIG.SMA_SLOW, CONFIG.SMA_SLOPE_LOOKBACK),
       detail: `${CONFIG.SMA_FAST}d ${smaRising(bars, CONFIG.SMA_FAST, CONFIG.SMA_SLOPE_LOOKBACK) ? "rising" : "not rising"} · ${CONFIG.SMA_SLOW}d ${smaRising(bars, CONFIG.SMA_SLOW, CONFIG.SMA_SLOPE_LOOKBACK) ? "rising" : "not rising"}`,
     },
-    { label: `Within ${th(CONFIG.MAX_DIST_FROM_HIGH)} of the 6-month high`, ok: c.distFromHigh <= CONFIG.MAX_DIST_FROM_HIGH, detail: `${pc(-c.distFromHigh)} from the high` },
+    { label: `Within ${th(L.MAX_DIST_FROM_HIGH)} of the 6-month high`, ok: c.distFromHigh <= L.MAX_DIST_FROM_HIGH, detail: `${pc(-c.distFromHigh)} from the high` },
   ];
 }
 
@@ -103,6 +130,19 @@ export function screenTicker(ticker: string, name: string, bars: Bar[]): Candida
   const c = buildCandidate(ticker, name, bars);
   if (!c) return null;
   return explainScreen(c, bars).every((k) => k.ok) ? c : null;
+}
+
+/**
+ * One build, two verdicts: does the ticker pass the real screen, and does it
+ * pass the loose one that scan_history records? Null when it fails even the
+ * loose screen (or lacks history). The nightly scan and the history backfill
+ * both go through here so the research tables see exactly the deck's numbers.
+ */
+export function screenBoth(ticker: string, name: string, bars: Bar[]): { candidate: Candidate; basePass: boolean } | null {
+  const c = buildCandidate(ticker, name, bars);
+  if (!c) return null;
+  if (!explainScreen(c, bars, LOOSE_LIMITS).every((k) => k.ok)) return null;
+  return { candidate: c, basePass: explainScreen(c, bars).every((k) => k.ok) };
 }
 
 /** Boxed setups first (there is a level to trade), tightest first within each group, capped at MAX_RESULTS. */

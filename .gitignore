@@ -47,3 +47,7 @@ skills-lock.json
 
 # Claude Code per-machine permissions
 .claude/settings.local.json
+.venv/
+.lavish/
+__pycache__/
+.pytest_cache/

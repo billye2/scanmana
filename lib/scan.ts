@@ -4,7 +4,8 @@ import { getSql } from "./db";
 import { analyzeCandidate } from "./analysis";
 import { assessMarket } from "./market";
 import { fetchGroupedDaily, fetchTickers, sleep, type GroupedBar } from "./massive";
-import { rankCandidates, screenTicker } from "./screen";
+import { LOOSE_LIMITS, rankCandidates, screenBoth } from "./screen";
+import { toHistoryRow, upsertScanHistory, type HistoryRow } from "./scan-history";
 import type { DeckCard, Analysis, Bar, Candidate, ScanPayload, WatchlistAlert } from "./types";
 
 const TICKER_REFRESH_DAYS = 7;
@@ -51,6 +52,8 @@ export async function runScan(opts: { force?: boolean } = {}): Promise<ScanResul
   await sql`DELETE FROM bars WHERE date < CURRENT_DATE - ${CONFIG.PRUNE_DAYS}::int`;
 
   // 4. Coarse SQL prefilter: price, dollar volume, momentum — shrinks 4k tickers to a few hundred.
+  //    Floors are the LOOSE ones: the JS screen below applies the real CONFIG, and the
+  //    loose passers are recorded in scan_history for the research sweep.
   const prefiltered = (await sql`
     WITH ranked AS (
       SELECT ticker, c, v, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
@@ -69,16 +72,17 @@ export async function runScan(opts: { force?: boolean } = {}): Promise<ScanResul
     )
     SELECT ticker FROM agg
     WHERE ticker <> ALL(${[...INDEX_TICKERS]})
-      AND c0 >= ${CONFIG.MIN_PRICE}
-      AND adv >= ${CONFIG.MIN_DOLLAR_VOLUME}
+      AND c0 >= ${LOOSE_LIMITS.MIN_PRICE}
+      AND adv >= ${LOOSE_LIMITS.MIN_DOLLAR_VOLUME}
       AND c6m IS NOT NULL AND c1m > 0 AND c3m > 0 AND c6m > 0
       AND (c0 / c1m - 1 >= ${CONFIG.MOMENTUM.M1}
         OR c0 / c3m - 1 >= ${CONFIG.MOMENTUM.M3}
         OR c0 / c6m - 1 >= ${CONFIG.MOMENTUM.M6})
   `) as { ticker: string }[];
 
-  // 5. Full JS screen on the survivors.
+  // 5. Full JS screen on the survivors — once per ticker, two verdicts (real deck / loose history).
   const candidates: Candidate[] = [];
+  const loose: { candidate: Candidate; basePass: boolean }[] = [];
   const watchRows = (await sql`SELECT ticker, box_top FROM watchlist`) as {
     ticker: string;
     box_top: number | null;
@@ -93,8 +97,10 @@ export async function runScan(opts: { force?: boolean } = {}): Promise<ScanResul
   for (const t of prefiltered) {
     const bars = barsByTicker.get(t.ticker);
     if (!bars) continue;
-    const c = screenTicker(t.ticker, names.get(t.ticker) ?? t.ticker, bars);
-    if (c) candidates.push(c);
+    const r = screenBoth(t.ticker, names.get(t.ticker) ?? t.ticker, bars);
+    if (!r) continue;
+    loose.push(r);
+    if (r.basePass) candidates.push(r.candidate);
   }
   const ranked = rankCandidates(candidates);
 
@@ -116,6 +122,14 @@ export async function runScan(opts: { force?: boolean } = {}): Promise<ScanResul
   const analyses = ranked.map((c) => analyzeCandidate(c, market));
   ranked.forEach((c, i) => (c.verdict = analyses[i].overall));
 
+  // 8b. scan_history rows for every loose passer: the deck's own analysis where it
+  //     exists, a fresh (identical, pure) one for the rest. Read by research/*.py.
+  const rankOf = new Map(ranked.map((c, i) => [c.ticker, i + 1]));
+  const analysisOf = new Map(analyses.map((a) => [a.ticker, a]));
+  const history: HistoryRow[] = loose.map(({ candidate: c, basePass }) =>
+    toHistoryRow(c, analysisOf.get(c.ticker) ?? analyzeCandidate(c, market), basePass, rankOf.get(c.ticker) ?? null, market),
+  );
+
   // 9. Persist.
   const payload: ScanPayload = {
     date,
@@ -129,6 +143,12 @@ export async function runScan(opts: { force?: boolean } = {}): Promise<ScanResul
     ON CONFLICT (date) DO UPDATE SET payload = EXCLUDED.payload, created_at = now()
   `;
   await upsertAnalyses(date, analyses);
+  // Research input only — a failure here (e.g. migration not applied yet) must not fail the scan.
+  try {
+    await upsertScanHistory(date, history);
+  } catch (err) {
+    console.error("scan_history write failed:", err);
+  }
 
   return { status: "ok", date, newSetups: ranked.length, watchlistAlerts: watchlistAlerts.length };
 }
@@ -184,10 +204,45 @@ export async function upsertBars(date: string, dayBars: GroupedBar[]): Promise<v
   }
 }
 
+/**
+ * Confirmed splits from the research layer (research/splits.py, status 'auto'):
+ * bars BEFORE the split date are multiplied by factor (volume divided) so a
+ * 1:3 reverse split stops reading as a +200% month. Empty until the research
+ * job has run (or before the migration) — never throws.
+ */
+async function splitFactors(tickers: string[]): Promise<Map<string, { date: string; factor: number }[]>> {
+  const out = new Map<string, { date: string; factor: number }[]>();
+  try {
+    const rows = (await getSql()`
+      SELECT ticker, date::text AS date, factor FROM research_splits
+      WHERE status = 'auto' AND ticker = ANY(${tickers}) ORDER BY ticker, date
+    `) as { ticker: string; date: string; factor: number }[];
+    for (const r of rows) {
+      const arr = out.get(r.ticker) ?? [];
+      arr.push({ date: r.date, factor: r.factor });
+      out.set(r.ticker, arr);
+    }
+  } catch {
+    // table missing (migration pending) — serve bars as stored
+  }
+  return out;
+}
+
+/** Pure: apply split factors to one ticker's bars (ascending by date). Exported for tests. */
+export function adjustForSplits(bars: Bar[], splits: { date: string; factor: number }[]): Bar[] {
+  if (splits.length === 0) return bars;
+  return bars.map((b) => {
+    let f = 1;
+    for (const s of splits) if (b.date < s.date) f *= s.factor;
+    return f === 1 ? b : { date: b.date, o: b.o * f, h: b.h * f, l: b.l * f, c: b.c * f, v: b.v / f };
+  });
+}
+
 export async function loadBars(tickers: string[]): Promise<Map<string, Bar[]>> {
   const sql = getSql();
   const map = new Map<string, Bar[]>();
   if (tickers.length === 0) return map;
+  const factors = await splitFactors(tickers);
   for (let i = 0; i < tickers.length; i += 200) {
     const chunk = tickers.slice(i, i + 200);
     const rows = (await sql`
@@ -204,6 +259,10 @@ export async function loadBars(tickers: string[]): Promise<Map<string, Bar[]>> {
       }
       arr.push({ date: row.date, o: row.o, h: row.h, l: row.l, c: row.c, v: row.v });
     }
+  }
+  for (const [ticker, splits] of factors) {
+    const arr = map.get(ticker);
+    if (arr) map.set(ticker, adjustForSplits(arr, splits));
   }
   return map;
 }

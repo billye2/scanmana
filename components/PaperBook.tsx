@@ -6,6 +6,7 @@ import { useState } from "react";
 import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
 import type { Track, TrailMode } from "@/lib/paper-engine";
+import type { ReplayRow } from "@/lib/research";
 
 const BTN = "rounded-lg bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 active:bg-neutral-700 disabled:opacity-40";
 const INPUT = "w-24 rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100";
@@ -22,7 +23,7 @@ async function post(path: string, body: unknown, method = "POST"): Promise<strin
   return j.error ?? `${res.status}`;
 }
 
-export default function PaperBook({ book }: { book: Book }) {
+export default function PaperBook({ book, replay = [] }: { book: Book; replay?: ReplayRow[] }) {
   const router = useRouter();
   const [track, setTrack] = useState<Track>("manual");
   const [orderMsg, setOrderMsg] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function PaperBook({ book }: { book: Book }) {
           : "Every boxed Wait card, $500 each, no cash cap, stop trails the 10-session low. Hands off — this measures the scanner."}
       </p>
       <Stats t={t} />
+      <ReplayLine rows={replay.filter((r) => r.track === track)} />
       <Section title={`Armed orders · ${t.orders.length}`}>
         {t.orders.length === 0 ? (
           <Empty>{track === "manual" ? "Nothing armed — tap Take on a deck card or a watchlist row." : "Nothing armed tonight."}</Empty>
@@ -251,6 +253,35 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One line from the research replay (research/replay.py): the exit rule that
+ * would have done best on this track's closed trades, against the current one.
+ */
+function ReplayLine({ rows }: { rows: ReplayRow[] }) {
+  const rules = rows.filter((r) => r.rule !== "actual" && r.avgR !== null);
+  if (rules.length === 0) return null;
+  const best = rules.reduce((a, b) => (b.avgR! > a.avgR! ? b : a));
+  const current = rules.find((r) => r.isCurrent) ?? rows.find((r) => r.rule === "actual") ?? null;
+  const dd = (x: number | null) => (x === null ? "" : ` · ${(x * 100).toFixed(0)}% max drawdown`);
+  return (
+    <p className="rounded-xl bg-neutral-900 px-3 py-2 text-[11px] leading-relaxed text-neutral-400">
+      Replayed on {best.trades} closed trade{best.trades === 1 ? "" : "s"}:{" "}
+      {current && current.rule !== best.rule ? (
+        <>
+          <span className="text-emerald-300">{best.label}</span> would have averaged{" "}
+          <span className="font-semibold text-emerald-300">{rr(best.avgR)}</span> vs {rr(current.avgR)} for {current.label.toLowerCase()}
+          {dd(best.maxDd)}.
+        </>
+      ) : (
+        <>
+          <span className="text-emerald-300">{best.label}</span> is the best of the rules tried ({rr(best.avgR)}{dd(best.maxDd)}).
+        </>
+      )}{" "}
+      <Link href="/research#replay" className="text-neutral-300 underline decoration-neutral-700 underline-offset-4">All rules</Link>
+    </p>
   );
 }
 

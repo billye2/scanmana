@@ -12,6 +12,7 @@ import { explainVcp } from "@/lib/minervini";
 import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
+import type { CardResearch } from "@/lib/research";
 import type { Analysis, Bar, DeckCard, WatchlistAlert } from "@/lib/types";
 import { verdictChip, verdictLabel } from "@/lib/verdict";
 import { APP_VERSION } from "@/lib/version";
@@ -93,6 +94,19 @@ export default function Deck({
   }, [idx, candidates, loadBars]);
   // Live chip + live trigger distance on the card. Budgeted server-side (CONFIG.LIVE); /deck polls the same route.
   const { data: liveDeck } = useLive<LiveDeckBundle>(live ? "/api/scan/live" : null);
+  // Research layer, once per deck: "setups like this" hit rate and the theme cluster per ticker (empty until the jobs have run).
+  const [research, setResearch] = useState<Record<string, CardResearch>>({});
+  useEffect(() => {
+    if (!live) return; // home deck only — the symbol page builds its own card
+    let cancelled = false;
+    fetch("/api/research/deck")
+      .then((r) => (r.ok ? (r.json() as Promise<Record<string, CardResearch>>) : {}))
+      .then((j) => !cancelled && setResearch(j))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [live, date]);
 
   const go = useCallback(
     (delta: number) => {
@@ -288,7 +302,38 @@ export default function Deck({
         <Badge label={`ADR ${c.adrPct.toFixed(1)}%`} tone="blue" />
         <Badge label={`tight ${c.tightness.toFixed(2)}`} tone="amber" />
         {c.ep && <Badge label={`EP ${pct(c.ep.gapPct)} · ${c.ep.volMult.toFixed(0)}× vol`} tone="green" />}
+        {research[c.ticker]?.theme && (
+          <Link href="/research#themes" className="rounded-full bg-sky-900/60 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap text-sky-300 active:opacity-80" aria-label="Theme cluster (research page)">
+            Theme · {research[c.ticker]!.theme!.deckMates.length + 1} deck name{research[c.ticker]!.theme!.deckMates.length === 0 ? "" : "s"}
+          </Link>
+        )}
       </div>
+      {(research[c.ticker]?.likeThis || research[c.ticker]?.theme) && (
+        <div className="mt-1.5 text-[11px] leading-relaxed text-neutral-400">
+          {research[c.ticker]?.likeThis && (
+            <span>
+              Setups like this <span className="text-neutral-500">({c.box ? "boxed" : "no box"}{c.ep ? ", EP" : ""}, {verdictLabel(c.verdict) ?? c.verdict})</span>:{" "}
+              <span className={`font-semibold ${research[c.ticker]!.likeThis!.hitRate >= 0.3 ? "text-emerald-300" : "text-neutral-200"}`}>
+                {Math.round(research[c.ticker]!.likeThis!.hitRate * 100)}% broke out
+              </span>{" "}
+              within 10d · n={research[c.ticker]!.likeThis!.n}
+            </span>
+          )}
+          {research[c.ticker]?.likeThis && research[c.ticker]?.theme && <span className="text-neutral-600"> · </span>}
+          {research[c.ticker]?.theme && (
+            <span>
+              {research[c.ticker]!.theme!.deckMates.length > 0 ? (
+                <>Moves with <span className="font-semibold text-sky-300">{research[c.ticker]!.theme!.deckMates.slice(0, 3).join(" · ")}</span></>
+              ) : (
+                <>Theme <span className="font-semibold text-sky-300">{research[c.ticker]!.theme!.name}</span></>
+              )}
+              <span className="text-neutral-500">
+                {research[c.ticker]!.theme!.deckMates.length > 0 ? ` · ${research[c.ticker]!.theme!.name}` : ""} · {research[c.ticker]!.theme!.memberCount} names · {pct(research[c.ticker]!.theme!.ret63d)} in 63d
+              </span>
+            </span>
+          )}
+        </div>
+      )}
 
       <div className="relative mt-3 min-h-[300px] flex-1 lg:min-h-[480px]">
         {bars ? (

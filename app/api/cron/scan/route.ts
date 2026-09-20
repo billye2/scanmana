@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
+import { triggerResearch } from "@/lib/research";
 import { scanAndNotify } from "@/lib/scan-notify";
 
 export const maxDuration = 300;
@@ -13,7 +14,15 @@ export async function GET(req: Request) {
 
   const force = new URL(req.url).searchParams.get("force") === "1";
   try {
-    return NextResponse.json(await scanAndNotify({ force }));
+    const result = await scanAndNotify({ force });
+    // Research layer (api/research_job.py): runs after the response, skips jobs already
+    // current for the latest scan, so the 1:30am catch-up run (scan "skipped") is where it
+    // normally does its work with the full time budget. Failures are logged, never raised.
+    after(async () => {
+      const r = await triggerResearch({});
+      console.log("research:", JSON.stringify(r));
+    });
+    return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("scan failed:", message);

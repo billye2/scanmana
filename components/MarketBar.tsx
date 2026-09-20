@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { BreadthRow } from "@/lib/research";
 import type { MarketHealth } from "@/lib/types";
 
 const TONE = {
@@ -6,7 +7,7 @@ const TONE = {
   "not-bullish": { dot: "bg-red-400", text: "text-red-300", label: "Not bullish" },
 } as const;
 
-export default function MarketBar({ market }: { market: MarketHealth | undefined }) {
+export default function MarketBar({ market, breadth }: { market: MarketHealth | undefined; breadth?: { today: BreadthRow; prev: BreadthRow | null } | null }) {
   if (!market) {
     return (
       <div className="mb-3 rounded-xl bg-neutral-900 px-3 py-2 text-[11px] text-neutral-500">
@@ -44,6 +45,28 @@ export default function MarketBar({ market }: { market: MarketHealth | undefined
         </span>
       </div>
       <div className="mt-0.5 text-[11px] text-neutral-500">{market.reason}</div>
+      {breadth && <BreadthLine b={breadth.today} prev={breadth.prev} bullish={market.verdict === "bullish"} />}
     </Link>
+  );
+}
+
+/**
+ * Breadth from the research layer (research/breadth.py): share of the whole
+ * universe above its 20-day average. Amber when the index verdict says Bullish
+ * on a thin tape (under 40%) — the case the QQQ/SPY filter cannot see.
+ */
+function BreadthLine({ b, prev, bullish }: { b: BreadthRow; prev: BreadthRow | null; bullish: boolean }) {
+  const pct = Math.round(b.pctAbove20 * 100);
+  const up = prev ? b.pctAbove20 >= prev.pctAbove20 : null;
+  const thin = bullish && b.pctAbove20 < 0.4;
+  const tone = thin ? "text-amber-300" : b.pctAbove20 >= 0.5 ? "text-emerald-300" : "text-red-300";
+  return (
+    <div className="mt-1 text-[11px] text-neutral-400">
+      Breadth <span className={`font-semibold ${tone}`}>{pct}%</span> above 20d
+      {up !== null && <span className={up ? "text-emerald-400" : "text-red-400"}> {up ? "▲" : "▼"}</span>}
+      {b.pctAbove50 !== null && <> · {Math.round(b.pctAbove50 * 100)}% above 50d</>}
+      {" · "}<span className="font-mono">{b.newHighs}</span> new highs / <span className="font-mono">{b.newLows}</span> lows
+      {thin && <span className="text-amber-300"> · narrow tape: only the leaders are working</span>}
+    </div>
   );
 }

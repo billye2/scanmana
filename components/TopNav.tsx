@@ -1,18 +1,19 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BriefcaseIcon, HelpCircleIcon, ListIcon, SearchIcon, StarIcon } from "@/components/Icons";
+import { BriefcaseIcon, FlaskIcon, HelpCircleIcon, ListIcon, SearchIcon, StarIcon } from "@/components/Icons";
 
 const ICONS: { href: string; label: string; Icon: typeof ListIcon }[] = [
   { href: "/help", label: "Help", Icon: HelpCircleIcon },
   { href: "/s", label: "Look up a symbol", Icon: SearchIcon },
   { href: "/watchlist", label: "Watchlist", Icon: StarIcon },
   { href: "/paper", label: "Paper trading", Icon: BriefcaseIcon },
+  { href: "/research", label: "Research — what the history says", Icon: FlaskIcon },
   { href: "/deck", label: "Tonight's deck as a list", Icon: ListIcon },
 ];
 
 /**
  * The one top navigation for every signed-in page: the Scanmana logo always
- * links home, a page line sits under it, and the same five icons sit on the
+ * links home, a page line sits under it, and the same six icons sit on the
  * right (the current page's icon is lit). `extra` slots page-specific controls
  * before the icons (the symbol page's Live toggle).
  */

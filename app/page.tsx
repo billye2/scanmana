@@ -6,6 +6,7 @@ import PushSetup from "@/components/PushSetup";
 import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
 import { manualTakenTickers } from "@/lib/paper-db";
+import { latestBreadth } from "@/lib/research";
 import { latestScan, slimDeck } from "@/lib/scan";
 import type { ScanPayload } from "@/lib/types";
 
@@ -16,6 +17,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
   let payload: ScanPayload | null = null;
   let savedTickers: string[] = [];
   let takenTickers: string[] = [];
+  let breadth: Awaited<ReturnType<typeof latestBreadth>> = null;
   let dbError = false;
   try {
     payload = await latestScan();
@@ -24,6 +26,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
     savedTickers = rows.map((r) => r.ticker);
     const { userId } = await auth();
     if (userId) takenTickers = await manualTakenTickers(userId).catch(() => []);
+    breadth = await latestBreadth();
   } catch {
     dbError = true;
   }
@@ -43,7 +46,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
         </p>
       ) : (
         <>
-          <MarketBar market={payload.market} />
+          <MarketBar market={payload.market} breadth={breadth} />
           <Deck candidates={slimDeck(payload.candidates, [initialIndex - 1, initialIndex, initialIndex + 1])} alerts={payload.watchlistAlerts} savedTickers={savedTickers} takenTickers={takenTickers} date={payload.date} live initialIndex={initialIndex} />
         </>
       )}

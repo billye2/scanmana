@@ -123,3 +123,14 @@ export function BriefcaseIcon(p: P) {
     </Svg>
   );
 }
+
+/** Flask: the research page (what the scanner's history says). */
+export function FlaskIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="M10 2v7.5L4.6 19a1.5 1.5 0 0 0 1.3 2.3h12.2a1.5 1.5 0 0 0 1.3-2.3L14 9.5V2" />
+      <path d="M8.5 2h7" />
+      <path d="M7 15h10" />
+    </Svg>
+  );
+}

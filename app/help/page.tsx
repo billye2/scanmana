@@ -153,6 +153,42 @@ export default async function Help() {
         <IndexCharts bars={indexBars} health={market?.indices} />
       </Term>
 
+      <H>
+        <span id="research">Research — what the history says</span>
+      </H>
+      <Term name="Research page" who="flask icon">
+        Every night, after the scan, a separate Python job replays the scanner&apos;s own history and writes a
+        handful of tables the app reads. Nothing here changes the scan, the verdicts or the paper book; it measures
+        them. Open the <span className="text-neutral-100">Research</span> page (flask icon) for the whole picture; the
+        deck, the market strip and the paper page each show one line from it.
+      </Term>
+      <Term name="Setups like this">
+        On a deck card: of past deck names with the same shape (boxed or not, EP badge or not, Wait or Pass), the share
+        whose close cleared its level within ten sessions (the box top, else the pivot while still overhead, else the 20-session high), and how many such names there were. Wait should beat
+        Pass; when it stops doing so, the rules need a look.
+      </Term>
+      <Term name="Theme">
+        Stocks that moved together over the last three months, grouped from price alone (no sector data exists here).
+        The chip counts tonight&apos;s deck names in the same group; the line names them. Kullamägi buys the leader
+        of the strongest group. You name the groups on the Research page — the job only clusters.
+      </Term>
+      <Term name="Breadth">
+        The share of the whole universe (about 5,000 names) above its 20-day average, under the market strip. The
+        QQQ/SPY filter can say Bullish on a narrow tape; breadth under 40% while the strip is green is flagged in
+        amber, and the Research page shows how the deck&apos;s hit rate falls with breadth.
+      </Term>
+      <Term name="Splits">
+        The stored bars are unadjusted, so a reverse split reads as a +200% month and a forward split as a collapse.
+        The job finds clean-ratio gaps with the matching volume signature; confirmed ones (status <em>auto</em>)
+        rescale the earlier bars everywhere the app reads them. Doubtful ones wait for you on the Research page.
+      </Term>
+      <Term name="Threshold sweep · Replay">
+        The sweep moves one screen floor at a time and shows deck size against hit rate, for retuning{" "}
+        <span className="font-mono text-[12px]">lib/config.ts</span>. The replay runs every closed paper trade under
+        other exit rules (5/10/15/20-session trails, a fixed 8% trail, half off at +2R) and reports which would have
+        made more. Both are reports; the live rules stay as they are until you change them.
+      </Term>
+
       <H>How to use the deck</H>
       <ol className="list-decimal space-y-2 pl-5 text-[13px] leading-relaxed text-neutral-300">
         <li>Check the market strip first. Not bullish means the deck is for watching, not buying.</li>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeCandidate } from "../lib/analysis";
+import { analyzeCandidate, overallVerdict } from "../lib/analysis";
 import { buildCandidate, screenTicker } from "../lib/screen";
 import type { Bar, MarketHealth } from "../lib/types";
 import { breakoutSetup, resetDays } from "./fixtures";
@@ -52,5 +52,18 @@ describe("analyzeCandidate", () => {
     const a = analyzeCandidate(c, notBullish);
     expect(a.qullamaggie.verdict).toBe("wait");
     expect(a.qullamaggie.points.join(" ")).toMatch(/Market filter: off/);
+  });
+});
+
+describe("overallVerdict", () => {
+  it("is the worst of Kullamägi, Darvas and Minervini", () => {
+    expect(overallVerdict({ qullamaggie: "wait", livermore: "wait", darvas: "wait", minervini: "wait" })).toBe("wait");
+    expect(overallVerdict({ qullamaggie: "pass", livermore: "wait", darvas: "wait", minervini: "wait" })).toBe("pass");
+    expect(overallVerdict({ qullamaggie: "wait", livermore: "wait", darvas: "pass", minervini: "wait" })).toBe("pass");
+    expect(overallVerdict({ qullamaggie: "wait", livermore: "wait", darvas: "wait", minervini: "pass" })).toBe("pass");
+  });
+
+  it("does not let Livermore alone turn a card to Pass (his read stays on the card)", () => {
+    expect(overallVerdict({ qullamaggie: "wait", livermore: "pass", darvas: "wait", minervini: "wait" })).toBe("wait");
   });
 });

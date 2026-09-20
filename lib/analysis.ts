@@ -15,6 +15,20 @@ function worst(...v: Verdict[]): Verdict {
   return v.includes("pass") ? "pass" : "wait";
 }
 
+/**
+ * The card's verdict: worst of Kullamägi, Darvas and Minervini. Livermore's read
+ * stays on the card but no longer vetoes it. Measured 2026-09-20 over 149 sessions
+ * of scan_history: the 836 deck cards he alone turned to Pass ("chasing", more than
+ * 5% past the pivot) broke out as often as the Wait cards (69% vs 67% in 10 sessions)
+ * and ran further (+16.5% vs +13.5% best close in 20), while every other framework's
+ * solo veto marked worse cards. In a momentum scanner "past the pivot" describes the
+ * leaders. His objection is still recorded in scan_history.objections so /research
+ * keeps scoring it. Pure.
+ */
+export function overallVerdict(v: { qullamaggie: Verdict; livermore: Verdict; darvas: Verdict; minervini: Verdict }): Verdict {
+  return worst(v.qullamaggie, v.darvas, v.minervini);
+}
+
 /** Closed above the box top today, having closed inside it yesterday — the break is one session old. */
 export function breakingOut(c: Candidate): boolean {
   const last = c.bars[c.bars.length - 1];
@@ -220,7 +234,7 @@ export function analyzeCandidate(c: Candidate, market: MarketHealth | undefined)
   const l = livermore(c, f);
   const d = darvas(c, f);
   const m = minervini(c, f);
-  const overall = worst(q.verdict, l.verdict, d.verdict, m.verdict);
+  const overall = overallVerdict({ qullamaggie: q.verdict, livermore: l.verdict, darvas: d.verdict, minervini: m.verdict });
   let plan: string | null = null;
   if (c.box && f.last.c >= c.box.bottom && c.box.top / c.box.bottom - 1 <= A.MAX_BOX_RISK) {
     const boxRisk = ((c.box.top / c.box.bottom - 1) * 100).toFixed(0);
@@ -235,7 +249,7 @@ export function analyzeCandidate(c: Candidate, market: MarketHealth | undefined)
     overall === "pass"
       ? f.parabolic
         ? "Pass — parabolic spike, no base; not a swing setup under any of the three."
-        : "Pass — at least one framework reads this as failed or already gone."
+        : "Pass — Kullamägi, Darvas or Minervini reads this as failed or already gone."
       : f.breakingOut
         ? `Wait — broke the box today; buy tomorrow's open only if it holds above ${fmt(c.box!.top)}${f.marketOk ? "" : "; market filter is off"}.`
         : `Wait — ${c.box ? "setup is forming, act only on the break" : "no box yet, nothing to act on"}${f.marketOk ? "" : "; market filter is off"}.`;

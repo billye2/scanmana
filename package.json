@@ -1,6 +1,6 @@
 {
   "name": "scanmana",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "private": true,
   "license": "MIT",
   "scripts": {
@@ -14,7 +14,9 @@
     "scan:now": "vercel env run -e production -- bash scripts/scan-now.sh",
     "seed:indices": "vercel env run -e production -- tsx scripts/seed-indices.ts",
     "analyze": "vercel env run -e production -- tsx scripts/analyze.ts",
-    "bump": "node scripts/bump-version.mjs"
+    "bump": "node scripts/bump-version.mjs",
+    "backfill:scans": "vercel env run -e production -- tsx scripts/backfill-scans.ts",
+    "research": "vercel env run -e production -- python3 -m research.run"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.1",

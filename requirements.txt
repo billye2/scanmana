@@ -1,0 +1,5 @@
+# Research layer (api/research_job.py -> research/). Runtime only; pytest is dev.
+numpy==2.3.3
+pandas==2.3.2
+scipy==1.16.2
+psycopg[binary]==3.2.10

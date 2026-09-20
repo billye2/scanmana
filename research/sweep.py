@@ -28,7 +28,7 @@ GRIDS: dict[str, list[float]] = {
     "MAX_DIST_FROM_HIGH": [0.05, 0.10, 0.15, 0.20, 0.25, 0.30],
     "MIN_PRICE": [5, 10, 15, 20, 30],
 }
-CURRENT: dict[str, float] = {"MIN_DOLLAR_VOLUME": 20e6, "MIN_ADR_PCT": 3.5, "MAX_DIST_FROM_HIGH": 0.15, "MIN_PRICE": 10}
+CURRENT: dict[str, float] = {"MIN_DOLLAR_VOLUME": 20e6, "MIN_ADR_PCT": 3.5, "MAX_DIST_FROM_HIGH": 0.05, "MIN_PRICE": 10}
 MAX_RESULTS = 60  # CONFIG.MAX_RESULTS
 
 COLUMNS = ["param", "value", "deck_size", "hit_rate", "avg_r", "n", "is_current", "as_of"]

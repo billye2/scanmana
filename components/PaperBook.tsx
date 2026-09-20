@@ -7,6 +7,7 @@ import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
 import type { Track, TrailMode } from "@/lib/paper-engine";
 import type { ReplayRow } from "@/lib/research";
+import type { Tape } from "@/lib/tape";
 
 const BTN = "rounded-lg bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 active:bg-neutral-700 disabled:opacity-40";
 const INPUT = "w-24 rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100";
@@ -23,7 +24,7 @@ async function post(path: string, body: unknown, method = "POST"): Promise<strin
   return j.error ?? `${res.status}`;
 }
 
-export default function PaperBook({ book, replay = [] }: { book: Book; replay?: ReplayRow[] }) {
+export default function PaperBook({ book, replay = [], tape = null }: { book: Book; replay?: ReplayRow[]; tape?: Tape | null }) {
   const router = useRouter();
   const [track, setTrack] = useState<Track>("manual");
   const [orderMsg, setOrderMsg] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function PaperBook({ book, replay = [] }: { book: Book; replay?: 
           : "Every boxed Wait card, $500 each, no cash cap, stop trails the 10-session low. Hands off — this measures the scanner."}
       </p>
       <Stats t={t} />
+      {tape && <TapeLine tape={tape} />}
       <ReplayLine rows={replay.filter((r) => r.track === track)} />
       <Section title={`Armed orders · ${t.orders.length}`}>
         {t.orders.length === 0 ? (
@@ -260,6 +262,17 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
  * One line from the research replay (research/replay.py): the exit rule that
  * would have done best on this track's closed trades, against the current one.
  */
+/** Tonight's position size from the tape (lib/tape.ts): full, half or quarter of the notional, and why. */
+function TapeLine({ tape }: { tape: Tape }) {
+  const tone = tape.label === "full" ? "text-emerald-300" : tape.label === "half" ? "text-amber-300" : "text-red-300";
+  return (
+    <p className="mt-2 text-[11px] text-neutral-500">
+      Next fills at <span className={`font-semibold ${tone}`}>{tape.label} size</span> ({money(500 * tape.mult)} per position): {tape.reason}.
+      <Link href="/help#paper" className="ml-1 underline decoration-neutral-700 underline-offset-4">Why</Link>
+    </p>
+  );
+}
+
 function ReplayLine({ rows }: { rows: ReplayRow[] }) {
   const rules = rows.filter((r) => r.rule !== "actual" && r.avgR !== null);
   if (rules.length === 0) return null;

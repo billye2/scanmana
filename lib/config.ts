@@ -27,7 +27,7 @@ export const CONFIG = {
   SMA_FAST: 10,
   SMA_SLOW: 20,
   SMA_SLOPE_LOOKBACK: 5, // "rising" = SMA now > SMA 5 sessions ago
-  MAX_DIST_FROM_HIGH: 0.15, // within 15% of 6-month high
+  MAX_DIST_FROM_HIGH: 0.05, // within 5% of the 6-month high (was 0.15 until 2026-09-20: 70% vs 53% ten-day breakout rate, see /research)
   HIGH_LOOKBACK: 126,
 
   // Watchlist cap: 20 fits inside LIVE.WATCH_BUDGET, so every watched name
@@ -92,6 +92,11 @@ export const CONFIG = {
     MANUAL_START_CASH: 10_000,
     TRAIL_LOOKBACK: 10, // sessions; auto trail and the manual "lowest low" trail default
     SPLIT_GAP_PCT: 0.4, // open this far from the prior close = flag "check for a split"
+    // Size by the tape (lib/tape.ts): the notional is scaled by how many of the two
+    // market signals hold at fill time — the index filter (QQQ/SPY Bullish) and breadth
+    // (share of the universe above its 20-day average). Measured 2026-09-20 on 149
+    // sessions: the same setups averaged +0.11R when Bullish and −0.11R when not.
+    TAPE: { BREADTH_MIN: 0.5, ONE_SIGNAL: 0.5, NO_SIGNAL: 0.25 },
   },
 
   // Data requirements

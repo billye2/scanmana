@@ -19,6 +19,7 @@ import {
   type TrackStats,
   type TrailMode,
 } from "./paper-engine";
+import { latestTape, tapeFor, type Tape } from "./tape";
 import type { Bar, ScanPayload } from "./types";
 
 const P = CONFIG.PAPER;
@@ -177,6 +178,8 @@ export async function ensureAccounts(userId: string): Promise<void> {
 /* ---------- nightly ---------- */
 
 export interface PaperNight {
+  /** Tape sizing in force for tonight's arming (null when nothing was processed). */
+  tape?: Tape | null;
   filled: number;
   stopped: number;
   armed: number;
@@ -191,7 +194,7 @@ export interface PaperNight {
  */
 export async function runPaperNight(date: string): Promise<PaperNight> {
   const sql = getSql();
-  const totals: PaperNight = { filled: 0, stopped: 0, armed: 0, cancelled: 0 };
+  const totals: PaperNight = { tape: null, filled: 0, stopped: 0, armed: 0, cancelled: 0 };
   const users = (await sql`SELECT DISTINCT user_id FROM paper_accounts`) as { user_id: string }[];
   for (const { user_id: userId } of users) {
     const [{ last }] = (await sql`
@@ -217,6 +220,7 @@ export async function runPaperNight(date: string): Promise<PaperNight> {
       totals.cancelled += t.cancelled;
     }
   }
+  if (users.length > 0) totals.tape = await tapeFor(date);
   return totals;
 }
 
@@ -228,7 +232,8 @@ async function processOneSession(userId: string, date: string): Promise<{ filled
   const cash = await loadCash(userId);
   const tickers = [...new Set([...orders.map((o) => o.ticker), ...positions.map((p) => p.ticker)])];
   const bars = await loadBarsUntil(tickers, date, P.TRAIL_LOOKBACK + 2);
-  const r = processSession({ date, bars, orders, positions, cash });
+  const tape = await tapeFor(date);
+  const r = processSession({ date, bars, orders, positions, cash, sizeMult: tape.mult });
 
   for (const o of r.orders) {
     const before = orders.find((x) => x.id === o.id)!;
@@ -339,8 +344,9 @@ export async function takeSignal(userId: string, ticker: string, trigger: number
   const kind: OrderKind = lastClose !== null && lastClose > trigger ? "market" : "buy_stop";
   const est = kind === "market" ? lastClose! : trigger; // the price the fill will be near
   if (!(stop < est)) return { ok: false, status: 400, error: `the stop must sit below the last close (${est.toFixed(2)})` };
-  const shares = sizeShares(est);
-  if (shares === 0) return { ok: false, status: 400, error: `one share at ${est.toFixed(2)} costs more than the $${P.NOTIONAL} notional` };
+  const tape = await latestTape();
+  const shares = sizeShares(est, tape.mult);
+  if (shares === 0) return { ok: false, status: 400, error: `one share at ${est.toFixed(2)} costs more than the $${Math.round(P.NOTIONAL * tape.mult)} notional (${tape.label} size: ${tape.reason})` };
   const cash = (await loadCash(userId)).manual;
   const cost = shares * est;
   if (cost > cash) return { ok: false, status: 400, error: `insufficient cash: ${shares} shares need $${cost.toFixed(0)}, you have $${cash.toFixed(0)}` };

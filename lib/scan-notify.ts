@@ -23,7 +23,7 @@ export function scanAndNotify(opts: { force?: boolean } = {}): Promise<ScanResul
         try {
           const paper = await runPaperNight(result.date);
           if (paper.filled || paper.stopped || paper.armed) {
-            parts.push(`Paper: ${paper.filled} filled, ${paper.stopped} stopped, ${paper.armed} armed`);
+            parts.push(`Paper: ${paper.filled} filled, ${paper.stopped} stopped, ${paper.armed} armed${paper.tape && paper.tape.label !== "full" ? ` · ${paper.tape.label} size` : ""}`);
           }
         } catch (err) {
           console.error("paper night failed:", err);

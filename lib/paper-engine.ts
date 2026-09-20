@@ -65,7 +65,7 @@ export interface EnginePosition {
 }
 
 export type EngineEvent =
-  | { type: "fill"; track: Track; ticker: string; price: number; shares: number; late: boolean }
+  | { type: "fill"; track: Track; ticker: string; price: number; shares: number; late: boolean; sizeMult: number }
   | { type: "exit"; track: Track; ticker: string; position: EnginePosition; exit: EngineExit }
   | { type: "skip"; track: Track; ticker: string; reason: string }
   | { type: "cancel"; track: Track; ticker: string; reason: string }
@@ -78,6 +78,8 @@ export interface SessionInput {
   orders: EngineOrder[];
   positions: EnginePosition[];
   cash: Record<Track, number>;
+  /** Notional multiplier for fills this session, from the tape (lib/tape.ts). Defaults to 1. */
+  sizeMult?: number;
 }
 
 export interface SessionResult {
@@ -87,9 +89,9 @@ export interface SessionResult {
   events: EngineEvent[];
 }
 
-/** Whole shares for a flat notional; 0 means one share costs more than the notional. */
-export function sizeShares(price: number): number {
-  return Math.floor(P.NOTIONAL / price);
+/** Whole shares for the notional × the tape multiplier; 0 means one share costs more than that. */
+export function sizeShares(price: number, sizeMult = 1): number {
+  return Math.floor((P.NOTIONAL * sizeMult) / price);
 }
 
 function lowestLow(bars: Bar[], n: number): number {
@@ -194,10 +196,11 @@ export function processSession(input: SessionInput): SessionResult {
     else if (bar.h >= o.trigger) fill = Math.max(bar.o, o.trigger);
     if (fill === null) continue;
 
-    const shares = sizeShares(fill);
+    const sizeMult = input.sizeMult ?? 1;
+    const shares = sizeShares(fill, sizeMult);
     if (shares === 0) {
       o.status = "cancelled";
-      o.cancelledReason = `one share (${fill.toFixed(2)}) costs more than the $${P.NOTIONAL} notional`;
+      o.cancelledReason = `one share (${fill.toFixed(2)}) costs more than the $${Math.round(P.NOTIONAL * sizeMult)} notional${sizeMult < 1 ? " at this tape size" : ""}`;
       events.push({ type: "skip", track: o.track, ticker: o.ticker, reason: o.cancelledReason });
       continue;
     }
@@ -234,7 +237,7 @@ export function processSession(input: SessionInput): SessionResult {
       exits: [],
     };
     positions.push(p);
-    events.push({ type: "fill", track: o.track, ticker: o.ticker, price: fill, shares, late: p.late });
+    events.push({ type: "fill", track: o.track, ticker: o.ticker, price: fill, shares, late: p.late, sizeMult });
 
     if (bar.l <= o.stop) {
       // The order of the two touches inside the day is unknowable; assume the worse one.

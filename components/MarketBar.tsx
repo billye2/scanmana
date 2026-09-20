@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { BreadthRow } from "@/lib/research";
+import { tapeMultiplier } from "@/lib/tape";
 import type { MarketHealth } from "@/lib/types";
 
 const TONE = {
@@ -60,6 +61,7 @@ function BreadthLine({ b, prev, bullish }: { b: BreadthRow; prev: BreadthRow | n
   const up = prev ? b.pctAbove20 >= prev.pctAbove20 : null;
   const thin = bullish && b.pctAbove20 < 0.4;
   const tone = thin ? "text-amber-300" : b.pctAbove20 >= 0.5 ? "text-emerald-300" : "text-red-300";
+  const size = tapeMultiplier(bullish, b.pctAbove20);
   return (
     <div className="mt-1 text-[11px] text-neutral-400">
       Breadth <span className={`font-semibold ${tone}`}>{pct}%</span> above 20d
@@ -67,6 +69,7 @@ function BreadthLine({ b, prev, bullish }: { b: BreadthRow; prev: BreadthRow | n
       {b.pctAbove50 !== null && <> · {Math.round(b.pctAbove50 * 100)}% above 50d</>}
       {" · "}<span className="font-mono">{b.newHighs}</span> new highs / <span className="font-mono">{b.newLows}</span> lows
       {thin && <span className="text-amber-300"> · narrow tape: only the leaders are working</span>}
+      {" · "}paper size <span className={`font-semibold ${size.label === "full" ? "text-emerald-300" : size.label === "half" ? "text-amber-300" : "text-red-300"}`}>{size.label}</span>
     </div>
   );
 }

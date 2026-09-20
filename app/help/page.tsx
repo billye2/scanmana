@@ -255,7 +255,7 @@ export default async function Help() {
         book: two ledgers that trade the deck on paper, priced on the same end-of-day bars the scan uses — nothing live, no
         broker. <span className="text-neutral-100">Auto</span> takes every qualifying card by rule and nobody touches it, so it
         measures the scanner. <span className="text-neutral-100">Manual</span> holds only the names you take, so it measures your
-        selection on top of the scanner. Both use the same fill rules and the same $500 per position, so their numbers compare.
+        selection on top of the scanner. Both use the same fill rules and the same notional per position, so their numbers compare.
       </p>
 
       <Term name="What arms, and when">
@@ -273,19 +273,28 @@ export default async function Help() {
         A buy-stop fills on the first session whose high reaches the trigger, at the trigger — or at the open if the stock gapped past
         it. A stop fills on any session whose low touches it, at the stop — or at the open if it gapped under. If the entry day also
         touches the stop, the trade counts as stopped out that same day: the order of the two touches is unknowable, so the book
-        assumes the worse one. $500 per position in whole shares, so a name above $500 a share is skipped and listed under Skipped.
+        assumes the worse one. $500 per position at full size, in whole shares, so a name that costs more than the notional per share is skipped and listed under Skipped.
         No commissions, no slippage, dividends and splits ignored; a 40%+ overnight gap is flagged &ldquo;check for a split&rdquo;.
       </Term>
 
+      <Term name="Size by the tape">
+        The $500 notional is scaled by two market signals at fill time: the index filter (Bullish or not, top of the home page) and
+        breadth (the share of all stocks above their 20-day average, from Research). Both on: full size. One on: half ($250). Neither:
+        quarter ($125). The market strip and the paper page say which applies tonight. Why: on the scanner&apos;s own history the same
+        setups averaged +0.11R when the index was Bullish and −0.11R when it was not — no setup rule beat a bad tape. Breadth is read
+        from the previous session, since it is computed after the book runs. A signal that is unknown is left out, not counted against
+        the trade.
+      </Term>
+
       <Term name="Auto ledger">
-        No cash cap — every armed signal gets its $500, because a cap would make the record depend on which names happened to
+        No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
         trigger first. The stop starts at the box bottom and each night moves up to the lowest low of the last 10 sessions if that is
         higher; it never moves down. That trail is the only exit. MFE / MAE on each trade show the best and worst price seen while it
         was open, so you can tell what was available versus what the rule captured.
       </Term>
 
       <Term name="Manual ledger">
-        $10,000 to start, $500 per position, and cash binds — a take that does not fit is refused with the reason. Tap{" "}
+        $10,000 to start, the same tape-sized notional per position, and cash binds — a take that does not fit is refused with the reason. Tap{" "}
         <span className="text-neutral-100">Take</span> on a deck card or a watchlist row to arm the same trigger and stop the card
         shows; a pivot-only name has no stop line, so it asks you to type one. When price is already above the trigger the button reads{" "}
         <span className="text-neutral-100">Take at open</span>: a market buy at the next open with the same stop. If the Auto

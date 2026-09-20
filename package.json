@@ -16,7 +16,7 @@
     "analyze": "vercel env run -e production -- tsx scripts/analyze.ts",
     "bump": "node scripts/bump-version.mjs",
     "backfill:scans": "vercel env run -e production -- tsx scripts/backfill-scans.ts",
-    "research": "vercel env run -e production -- python3 -m research.run"
+    "research": "vercel env run -e production -- .venv/bin/python -m research.run"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.9.1",

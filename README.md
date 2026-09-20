@@ -5,7 +5,8 @@
 Personal EOD momentum scanner as a mobile-first PWA. Engine: Qullamaggie-style
 breakout screens (momentum leaders in tight consolidations) with Darvas boxes
 and Livermore pivotal points drawn on each chart as entry-trigger / stop-zone
-overlays.
+overlays. A Python research layer scores the scanner's own history every night
+(`/research`), and the two rule changes so far came from what it measured.
 
 ## Screenshots
 
@@ -40,9 +41,9 @@ overlays.
 - **Paper trading** (`/paper`, `lib/paper-engine.ts` + `lib/paper-db.ts`): two
   ledgers priced on the same end-of-day bars, run right after each nightly scan.
   *Auto* arms a buy-stop at the box top of every boxed Wait card (stop at the box
-  bottom, $500 each, no cash cap) and trails the stop up to the lowest low of the
+  bottom, no cash cap) and trails the stop up to the lowest low of the
   last 10 sessions — hands off, it measures the scanner. *Manual* is a $10k
-  account, $500 per position, cash binds: **Take** on a card or watchlist row arms
+  account, cash binds: **Take** on a card or watchlist row arms
   the same buy-stop; raise the stop, pick a percent or N-session-low trail, or
   queue a partial sell at the next open. Price already above the trigger (the
   breakout-day cards, or a late Take) means a market buy at the next open with
@@ -51,11 +52,18 @@ overlays.
   touches it (at the open if it gapped under); an entry day that also touches the
   stop is a same-day stop-out. No commissions, no slippage; a 40%+ overnight gap
   is flagged "check for a split". Win rate, expectancy in R, profit factor and a
-  realized equity curve per ledger.
+  realized equity curve per ledger. **Position size follows the tape**
+  (`lib/tape.ts`): $500 when the index filter is Bullish *and* breadth is at
+  least 50%, $250 when one of the two holds, $125 when neither — the market
+  strip, the paper page and the nightly push say which applies. Measured
+  reason: the same setups averaged +0.11R when Bullish and −0.11R when not.
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. IWM shown for
-  breadth. `/help#market` charts all three ETFs with their 10/20/50 SMAs.
+  breadth. `/help#market` charts all three ETFs with their 10/20/50 SMAs. A
+  second line carries **breadth** from the research layer — share of the
+  whole universe above its 20-day average, new 63-day highs / lows — amber
+  when the index says Bullish on a thin tape, plus tonight's paper size.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.
@@ -65,9 +73,28 @@ overlays.
   box and Minervini's VCP (progressively shallower contractions, volume
   dry-up, pivot) — Wait / Pass per framework with the reasons (no "Take": EOD data can
   only say what to watch at tomorrow's open, never to buy now), plus a trade plan
-  (trigger · stop · risk) when one exists. Computed at scan time
+  (trigger · stop · risk) when one exists. The card's verdict is the worst of
+  Kullamägi, Darvas and Minervini; Livermore's read is shown but does not veto
+  (since 1.3.0 — the cards his "chasing" objection alone turned to Pass broke
+  out as often as the Wait cards and ran further). Computed at scan time
   (`lib/analysis.ts`), stored in the `analyses` table, served by
   `GET /api/analysis`. `npm run analyze` recomputes for the latest scan.
+- **Research** (flask icon → `/research`, `research/*.py` on a Vercel Python
+  3.13 function chained after each scan): every loose-screen passer is
+  recorded nightly in `scan_history`, then six jobs score it — **outcomes**
+  (did each deck name close above its level within 10 sessions; the level is
+  the box top, else the pivot while overhead, else the 20-session high — hit
+  rate by verdict, badge and which framework objected), **threshold sweep**
+  (deck size and hit rate at every setting of each screen floor, current one
+  marked), **themes** (price-only clusters of the liquid universe on
+  market-residual return correlation; the deck card says "Moves with …" and
+  links the deck-mates), **splits** (unadjusted gaps that look like splits;
+  confirmed ones rescale the bars the scan and charts use, ambiguous ones wait
+  in a review list), **breadth** (per day, back to the start of the bars), and
+  **paper replay** (closed paper trades under trail 5/10/15/20, a fixed 8% and
+  half-off-at-2R). Each deck card shows "Setups like this: N% broke out within
+  10d (n=…)" for its shape. `npm run research -- --jobs outcomes,sweep --force`
+  runs jobs locally against the same DB (needs the `.venv`, see Setup).
 - **List** icon (header, next to ★): every setup in tonight's deck on one screen
   with its Wait / Pass chip, price, box and ★ markers, and a tally at the
   top — no need to page through each card. Tap a row to jump the deck to it.
@@ -131,10 +158,14 @@ and 21-session price floor are the parabolic guard: a sub-dollar shell that
 spiked to $18 passes every floor on today's numbers alone. Ranked with boxed
 setups first (there is a level to trade), then by consolidation tightness
 (10-day range ÷ ADR). EP badge = 10%+ gap on 3× volume in the last 5
-sessions. Paper trading (`CONFIG.PAPER`): $500 notional per position at full
+sessions. Verdict = worst of Kullamägi, Darvas and Minervini (Livermore
+advisory). Paper trading (`CONFIG.PAPER`): $500 notional per position at full
 size — half when only one of the two tape signals (index Bullish, breadth ≥ 50%)
 holds, quarter when neither — $10,000 manual start cash, 10-session trail
-lookback, 40% split-flag gap.
+lookback, 40% split-flag gap. The 5% distance limit and the tape sizing are
+the two settings chosen from `/research` numbers (2026-09-20); the research
+layer itself screens loosely (`LOOSE_LIMITS` in `lib/screen.ts`: $5, $5M,
+ADR 2.5, 30% off the high) so the sweep can re-cut the deck either way.
 
 ## Setup
 
@@ -159,7 +190,13 @@ the iPhone install steps. Manual equivalent:
 3. `npm run migrate` — creates tables (idempotent).
 4. `npm run backfill` — one year of daily bars, ~55 min on the free tier
    (5 calls/min). Resume-safe; re-run if interrupted. Then `npm run
-   seed:indices` for the market strip's ETF history (3 calls).
+   seed:indices` for the market strip's ETF history (3 calls), and
+   `npm run backfill:scans` to replay the loose screen over the stored history
+   so `/research` has something to score on day one (~2 min, no API calls).
+   The research jobs themselves run on Vercel after each scan; nothing to
+   install for that. For local runs and the Python tests: Python ≥ 3.11
+   (`brew install python@3.13`), then `python3.13 -m venv .venv &&
+   .venv/bin/pip install -r requirements.txt pytest`.
 5. Tap **↻ Run scan for previous day** on the app's Help page (or `npm run scan:now`, which calls `/api/cron/scan?force=1` with
    `CRON_SECRET` injected from Vercel).
 6. On iPhone: open the deployed URL in Safari → Share → Add to Home Screen →
@@ -172,26 +209,35 @@ the iPhone install steps. Manual equivalent:
 All of these inject secrets per-process from Vercel (`vercel env run -e production`).
 
 - `npm run dev` / `npm run build`
-- `npm test` — engine unit tests (indicators, Darvas box, screens, market filter)
-- `npm run migrate` / `npm run backfill [calendarDays]` / `npm run seed:indices` (QQQ/SPY/IWM history, once) / `npm run analyze` (recompute analyses for the latest scan)
+- `npm test` — engine unit tests (indicators, Darvas box, screens, market filter, paper engine, tape sizing, research readers; 95)
+- `.venv/bin/pytest tests/py` — research jobs (outcomes, sweep, clusters, splits, breadth, replay; 36) — `test_sweep.py` also asserts the Python grids match `lib/screen.ts` and `lib/config.ts`
+- `npm run migrate` / `npm run backfill [calendarDays]` / `npm run seed:indices` (QQQ/SPY/IWM history, once) / `npm run backfill:scans [-- --days N] [-- --force]` (replay the loose screen into `scan_history`) / `npm run analyze` (recompute analyses for the latest scan)
+- `npm run research -- [--jobs a,b] [--force] [--budget S]` — run research jobs locally against the production DB (writes the same derived tables the nightly function writes)
 - `npm run scan:now` — needs a readable `CRON_SECRET` (see HANDOFF gotcha 6); otherwise use the in-app button
 - Deploy: git-connected since 2026-09-01 — `git push origin main` builds and promotes production automatically (`vercel --prod --yes` still works for an out-of-band deploy)
 
 ## Layout
 
 - `lib/` — pure engine (`indicators`, `screen`, `darvas`, `livermore`,
-  `market`, `analysis`, `paper-engine`), `scan.ts` orchestrator, `scan-notify.ts` (scan + push + paper night, shared by
-  cron and button), `paper-db.ts` (paper book persistence), `massive.ts` API client (retries, pre-EOD fallback),
+  `market`, `analysis`, `paper-engine`, `tape`), `scan.ts` orchestrator (also writes
+  `scan_history` via `scan-history.ts` and applies confirmed split factors), `scan-notify.ts` (scan + push + paper night, shared by
+  cron and button), `paper-db.ts` (paper book persistence), `research.ts` (research
+  readers + `triggerResearch`), `massive.ts` API client (retries, pre-EOD fallback),
   `db.ts`, `push.ts`
-- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/s/[ticker]` symbol page (same card for
+- `research/` — the Python jobs (`run.py` orders and budgets them; `db.py`,
+  `util.py` shared); `api/research_job.py` — the Vercel Python function that
+  runs them (`POST /api/research_job?job=a,b&force=1&budget=S`, Bearer
+  `CRON_SECRET`); `.python-version`, `requirements.txt`, `vercel.json`
+  `functions` block
+- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/research`, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
   `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`,
-  `paper/book|take|sell|stop|trail|order`)
+  `paper/book|take|sell|stop|trail|order`, `research/deck|run|alias|split`)
 - `proxy.ts` — Clerk gate; `lib/auth.ts` — public-path list; `app/sign-in/` — Clerk sign-in page
-- `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `seed-indices`,
+- `scripts/` — `setup.sh` wizard, `migrate`, `backfill`, `backfill-scans`, `seed-indices`,
   `analyze`, `scan-now.sh`, `gen-icons.py`
-- `tests/` — vitest suite with synthetic fixtures
+- `tests/` — vitest suite with synthetic fixtures; `tests/py/` — pytest suite for the research jobs
 
 Out of scope (v1, deliberate): intraday entries or verdicts (the live reads
 are display-only — the scan and its Wait/Pass never change during the day, and

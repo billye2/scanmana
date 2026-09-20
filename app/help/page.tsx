@@ -159,8 +159,22 @@ export default async function Help() {
       <Term name="Research page" who="flask icon">
         Every night, after the scan, a separate Python job replays the scanner&apos;s own history and writes a
         handful of tables the app reads. Nothing here changes the scan, the verdicts or the paper book; it measures
-        them. Open the <span className="text-neutral-100">Research</span> page (flask icon) for the whole picture; the
-        deck, the market strip and the paper page each show one line from it.
+        them. The page answers one question — is the scanner working, and did the last rule change help — in this
+        order: a scorecard, the rule changes, the breakout rates, the threshold sweep, breadth, tonight&apos;s themes.
+        Splits, the paper replay and the job log sit under <em>Maintenance</em> at the bottom. The deck, the market
+        strip and the paper page each show one line from it.
+      </Term>
+      <Term name="Scorecard">
+        Four numbers, each shown for all labelled history and again for everything since the last rule change took
+        effect: the share of deck names that broke out within ten sessions, Wait minus Pass on that share, the average
+        R a Wait card would have made on the box-top-buy / 10-low-trail plan, and the share of scan nights the index
+        filter called Bullish. The line under the tiles reads them out; a red line above them means a job failed or the
+        latest scan has no research run yet, so the numbers may be stale.
+      </Term>
+      <Term name="Rule changes">
+        One row per shipped change, scored on the number it was meant to move — all labelled history before it against
+        everything from it on. A row stays grey until the after side has 30 rows (about two weeks of decks); before
+        that it says when the first read can exist. Changes are registered in code with the change itself.
       </Term>
       <Term name="Setups like this">
         On a deck card: of past deck names with the same shape (boxed or not, EP badge or not, Wait or Pass), the share
@@ -184,7 +198,8 @@ export default async function Help() {
       </Term>
       <Term name="Threshold sweep · Replay">
         The sweep moves one screen floor at a time and shows deck size against hit rate, for retuning{" "}
-        <span className="font-mono text-[12px]">lib/config.ts</span>. The replay runs every closed paper trade under
+        <span className="font-mono text-[12px]">lib/config.ts</span>; its first line names the one knob whose best
+        value is furthest above the current one, or says nothing needs retuning. The replay runs every closed paper trade under
         other exit rules (5/10/15/20-session trails, a fixed 8% trail, half off at +2R) and reports which would have
         made more. Both are reports; the live rules stay as they are until you change them.
       </Term>

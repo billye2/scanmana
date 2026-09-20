@@ -2,7 +2,9 @@
 import numpy as np
 import pandas as pd
 
-from research.clusters import cluster_returns, residual_returns
+from datetime import date
+
+from research.clusters import cluster_returns, history_rows, residual_returns
 
 
 def _prices_from_log_returns(log_returns: np.ndarray, start: float = 100.0) -> np.ndarray:
@@ -110,3 +112,19 @@ def test_market_factor_is_removed_before_clustering():
     log_ret = np.log(closes / closes.shift(1)).iloc[1:]
     resid = residual_returns(log_ret)
     assert abs(resid.mean(axis=1).abs().mean()) < 1e-3  # market component gone
+
+
+def test_history_rows_one_per_member_with_nightly_id_and_stable_key():
+    clusters = [
+        {"cluster_key": "A|B", "members": ["A", "B", "C"], "leaders": ["A", "B"], "member_count": 3, "ret_63d": 0.2},
+        {"cluster_key": "X|Y", "members": ["X", "Y"], "leaders": ["X", "Y"], "member_count": 2, "ret_63d": 0.1},
+    ]
+    rows = history_rows(clusters, date(2026, 9, 21))
+    assert rows == [
+        (date(2026, 9, 21), "A", "A|B", 1),
+        (date(2026, 9, 21), "B", "A|B", 1),
+        (date(2026, 9, 21), "C", "A|B", 1),
+        (date(2026, 9, 21), "X", "X|Y", 2),
+        (date(2026, 9, 21), "Y", "X|Y", 2),
+    ]
+    assert history_rows([], date(2026, 9, 21)) == []

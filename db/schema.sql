@@ -223,6 +223,17 @@ CREATE TABLE IF NOT EXISTS research_cluster_members (
   cluster_id integer NOT NULL
 );
 
+-- Nightly membership snapshot (one row per name per scan date), appended by
+-- research/clusters.py so a per-theme hit rate can be measured later. The two
+-- tables above are rebuilt every night, this one accumulates.
+CREATE TABLE IF NOT EXISTS research_cluster_history (
+  as_of date NOT NULL,
+  ticker text NOT NULL,
+  cluster_key text NOT NULL,
+  cluster_id integer NOT NULL,
+  PRIMARY KEY (as_of, ticker)
+);
+
 CREATE TABLE IF NOT EXISTS research_cluster_alias (
   cluster_key text PRIMARY KEY,
   alias text NOT NULL,

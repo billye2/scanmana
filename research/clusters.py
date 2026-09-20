@@ -1,4 +1,5 @@
-"""Theme clustering from price alone (research_clusters, research_cluster_members).
+"""Theme clustering from price alone (research_clusters, research_cluster_members,
+research_cluster_history).
 
 Groups the liquid universe by 63-session return correlation (hierarchical,
 average linkage, distance = 1 - corr). The equal-weight market return is
@@ -17,7 +18,7 @@ import psycopg
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 
-from .db import load_bars, pyval, replace_table
+from .db import load_bars, pyval, replace_table, write_rows
 from .util import JobContext, as_date, close_matrix
 
 EXCLUDE_TICKERS = {"QQQ", "SPY", "IWM"}  # lib/market.ts CONFIG.MARKET.INDICES
@@ -30,6 +31,21 @@ LOOKBACK_DAYS = 220  # calendar days of bars to load (comfortably > 64 sessions)
 
 CLUSTER_COLUMNS = ["cluster_id", "cluster_key", "leaders", "members", "member_count", "ret_63d", "as_of"]
 MEMBER_COLUMNS = ["ticker", "cluster_id"]
+HISTORY_COLUMNS = ["as_of", "ticker", "cluster_key", "cluster_id"]
+
+
+def history_rows(clusters: list[dict], scan_date) -> list[tuple]:
+    """research_cluster_history rows for one night: (as_of, ticker, cluster_key, cluster_id). Pure.
+
+    cluster_id follows the nightly numbering (1 = strongest), cluster_key is the
+    stable-ish identity (the sorted leaders), so a theme can be followed across
+    nights even when its rank moves.
+    """
+    rows = []
+    for i, cl in enumerate(clusters, start=1):
+        for m in cl["members"]:
+            rows.append((pyval(scan_date), pyval(m), pyval(cl["cluster_key"]), pyval(i)))
+    return rows
 
 
 def residual_returns(log_ret: pd.DataFrame) -> pd.DataFrame:
@@ -170,5 +186,7 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
 
     replace_table(conn, "research_clusters", CLUSTER_COLUMNS, cluster_rows)
     replace_table(conn, "research_cluster_members", MEMBER_COLUMNS, member_rows)
+    # The snapshot accumulates (upsert on as_of, ticker), so a forced rerun of the same night is a no-op.
+    write_rows(conn, "research_cluster_history", HISTORY_COLUMNS, history_rows(clusters, scan_date), conflict=["as_of", "ticker"])
 
     return f"{len(clusters)} clusters from {universe_n} names"

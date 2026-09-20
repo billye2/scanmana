@@ -3,6 +3,22 @@
 // returns an empty shape (never throws) so pages render before the first run.
 import { CONFIG } from "./config";
 import { getSql } from "./db";
+import {
+  type ChangeScore,
+  type Metrics,
+  type PeriodSums,
+  RULE_CHANGES,
+  type RuleChange,
+  ZERO_SUMS,
+  addSums,
+  firstReadDate,
+  lastChangeDate,
+  lensFromMetrics,
+  lensFromTrades,
+  metrics,
+  scoreChange,
+  scorecardSentence,
+} from "./research-story";
 
 /* ---------- trigger ---------- */
 
@@ -391,20 +407,97 @@ export const SWEEP_CURRENT = {
   MIN_PRICE: CONFIG.MIN_PRICE,
 } as const;
 
-/** Realized R of every closed paper position on one track (all users), for the histogram on /research. */
-export async function closedTradeRs(track: "auto" | "manual"): Promise<number[]> {
+/** Realized R of every closed paper position on one track (all users), with its entry date. */
+export async function closedTrades(track: "auto" | "manual"): Promise<{ r: number; entryDate: string }[]> {
   try {
     const rows = (await getSql()`
-      SELECT p.entry_price, p.initial_stop, p.shares,
+      SELECT p.entry_date::text AS entry_date, p.entry_price, p.initial_stop, p.shares,
              sum(e.exit_price * e.shares)::double precision AS proceeds, sum(e.shares)::int AS sold
       FROM paper_positions p JOIN paper_exits e ON e.position_id = p.id
       WHERE p.track = ${track} AND p.status = 'closed'
-      GROUP BY p.id, p.entry_price, p.initial_stop, p.shares
-    `) as { entry_price: number; initial_stop: number; shares: number; proceeds: number; sold: number }[];
+      GROUP BY p.id, p.entry_date, p.entry_price, p.initial_stop, p.shares
+    `) as { entry_date: string; entry_price: number; initial_stop: number; shares: number; proceeds: number; sold: number }[];
     return rows
       .filter((r) => r.sold > 0 && r.entry_price > r.initial_stop)
-      .map((r) => (r.proceeds / r.sold - r.entry_price) / (r.entry_price - r.initial_stop));
+      .map((r) => ({ r: (r.proceeds / r.sold - r.entry_price) / (r.entry_price - r.initial_stop), entryDate: r.entry_date }));
   } catch {
     return [];
   }
+}
+
+/* ---------- the story: scorecard + rule-change scores ---------- */
+
+/**
+ * Labelled deck rows split at `since`: everything before it and everything
+ * from it on. Sums, not rates, so the two halves add up to all-history
+ * (lib/research-story.ts does the arithmetic).
+ */
+export async function periodSums(since: string): Promise<{ before: PeriodSums; since: PeriodSums }> {
+  const empty = { before: { ...ZERO_SUMS }, since: { ...ZERO_SUMS } };
+  try {
+    const sql = getSql();
+    const rows = (await sql`
+      SELECT (h.date >= ${since}::date) AS recent,
+             count(o.broke_10d)::int AS n, coalesce(sum(o.broke_10d::int), 0)::int AS hits,
+             count(o.broke_10d) FILTER (WHERE h.verdict = 'wait')::int AS wait_n,
+             coalesce(sum(o.broke_10d::int) FILTER (WHERE h.verdict = 'wait'), 0)::int AS wait_hits,
+             count(o.broke_10d) FILTER (WHERE h.verdict = 'pass')::int AS pass_n,
+             coalesce(sum(o.broke_10d::int) FILTER (WHERE h.verdict = 'pass'), 0)::int AS pass_hits,
+             count(o.r_at_exit) FILTER (WHERE h.verdict = 'wait')::int AS wait_r_n,
+             coalesce(sum(o.r_at_exit) FILTER (WHERE h.verdict = 'wait'), 0)::double precision AS wait_r_sum
+      FROM scan_history h LEFT JOIN research_outcomes o USING (date, ticker)
+      WHERE h.rank IS NOT NULL GROUP BY 1
+    `) as { recent: boolean; n: number; hits: number; wait_n: number; wait_hits: number; pass_n: number; pass_hits: number; wait_r_n: number; wait_r_sum: number }[];
+    const nights = (await sql`
+      SELECT (d.date >= ${since}::date) AS recent, count(*)::int AS nights, count(*) FILTER (WHERE d.bullish)::int AS bullish
+      FROM (SELECT date, bool_or(market_bullish) AS bullish FROM scan_history WHERE rank IS NOT NULL GROUP BY date) d GROUP BY 1
+    `) as { recent: boolean; nights: number; bullish: number }[];
+    const out = empty;
+    for (const r of rows) {
+      const t = r.recent ? out.since : out.before;
+      t.n = Number(r.n); t.hits = Number(r.hits);
+      t.waitN = Number(r.wait_n); t.waitHits = Number(r.wait_hits);
+      t.passN = Number(r.pass_n); t.passHits = Number(r.pass_hits);
+      t.waitRN = Number(r.wait_r_n); t.waitRSum = Number(r.wait_r_sum);
+    }
+    for (const r of nights) {
+      const t = r.recent ? out.since : out.before;
+      t.nights = Number(r.nights); t.bullishNights = Number(r.bullish);
+    }
+    return out;
+  } catch {
+    return empty;
+  }
+}
+
+export interface Story {
+  sinceDate: string | null; // the last rule change's first effective scan
+  firstRead: string | null; // when "since" can first have labelled rows
+  all: Metrics;
+  since: Metrics;
+  sentence: string;
+  changes: ChangeScore[];
+}
+
+/** Scorecard (all-history vs since the last rule change) and one scored row per shipped change. */
+export async function getStory(changes: RuleChange[] = RULE_CHANGES): Promise<Story> {
+  const sinceDate = lastChangeDate(changes);
+  const dates = [...new Set(changes.map((c) => c.effective))];
+  const sumsByDate = new Map<string, { before: PeriodSums; since: PeriodSums }>();
+  await Promise.all(dates.map(async (d) => sumsByDate.set(d, await periodSums(d))));
+  const needsTrades = changes.some((c) => c.lens === "paper_avg_r");
+  const trades = needsTrades ? await closedTrades("auto") : [];
+
+  const base = sinceDate ? sumsByDate.get(sinceDate)! : await periodSums("9999-12-31");
+  const all = metrics(addSums(base.before, base.since));
+  const since = metrics(base.since);
+
+  const scored = changes.map((c) => {
+    if (c.lens === "paper_avg_r") {
+      return scoreChange(c, lensFromTrades(trades.filter((t) => t.entryDate < c.effective).map((t) => t.r)), lensFromTrades(trades.filter((t) => t.entryDate >= c.effective).map((t) => t.r)));
+    }
+    const s = sumsByDate.get(c.effective)!;
+    return scoreChange(c, lensFromMetrics(c.lens, metrics(s.before)), lensFromMetrics(c.lens, metrics(s.since)));
+  });
+  return { sinceDate, firstRead: sinceDate ? firstReadDate(sinceDate) : null, all, since, sentence: scorecardSentence(all), changes: scored };
 }

@@ -6,7 +6,7 @@ Personal EOD momentum scanner as a mobile-first PWA. Engine: Qullamaggie-style
 breakout screens (momentum leaders in tight consolidations) with Darvas boxes
 and Livermore pivotal points drawn on each chart as entry-trigger / stop-zone
 overlays. A Python research layer scores the scanner's own history every night
-(`/research`), and the two rule changes so far came from what it measured.
+(`/research`) and scores every rule change made from it.
 
 ## Screenshots
 
@@ -92,8 +92,14 @@ overlays. A Python research layer scores the scanner's own history every night
   confirmed ones rescale the bars the scan and charts use, ambiguous ones wait
   in a review list), **breadth** (per day, back to the start of the bars), and
   **paper replay** (closed paper trades under trail 5/10/15/20, a fixed 8% and
-  half-off-at-2R). Each deck card shows "Setups like this: N% broke out within
-  10d (n=…)" for its shape. `npm run research -- --jobs outcomes,sweep --force`
+  half-off-at-2R). The page reads top-down as one question — is the scanner
+  working, did the last rule change help: a **scorecard** (four numbers, all
+  history vs since the last change), the **rule changes** (`RULE_CHANGES` in
+  `lib/research-story.ts`, one entry per shipped change with the number it is
+  scored on, grey until 30 rows), then the rates, the sweep (headline knob
+  first, curves folded), breadth and tonight's themes; splits, replay and the
+  job log live under a collapsed Maintenance block. Each deck card shows
+  "Setups like this: N% broke out within 10d (n=…)" for its shape. `npm run research -- --jobs outcomes,sweep --force`
   runs jobs locally against the same DB (needs the `.venv`, see Setup).
 - **List** icon (header, next to ★): every setup in tonight's deck on one screen
   with its Wait / Pass chip, price, box and ★ markers, and a tally at the
@@ -209,8 +215,8 @@ the iPhone install steps. Manual equivalent:
 All of these inject secrets per-process from Vercel (`vercel env run -e production`).
 
 - `npm run dev` / `npm run build`
-- `npm test` — engine unit tests (indicators, Darvas box, screens, market filter, paper engine, tape sizing, research readers; 95)
-- `.venv/bin/pytest tests/py` — research jobs (outcomes, sweep, clusters, splits, breadth, replay; 36) — `test_sweep.py` also asserts the Python grids match `lib/screen.ts` and `lib/config.ts`
+- `npm test` — engine unit tests (indicators, Darvas box, screens, market filter, paper engine, tape sizing, research readers and story; 109)
+- `.venv/bin/pytest tests/py` — research jobs (outcomes, sweep, clusters, splits, breadth, replay; 37) — `test_sweep.py` also asserts the Python grids match `lib/screen.ts` and `lib/config.ts`
 - `npm run migrate` / `npm run backfill [calendarDays]` / `npm run seed:indices` (QQQ/SPY/IWM history, once) / `npm run backfill:scans [-- --days N] [-- --force]` (replay the loose screen into `scan_history`) / `npm run analyze` (recompute analyses for the latest scan)
 - `npm run research -- [--jobs a,b] [--force] [--budget S]` — run research jobs locally against the production DB (writes the same derived tables the nightly function writes)
 - `npm run scan:now` — needs a readable `CRON_SECRET` (see HANDOFF gotcha 6); otherwise use the in-app button
@@ -222,7 +228,8 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
   `market`, `analysis`, `paper-engine`, `tape`), `scan.ts` orchestrator (also writes
   `scan_history` via `scan-history.ts` and applies confirmed split factors), `scan-notify.ts` (scan + push + paper night, shared by
   cron and button), `paper-db.ts` (paper book persistence), `research.ts` (research
-  readers + `triggerResearch`), `massive.ts` API client (retries, pre-EOD fallback),
+  readers + `triggerResearch`), `research-story.ts` (rule-change registry,
+  scorecard arithmetic, sweep headline, health line — pure), `massive.ts` API client (retries, pre-EOD fallback),
   `db.ts`, `push.ts`
 - `research/` — the Python jobs (`run.py` orders and budgets them; `db.py`,
   `util.py` shared); `api/research_job.py` — the Vercel Python function that

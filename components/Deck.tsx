@@ -323,7 +323,17 @@ export default function Deck({
           {research[c.ticker]?.theme && (
             <span>
               {research[c.ticker]!.theme!.deckMates.length > 0 ? (
-                <>Moves with <span className="font-semibold text-sky-300">{research[c.ticker]!.theme!.deckMates.slice(0, 3).join(" · ")}</span></>
+                <>
+                  Moves with{" "}
+                  {research[c.ticker]!.theme!.deckMates.slice(0, 3).map((t, i) => (
+                    <span key={t}>
+                      {i > 0 && <span className="text-neutral-600"> · </span>}
+                      <Link href={`/s/${encodeURIComponent(t)}`} className="font-semibold text-sky-300 underline decoration-sky-300/40 underline-offset-4 active:opacity-70" aria-label={`Open ${t}`}>
+                        {t}
+                      </Link>
+                    </span>
+                  ))}
+                </>
               ) : (
                 <>Theme <span className="font-semibold text-sky-300">{research[c.ticker]!.theme!.name}</span></>
               )}

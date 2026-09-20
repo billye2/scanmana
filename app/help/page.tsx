@@ -211,7 +211,7 @@ export default async function Help() {
           Tap <span className="text-neutral-100">Analysis</span> under the symbol for a rule-based read of the card through
           all four frameworks — Kullamägi, Livermore, Darvas and Minervini&apos;s VCP (successive contractions, each
           shallower, volume drying up) — Wait / Pass with the reasons, computed from the same numbers at scan time. The card&apos;s
-          verdict is the worst of Kullamägi, Darvas and Minervini; Livermore&apos;s read is shown but does not veto (since 1.2.10:
+          verdict is the worst of Kullamägi, Darvas and Minervini; Livermore&apos;s read is shown but does not veto (since 1.3.0:
           the cards he alone turned to Pass, &ldquo;chasing&rdquo; past the pivot, broke out as often as the Wait cards and ran
           further — see Research). There is no &ldquo;Take&rdquo;: end-of-day data can only tell you what to watch tomorrow, never to buy now.
         </li>

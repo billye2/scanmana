@@ -134,3 +134,26 @@ export function FlaskIcon(p: P) {
     </Svg>
   );
 }
+
+/** Magnifier with a plus: zoom the chart to the last 30 sessions. */
+export function ZoomInIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M11 8v6" />
+      <path d="M8 11h6" />
+    </Svg>
+  );
+}
+
+/** Magnifier with a minus: back to the full chart window. */
+export function ZoomOutIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+      <path d="M8 11h6" />
+    </Svg>
+  );
+}

@@ -124,6 +124,11 @@ export default async function Help() {
         The stock is making fresh highs (nothing above it to break) or its range is too tall. It passed the momentum
         screen but there is no clean level to trade — watch it, don&apos;t chase it.
       </Term>
+      <Term name="30d / All">
+        The pill in the chart&apos;s top-left corner zooms to the last 30 sessions — six trading weeks, enough to see
+        the base and the last few candles clearly. Tap <span className="font-mono">All</span> to return to the full
+        window. On the deck the setting carries over as you swipe between cards.
+      </Term>
 
       <H>
         <span id="market">The market strip</span>

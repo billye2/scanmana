@@ -60,7 +60,9 @@ overlays. A Python research layer scores the scanner's own history every night
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. `/help#market`
-  charts both ETFs with their 10/20/50 SMAs. A
+  charts both ETFs with their 10/20/50 SMAs. Every chart has a **30d / All**
+  pill: zoom to the last 30 sessions, tap again for the full window (the deck
+  keeps the setting as you swipe). A
   second line carries **breadth** from the research layer — share of the
   whole universe above its 20-day average, new 63-day highs / lows — amber
   when the index says Bullish on a thin tape, plus tonight's paper size.

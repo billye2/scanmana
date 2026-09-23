@@ -59,6 +59,7 @@ export default function Deck({
 }) {
   const [idx, setIdx] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, candidates.length - 1)));
   const [showAnalysis, setShowAnalysis] = useState(false);
+  const [zoomed, setZoomed] = useState(false); // chart window: last 30 sessions or all bars; shared across cards
   const [saved, setSaved] = useState<Set<string>>(new Set(savedTickers));
   const [taken, setTaken] = useState<Set<string>>(new Set(takenTickers));
   const [takeStop, setTakeStop] = useState<string | null>(null); // pivot-only card: the typed stop, while the input is open
@@ -347,7 +348,7 @@ export default function Deck({
 
       <div className="relative mt-3 min-h-[300px] flex-1 lg:min-h-[480px]">
         {bars ? (
-          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} />
+          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} zoomed={zoomed} onZoomChange={setZoomed} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-600">
             {barsErrors[c.ticker] ? `Chart unavailable — ${barsErrors[c.ticker]}` : "Loading chart…"}

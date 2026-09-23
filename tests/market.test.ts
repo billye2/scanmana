@@ -33,10 +33,10 @@ describe("indexHealth", () => {
 });
 
 describe("assessMarket", () => {
-  it("is bullish when both leaders are above rising averages", () => {
+  it("is bullish when both leaders are above rising averages, ignoring tickers outside the index list", () => {
     const m = assessMarket(new Map([["QQQ", up()], ["SPY", up()], ["IWM", down()]]))!;
     expect(m.verdict).toBe("bullish");
-    expect(m.indices.map((i) => i.ticker)).toEqual(["QQQ", "SPY", "IWM"]);
+    expect(m.indices.map((i) => i.ticker)).toEqual(["QQQ", "SPY"]);
   });
   it("is not bullish when a leader is in a downtrend, even if the other is fine", () => {
     const m = assessMarket(new Map([["QQQ", up()], ["SPY", down()]]))!;
@@ -55,7 +55,7 @@ describe("assessMarket", () => {
     expect(m.verdict).toBe("not-bullish");
     expect(m.reason).toMatch(/QQQ 10d below 20d/);
   });
-  it("ignores non-leader indexes for the verdict and returns null without leaders", () => {
+  it("returns null without a leader", () => {
     expect(assessMarket(new Map([["IWM", down()]]))).toBeNull();
   });
 });

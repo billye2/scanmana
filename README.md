@@ -59,8 +59,8 @@ overlays. A Python research layer scores the scanner's own history every night
   reason: the same setups averaged +0.11R when Bullish and −0.11R when not.
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
-  otherwise **Not bullish** naming the failing condition. IWM shown for
-  breadth. `/help#market` charts all three ETFs with their 10/20/50 SMAs. A
+  otherwise **Not bullish** naming the failing condition. `/help#market`
+  charts both ETFs with their 10/20/50 SMAs. A
   second line carries **breadth** from the research layer — share of the
   whole universe above its 20-day average, new 63-day highs / lows — amber
   when the index says Bullish on a thin tape, plus tonight's paper size.
@@ -134,7 +134,7 @@ overlays. A Python research layer scores the scanner's own history every night
   block (contraction sequence, final tightness, volume dry-up — an analysis
   lens, not a screen filter). Deck cards carry the same two panels below the
   buttons, collapsed to one-line summaries (every deck name passes the screen). A **Live** toggle reruns the whole read intraday:
-  Finnhub free quotes (symbol + QQQ/SPY/IWM, 30-minute in-memory cache) become
+  Finnhub free quotes (symbol + QQQ/SPY, 30-minute in-memory cache) become
   a provisional today-bar — volume assumed at the 20-day average — and the
   market filter recomputes from the live indexes; failures fall back to EOD
   with a note. The Analysis modal for a symbol outside the scan

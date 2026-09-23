@@ -21,7 +21,7 @@ from scipy.spatial.distance import squareform
 from .db import load_bars, pyval, replace_table, write_rows
 from .util import JobContext, as_date, close_matrix
 
-EXCLUDE_TICKERS = {"QQQ", "SPY", "IWM"}  # lib/market.ts CONFIG.MARKET.INDICES
+EXCLUDE_TICKERS = {"QQQ", "SPY", "IWM"}  # lib/config.ts CONFIG.MARKET.STORED
 MIN_PRICE = 5.0  # lib/screen.ts LOOSE_LIMITS.MIN_PRICE
 MIN_DOLLAR_VOLUME = 5_000_000.0  # lib/screen.ts LOOSE_LIMITS.MIN_DOLLAR_VOLUME
 MIN_HISTORY_SESSIONS = 64  # 64 closes -> 63 daily log returns

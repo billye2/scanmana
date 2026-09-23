@@ -10,7 +10,7 @@ import type { DeckCard, Analysis, Bar, Candidate, ScanPayload, WatchlistAlert } 
 
 const TICKER_REFRESH_DAYS = 7;
 const MIN_MARKET_BARS = 1000; // fewer grouped rows than this => holiday / data not ready
-const INDEX_TICKERS = new Set<string>(CONFIG.MARKET.INDICES);
+const INDEX_TICKERS = new Set<string>(CONFIG.MARKET.STORED);
 
 export type ScanResult =
   | { status: "ok"; date: string; newSetups: number; watchlistAlerts: number }

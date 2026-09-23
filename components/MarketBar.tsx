@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CONFIG } from "@/lib/config";
 import type { BreadthRow } from "@/lib/research";
 import { tapeMultiplier } from "@/lib/tape";
 import type { MarketHealth } from "@/lib/types";
@@ -23,7 +24,8 @@ export default function MarketBar({ market, breadth }: { market: MarketHealth | 
         <span className={`inline-block h-2 w-2 rounded-full ${t.dot}`} />
         <span className={`font-semibold ${t.text}`}>Market {t.label}</span>
         <span className="ml-auto flex gap-2 font-mono text-[11px]">
-          {market.indices.map((i) => (
+          {/* Filter at render time: a stored scan may carry an index that has since left CONFIG (IWM, 2026-09-22). */}
+          {market.indices.filter((i) => (CONFIG.MARKET.INDICES as readonly string[]).includes(i.ticker)).map((i) => (
             <span key={i.ticker} className="text-neutral-400">
               {i.ticker}
               <span

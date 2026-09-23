@@ -132,7 +132,7 @@ export default async function Help() {
         Kullamägi&apos;s first rule is that the index decides whether breakouts work at all. His stated filter: while
         the Nasdaq (QQQ) and S&amp;P (SPY) have their <span className="text-neutral-100">10-day average above the
         20-day</span>, breakouts and EPs work; when the 10 crosses under the 20, they fail repeatedly and he steps
-        aside. Small caps (IWM) are shown for breadth. Per index the strip shows{" "}
+        aside. Per index the strip shows{" "}
         <span className="font-mono">10&gt;20</span> or <span className="font-mono">10&lt;20</span>, then one ▲/▼ per
         average (10, 20, 50): green ▲ = price above it and rising, amber ▲ = above but flat/falling, red ▼ = below.
         <span className="mt-1 block">

@@ -1,4 +1,4 @@
-// Seed a year of daily bars for the market-health index ETFs (QQQ/SPY/IWM).
+// Seed a year of daily bars for the market-health index ETFs (CONFIG.MARKET.STORED: QQQ/SPY/IWM).
 // The nightly scan keeps them current afterwards. One API call per index.
 // Usage: npm run seed:indices
 import { CONFIG } from "../lib/config";
@@ -9,7 +9,7 @@ import { upsertBars } from "../lib/scan";
 async function main() {
   const to = addDays(etToday(), -1);
   const from = addDays(to, -CONFIG.PRUNE_DAYS);
-  for (const t of CONFIG.MARKET.INDICES) {
+  for (const t of CONFIG.MARKET.STORED) {
     const bars = await fetchDailyRange(t, from, to);
     for (const b of bars) await upsertBars(b.date, [{ T: t, o: b.o, h: b.h, l: b.l, c: b.c, v: b.v }]);
     console.log(`${t}: ${bars.length} bars (${bars[0]?.date} → ${bars.at(-1)?.date})`);

@@ -63,10 +63,15 @@ export const CONFIG = {
 
   // Market health (Kullamägi: trade breakouts when the indexes sit above rising
   // 10/20-day averages; step back when they're below the 20-day). Verdict is
-  // computed from LEADERS; the rest are shown for context.
+  // computed from LEADERS; anything else in INDICES is shown for context only.
+  // STORED is the set of ETFs the scan keeps bars for (and keeps out of the
+  // screen); IWM stays there for research but left INDICES on 2026-09-22 —
+  // small caps don't trend with the leaders, so the strip read as three
+  // signals when only two decide. Nothing in the app shows or names IWM.
   MARKET: {
-    INDICES: ["QQQ", "SPY", "IWM"],
+    INDICES: ["QQQ", "SPY"],
     LEADERS: ["QQQ", "SPY"],
+    STORED: ["QQQ", "SPY", "IWM"],
     SMAS: [10, 20, 50],
     SLOPE_LOOKBACK: 5,
   },

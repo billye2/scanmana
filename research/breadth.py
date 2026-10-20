@@ -11,7 +11,7 @@ from datetime import timedelta
 import pandas as pd
 import psycopg
 
-from .db import load_bars, pyval, write_rows
+from .db import load_bars, pyval, read_df, write_rows
 from .util import JobContext, as_date, close_matrix, sma
 
 EXCLUDE_TICKERS = {"QQQ", "SPY", "IWM"}  # lib/config.ts CONFIG.MARKET.STORED
@@ -19,7 +19,11 @@ MIN_PRICE = 5.0  # lib/screen.ts LOOSE_LIMITS.MIN_PRICE
 MIN_DOLLAR_VOLUME = 5_000_000.0  # lib/screen.ts LOOSE_LIMITS.MIN_DOLLAR_VOLUME
 MIN_UNIVERSE = 100  # skip thin days (holidays, partial data) entirely
 MIN_PRIOR_SESSIONS = 63  # need a full 63-session window for new_highs/new_lows
-LOOKBACK_DAYS = 470  # calendar days of bars to load
+LOOKBACK_DAYS = 470  # calendar days of bars to load when research_breadth is empty (bootstrap)
+# Nightly: research_breadth already holds every earlier date, so only the dates
+# since the last stored one are recomputed, from a window that still gives the
+# first of them MIN_PRIOR_SESSIONS of history (110 calendar days >= 73 sessions).
+INCREMENT_LOOKBACK_DAYS = 110
 WRITE_WINDOW_DAYS = 400  # calendar days of output to keep (matches CONFIG.PRUNE_DAYS)
 
 BREADTH_COLUMNS = ["date", "universe", "pct_above_20", "pct_above_50", "pct_10_over_20", "new_highs", "new_lows"]
@@ -100,10 +104,19 @@ def compute_breadth(
 
 
 def run(conn: psycopg.Connection, ctx: JobContext) -> str:
-    """Recompute breadth for every date in the write window and upsert it."""
+    """Compute breadth for the dates not yet stored (plus the last stored one, so a
+    rescan of that date is picked up) and upsert them. Loads closes and volume only."""
     scan_date = as_date(ctx.scan_date)
-    since = (scan_date - timedelta(days=LOOKBACK_DAYS)).isoformat()
-    bars = load_bars(conn, since=since)
+    stored = read_df(conn, "SELECT max(date) AS d FROM research_breadth")
+    last_stored = stored["d"].iloc[0] if not stored.empty else None
+    if last_stored is None or pd.isna(last_stored):
+        since = scan_date - timedelta(days=LOOKBACK_DAYS)
+        write_from = None
+    else:
+        last_stored = as_date(last_stored)
+        since = last_stored - timedelta(days=INCREMENT_LOOKBACK_DAYS)
+        write_from = pd.Timestamp(last_stored)
+    bars = load_bars(conn, since=since.isoformat(), columns=("c", "v"))
     if bars.empty:
         return "0 dates written"
 
@@ -114,6 +127,8 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         return "0 dates written"
 
     cutoff = pd.Timestamp(scan_date - timedelta(days=WRITE_WINDOW_DAYS))
+    if write_from is not None:
+        cutoff = max(cutoff, write_from)
     out = out[out["date"] >= cutoff]
     if out.empty:
         return "0 dates written"

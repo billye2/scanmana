@@ -15,7 +15,18 @@ import psycopg
 from .db import load_bars, pyval, read_df, write_rows
 from .util import JobContext, as_date
 
-LOOKBACK_DAYS = 400  # calendar days of bars to load (matches CONFIG.PRUNE_DAYS)
+LOOKBACK_DAYS = 400  # calendar days of bars to scan (matches CONFIG.PRUNE_DAYS)
+
+# Postgres finds the gap days (the same o / previous-close test as detect_splits)
+# and only the tickers that have one are loaded in full — a few dozen names
+# instead of the whole 1.4M-row table every night.
+GAP_TICKERS_SQL = """
+SELECT DISTINCT ticker FROM (
+  SELECT ticker, o / NULLIF(lag(c) OVER (PARTITION BY ticker ORDER BY date), 0) AS g
+  FROM bars WHERE date >= %s
+) t WHERE g >= %s OR (g > 0 AND g <= %s)
+ORDER BY ticker
+"""
 
 # "Clean" split ratios. Reverse: g ~= R. Forward: g ~= 1/R.
 REVERSE_RATIOS = [2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 100]
@@ -159,10 +170,11 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
     """Detect split candidates and upsert research_splits, preserving 'ignored' rows."""
     scan_date = as_date(ctx.scan_date)
     since = (scan_date - timedelta(days=LOOKBACK_DAYS)).isoformat()
-    bars = load_bars(conn, since=since)
-    if bars.empty:
-        return "0 candidates: 0 auto, 0 review"
+    gap_tickers = read_df(conn, GAP_TICKERS_SQL, [since, GAP_THRESHOLD, 1.0 / GAP_THRESHOLD])
+    tickers = gap_tickers["ticker"].tolist() if not gap_tickers.empty else []
+    bars = load_bars(conn, tickers=tickers, since=since) if tickers else pd.DataFrame()
 
+    # Empty is a real answer (no gap anywhere): the reconciliation below then drops stale rows.
     detected = detect_splits(bars)
 
     ignored_df = read_df(conn, "SELECT ticker, date::text AS date FROM research_splits WHERE status = 'ignored'")

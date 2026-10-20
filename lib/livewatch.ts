@@ -4,8 +4,8 @@
 import { CONFIG } from "./config";
 import { getSql } from "./db";
 import { getQuotes, LOOKUP_TTL_MS, WATCH_TTL_MS, type CachedQuote, type Quote } from "./intraday";
-import { latestScan } from "./scan";
-import type { Candidate, Verdict } from "./types";
+import { latestLiveCards, type LiveCard } from "./scan";
+import type { Verdict } from "./types";
 
 export type WatchStatus = "breaking" | "failed" | "stopped" | "approaching" | "quiet";
 
@@ -71,7 +71,7 @@ export interface LiveWatchBundle {
 }
 
 /** Deck candidates carry a box or a bare pivot; the trigger is whichever exists (same rule as ☆ Watch). Pure; exported for tests. */
-export function toLiveEntries(candidates: Candidate[]): LiveEntry[] {
+export function toLiveEntries(candidates: LiveCard[]): LiveEntry[] {
   return candidates.map((c) => ({
     ticker: c.ticker,
     boxTop: c.box?.top ?? c.pivot ?? null,
@@ -131,8 +131,8 @@ export interface LiveDeckBundle extends LiveWatchBundle {
 
 /** Tonight's deck against live quotes — the same read as the watchlist, for every card. */
 export async function deckLive(): Promise<LiveDeckBundle> {
-  const scan = await latestScan();
+  const scan = await latestLiveCards();
   if (!scan) return { rows: [], asOf: "", live: false, date: null };
-  const bundle = await liveRows(toLiveEntries(scan.candidates), CONFIG.LIVE.DECK_BUDGET);
+  const bundle = await liveRows(toLiveEntries(scan.cards), CONFIG.LIVE.DECK_BUDGET);
   return { ...bundle, date: scan.date };
 }

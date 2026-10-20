@@ -18,7 +18,7 @@ import psycopg
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 
-from .db import load_bars, pyval, replace_table, write_rows
+from .db import load_bars, pyval, read_df, replace_table, write_rows
 from .util import JobContext, as_date, close_matrix
 
 EXCLUDE_TICKERS = {"QQQ", "SPY", "IWM"}  # lib/config.ts CONFIG.MARKET.STORED
@@ -27,7 +27,35 @@ MIN_DOLLAR_VOLUME = 5_000_000.0  # lib/screen.ts LOOSE_LIMITS.MIN_DOLLAR_VOLUME
 MIN_HISTORY_SESSIONS = 64  # 64 closes -> 63 daily log returns
 MAX_UNIVERSE = 1500  # cap on the most liquid names, to bound the matrix
 RETURN_WINDOW = 64  # closes fed into the correlation calc (63 returns)
-LOOKBACK_DAYS = 220  # calendar days of bars to load (comfortably > 64 sessions)
+UNIVERSE_LOOKBACK_DAYS = 220  # calendar days the universe query counts sessions over (aggregates only, nothing loaded)
+CLOSE_LOOKBACK_DAYS = 110  # calendar days of closes loaded for the universe (>= 73 sessions > RETURN_WINDOW)
+
+# The universe filter runs in Postgres: latest close, the 20-session average
+# dollar volume (over the market's last 20 sessions, all present — the same
+# thing the old rolling(20, min_periods=20) over the wide frame required) and
+# the session count. Only the MAX_UNIVERSE survivors' closes leave the database.
+UNIVERSE_SQL = """
+WITH span AS (
+  SELECT DISTINCT date FROM bars WHERE date >= %(since)s AND date <= %(until)s
+),
+last20 AS (SELECT date FROM span ORDER BY date DESC LIMIT 20),
+agg AS (
+  SELECT ticker,
+    count(*) AS n_sessions,
+    max(c) FILTER (WHERE date = (SELECT max(date) FROM last20)) AS latest_close,
+    avg(c * v) FILTER (WHERE date IN (SELECT date FROM last20)) AS dv20,
+    count(*) FILTER (WHERE date IN (SELECT date FROM last20)) AS n20
+  FROM bars WHERE date >= %(since)s AND date <= %(until)s
+  GROUP BY ticker
+)
+SELECT ticker FROM agg
+WHERE NOT (ticker = ANY(%(exclude)s))
+  AND latest_close >= %(min_price)s
+  AND n20 = 20 AND dv20 >= %(min_dv)s
+  AND n_sessions >= %(min_hist)s
+ORDER BY dv20 DESC, ticker
+LIMIT %(max_n)s
+"""
 
 CLUSTER_COLUMNS = ["cluster_id", "cluster_key", "leaders", "members", "member_count", "ret_63d", "as_of"]
 MEMBER_COLUMNS = ["ticker", "cluster_id"]
@@ -127,44 +155,36 @@ def _write_empty(conn: psycopg.Connection) -> None:
 def run(conn: psycopg.Connection, ctx: JobContext) -> str:
     """Rebuild research_clusters / research_cluster_members as of ctx.scan_date."""
     scan_date = as_date(ctx.scan_date)
-    since = (scan_date - timedelta(days=LOOKBACK_DAYS)).isoformat()
-    bars = load_bars(conn, since=since)
-    if not bars.empty:
-        bars = bars[bars["date"] <= pd.Timestamp(scan_date)]
-    if bars.empty:
-        _write_empty(conn)
-        return "0 clusters from 0 names"
-
-    close = close_matrix(bars, "c")
-    volume = close_matrix(bars, "v")
-    cols = [c for c in close.columns if c not in EXCLUDE_TICKERS and c in volume.columns]
-    close = close[cols]
-    volume = volume[cols]
-    if close.empty:
-        _write_empty(conn)
-        return "0 clusters from 0 names"
-
-    asof = close.index.max()
-    dollar_vol_20 = (close * volume).rolling(20, min_periods=20).mean()
-
-    latest_close = close.loc[asof]
-    latest_dv20 = dollar_vol_20.loc[asof]
-    n_sessions = close.loc[:asof].notna().sum()
-
-    mask = (
-        latest_close.notna()
-        & (latest_close >= MIN_PRICE)
-        & latest_dv20.notna()
-        & (latest_dv20 >= MIN_DOLLAR_VOLUME)
-        & (n_sessions >= MIN_HISTORY_SESSIONS)
+    universe_df = read_df(
+        conn,
+        UNIVERSE_SQL,
+        {
+            "since": (scan_date - timedelta(days=UNIVERSE_LOOKBACK_DAYS)).isoformat(),
+            "until": scan_date.isoformat(),
+            "exclude": sorted(EXCLUDE_TICKERS),
+            "min_price": MIN_PRICE,
+            "min_dv": MIN_DOLLAR_VOLUME,
+            "min_hist": MIN_HISTORY_SESSIONS,
+            "max_n": MAX_UNIVERSE,
+        },
     )
-    universe = latest_dv20[mask].sort_values(ascending=False).index[:MAX_UNIVERSE]
+    universe = universe_df["ticker"].tolist() if not universe_df.empty else []
     universe_n = len(universe)
     if universe_n < 5:
         _write_empty(conn)
         return f"0 clusters from {universe_n} names"
 
-    closes_wide = close[universe]
+    bars = load_bars(
+        conn,
+        tickers=universe,
+        since=(scan_date - timedelta(days=CLOSE_LOOKBACK_DAYS)).isoformat(),
+        until=scan_date.isoformat(),
+        columns=("c",),
+    )
+    if bars.empty:
+        _write_empty(conn)
+        return f"0 clusters from {universe_n} names"
+    closes_wide = close_matrix(bars, "c").reindex(columns=universe)  # most liquid first, as before
     clusters = cluster_returns(closes_wide, t=0.55, min_members=5)
 
     cluster_rows = []

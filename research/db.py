@@ -84,8 +84,26 @@ def replace_table(conn: psycopg.Connection, table: str, columns: Sequence[str], 
     return write_rows(conn, table, columns, rows)
 
 
-def load_bars(conn: psycopg.Connection, tickers: Sequence[str] | None = None, since: str | None = None) -> pd.DataFrame:
-    """bars as a DataFrame (ticker, date, o, h, l, c, v) sorted by ticker, date."""
+BAR_COLUMNS = ("o", "h", "l", "c", "v")
+
+
+def load_bars(
+    conn: psycopg.Connection,
+    tickers: Sequence[str] | None = None,
+    since: str | None = None,
+    until: str | None = None,
+    columns: Sequence[str] = BAR_COLUMNS,
+) -> pd.DataFrame:
+    """bars as a DataFrame (ticker, date, + `columns`) sorted by ticker, date.
+
+    Every row leaves Neon over the wire and counts against the data-transfer
+    allowance (~74 bytes per full row), so callers narrow by ticker, date and
+    column to what they actually read: the whole table is 1.4M rows.
+    """
+    bad = [c for c in columns if c not in BAR_COLUMNS]
+    if bad:
+        raise ValueError(f"unknown bars columns: {bad}")
+    select = ", ".join("v::double precision AS v" if c == "v" else c for c in columns)
     clauses, params = [], []
     if tickers is not None:
         clauses.append("ticker = ANY(%s)")
@@ -93,12 +111,11 @@ def load_bars(conn: psycopg.Connection, tickers: Sequence[str] | None = None, si
     if since:
         clauses.append("date >= %s")
         params.append(since)
+    if until:
+        clauses.append("date <= %s")
+        params.append(until)
     where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
-    df = read_df(
-        conn,
-        f"SELECT ticker, date, o, h, l, c, v::double precision AS v FROM bars {where} ORDER BY ticker, date",
-        params,
-    )
+    df = read_df(conn, f"SELECT ticker, date, {select} FROM bars {where} ORDER BY ticker, date", params)
     if not df.empty:
         df["date"] = pd.to_datetime(df["date"])
     return df

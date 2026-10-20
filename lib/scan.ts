@@ -287,6 +287,34 @@ export async function latestScan(): Promise<ScanPayload | null> {
   return rows[0]?.payload ?? null;
 }
 
+/** The slice of a card the live poll reads (`lib/livewatch.ts` toLiveEntries). */
+export type LiveCard = Pick<Candidate, "ticker" | "name" | "box" | "pivot" | "verdict">;
+
+/**
+ * Tonight's deck as live-poll cards, projected inside Postgres: ticker, name,
+ * box, pivot and verdict per card. `latestScan()` would ship the whole payload
+ * (bars are ~96% of it, 100–400 KB) and the deck polls every 60 s, so this
+ * keeps each poll to a few KB of Neon egress. Null before the first scan.
+ */
+export async function latestLiveCards(): Promise<{ date: string; cards: LiveCard[] } | null> {
+  const sql = getSql();
+  const rows = (await sql`
+    SELECT s.date::text AS date,
+      coalesce(
+        jsonb_agg(
+          jsonb_build_object('ticker', t.c->'ticker', 'name', t.c->'name', 'box', t.c->'box', 'pivot', t.c->'pivot', 'verdict', t.c->'verdict')
+          ORDER BY t.ord
+        ) FILTER (WHERE t.c IS NOT NULL),
+        '[]'::jsonb
+      ) AS cards
+    FROM scan_results s
+    LEFT JOIN LATERAL jsonb_array_elements(s.payload->'candidates') WITH ORDINALITY AS t(c, ord) ON true
+    WHERE s.date = (SELECT max(date) FROM scan_results)
+    GROUP BY s.date
+  `) as { date: string; cards: LiveCard[] }[];
+  return rows[0] ?? null;
+}
+
 /**
  * Strip bars from every card except the indices in `keep` (wrapped into range),
  * so a page embeds only the charts it will show first. See `DeckCard`.

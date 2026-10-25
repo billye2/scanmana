@@ -1,6 +1,6 @@
 # HANDOFF — Scanmana (Vercel project `scanmana`, named `rc02` until 2026-08-31)
 
-_Last updated: 2026-10-19 (1.3.5). Read this first when picking up the project._
+_Last updated: 2026-10-25 (1.3.8). Read this first when picking up the project._
 
 ## What this is
 
@@ -33,11 +33,14 @@ README.md and `lib/config.ts` (thresholds are deliberately hardcoded — no sett
 
 ## Next step (user-driven)
 
-**First unattended night of the whole stack is 2026-09-21 (Monday's scan, 04:00 UTC; the 05:30 catch-up gives the research job its full budget).** Shipped 2026-09-20 without a live night yet: research layer (1.2.9), Livermore out of the composite verdict (1.3.0), deck-mate links (1.3.1), 5% distance limit + tape-sized paper orders (1.3.2). Check Tuesday morning:
+**First night of the Kullamägi Auto book is Monday 2026-10-27's scan (processed Tuesday 04:00 UTC; 1.3.7 + 1.3.8 shipped Saturday 2026-10-25 with the schema migrated and the replay table refreshed).** Check Tuesday morning:
 
-1. `/research`: no red line under the Scorecard heading (a failed job or no run for the 2026-09-21 scan shows there); Maintenance summary says "6 of 6 jobs ok". If a job is missing, `npm run research -- --jobs <job> --force` reruns it locally with the same code. The "since 09-21" tiles and the Rule changes table stay at n=0 until about 2026-10-05 (ten sessions to label) and grey until 30 rows — that is expected, not a bug.
-2. Home: the deck is smaller (expect ~45–50 instead of ~55 — the 5% limit) with more Wait cards (Livermore no longer vetoes); each card has the "Setups like this" line and, where it applies, "Moves with …" with linked tickers; the market strip has the breadth line and a paper size.
-3. `/paper`: Auto armed the boxed Wait cards; the size line under the stats matches the market strip; the push carried `Paper: … armed` and, if the tape was not both signals on, `· half size` / `· quarter size`.
+1. `/paper` → Auto: the Armed list is empty or holds only names that closed above their box on Monday, each `buy at the next open · stop <Monday's low>`; ZETA's old buy-stop is gone (cancelled "waiting for a close above the box" — visible only in `paper_orders.cancelled_reason`). The ten legacy open positions still read `(trail: 10-session low)`. The push said `Paper: 0 filled, N stopped, K armed` — a first `sold` count can only appear from Friday (day 4 of a Wednesday fill).
+2. From the first fill on: the open row says `half off on day 4 if up (day N)`; on day 4 either `half sold, stop at entry` with a `half off` leg in the closed list later, or `no half-off (under water on day 4)`; a close under the 10-day shows `selling N at the next open (closed under the 10-day)` and books a `10-day exit` leg the next night. If any of this does not happen on a position that should have qualified, the bug is in `processSession`'s kullamagi branch — the 13 engine tests for it are the spec.
+3. `/research`: the Rule changes table lists "Auto trades Kullamägi's playbook …" (effective 2026-10-27) in grey with a first-read date; the replay line on `/paper` now compares against "Kullamägi: half off day 4, breakeven, 10-day exit" and its "actual" row must keep matching the book's expectancy (it did on 2026-10-25: −0.27R vs −0.27R) — if those two drift apart the replay is wrong, not the book (mistakes.md 2026-10-25).
+4. Stats line `By tape at entry`: as of 2026-10-25 it reads Bullish 7 trades 0% win −1.00R · Not bullish 12 trades 17% +0.15R — the one-week Bullish window of 09-28 / 10-06..10-13 produced seven straight full losers, so "weak tape explains the losses" is not supported by this sample. Watch whether the split holds as trades accumulate.
+
+**Decision record 2026-10-25 (why the Auto book changed):** 19 closed trades at 11% win / −0.27R; all 12 whose breakout day closed back inside the box lost (−0.94R), the 7 that closed above averaged +0.87R. Backtest on 1,222 boxed Wait deck rows (`scan_history`, 138 sessions): first-touch entry −0.03R vs close-above-then-next-open +0.05R; with that entry fixed, box-bottom stop + 10-low trail +0.04R / 30% win / 14-session hold vs the Kullamägi routine −0.03R / 42% / 5 sessions (breakeven at +1R +0.02R, half off at +2R +0.01R, 10-day-MA-only −0.07R). Billy adopted Kullamägi's entry **and** exit knowing the trail scored higher: the Auto book measures the playbook he would trade, not the best-tuned exit. One `RULE_CHANGES` row covers both, so the scorecard cannot separate them; that is accepted. The numbers also live in the `CONFIG.PAPER` comment and the Help "Auto ledger" term.
 
 Then, at your pace: approve or ignore the `/research` split review list (top rows are the ambiguous ones; `auto` rows rescale the scan's bars, `ignored` rows are never re-flagged); name a few themes (cluster alias); after a month, look at whether the 5% limit's 70% hit rate held out of sample (the sweep marks the current setting) and whether tape sizing moved the equity curve.
 

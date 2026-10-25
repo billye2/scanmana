@@ -17,14 +17,15 @@ Trails ratchet up only (paper-engine.ts trailLevel/lines ~171-172).
 `replay_position` only ever sees bars strictly after entry_date (by contract —
 see its docstring), so the entry session itself cannot exit a position in this
 replay, even though the live engine *does* evaluate the stop on the entry/fill
-day for a position that fills that day (paper-engine.ts lines 239-246: "if
-(bar.l <= o.stop)" right after the position is created). That is not a gap in
-this module: a position whose real entry day breached its own stop closes the
-same day (closed_date == entry_date) and so has zero bars after entry — it is
-skipped by the "fewer than 1 session of bars after entry" rule below, for every
-rule including 'actual'. Every other closed position's entry-day price action
-was already survived in reality, so all the rules agree on day zero and only
-need to diverge from the session after.
+day for a position that fills that day (paper-engine.ts: "if (bar.l <= o.stop)"
+right after the position is created). A position whose real entry day breached
+its own stop closes the same day (closed_date == entry_date) and has zero bars
+after entry: every rule books its actual result, since no rule had a session to
+act in, which keeps the replay's trade count and totals equal to the paper
+page's. Every other closed position's entry-day price action was already
+survived in reality, so all the rules agree on day zero and only need to
+diverge from the session after — seeded with the pre-entry lows and closes the
+live engine also sees (`pre_lows`, `pre_closes`).
 """
 from __future__ import annotations
 
@@ -74,10 +75,29 @@ def _combine(
     return {"exit_price": float(px), "exit_date": dt, "hold": int(hold), "r": float(r), "pnl": float(pnl), "mtm": bool(mtm)}
 
 
-def _replay_trail(bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, n: int) -> dict:
-    """stop = max(previous stop, lowest low of the last n completed sessions), ratchet up only."""
-    stop = initial_stop
-    lows: list[float] = []
+def _seed_trail(initial_stop: float, pre_lows: list[float], n: int) -> tuple[float, list[float]]:
+    """The trail's starting point, as the live engine sets it on the fill day
+    (lib/paper-engine.ts trailLevel after the fill): the lowest low of the last
+    n bars *including the sessions before entry and the entry day itself*,
+    ratcheted over the initial stop. Without pre-entry lows the window starts
+    empty and the stop stays at initial_stop until post-entry lows exist.
+    """
+    lows = list(pre_lows)
+    stop = max(initial_stop, min(lows[-n:])) if lows else initial_stop
+    return stop, lows
+
+
+def _replay_trail(
+    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, n: int, pre_lows: list[float]
+) -> dict:
+    """stop = max(previous stop, lowest low of the last n sessions), ratchet up only.
+
+    The n-session window spans the bars before entry too, like the live engine's
+    10-bar lookback — seeding it from post-entry bars only (the bug fixed
+    2026-10-25) put the stop at day 1's low after one session, far tighter than
+    the rule the book actually trades.
+    """
+    stop, lows = _seed_trail(initial_stop, pre_lows, n)
     for i, row in enumerate(bars.itertuples(index=False)):
         if row.l <= stop:
             return _combine(entry_price, initial_stop, [(min(row.o, stop), row.date, shares, i + 1)], False)
@@ -87,14 +107,18 @@ def _replay_trail(bars: pd.DataFrame, entry_price: float, initial_stop: float, s
     return _combine(entry_price, initial_stop, [(last.c, last.date, shares, len(bars))], True)
 
 
-def _replay_pct(bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pct: float) -> dict:
+def _replay_pct(
+    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pct: float, pre_closes: list[float]
+) -> dict:
     """stop = max(previous stop, highest close since entry * (1 - pct)), ratchet up only.
 
-    "Since entry" is seeded at entry_price: bars passed in start strictly after
-    entry_date, so the entry day's own close is not available here.
+    The peak is seeded at the entry day's close (the last of `pre_closes`), as
+    the live engine seeds peakClose at the fill; it falls back to entry_price
+    when no pre-entry closes were supplied. The stop itself first moves after
+    the first post-entry session, as the manual percent trail does.
     """
     stop = initial_stop
-    peak_close = entry_price
+    peak_close = pre_closes[-1] if pre_closes else entry_price
     for i, row in enumerate(bars.itertuples(index=False)):
         if row.l <= stop:
             return _combine(entry_price, initial_stop, [(min(row.o, stop), row.date, shares, i + 1)], False)
@@ -104,11 +128,14 @@ def _replay_pct(bars: pd.DataFrame, entry_price: float, initial_stop: float, sha
     return _combine(entry_price, initial_stop, [(last.c, last.date, shares, len(bars))], True)
 
 
-def _replay_half_2r(bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int) -> dict:
+def _replay_half_2r(
+    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pre_lows: list[float]
+) -> dict:
     """Sell half at entry + 2R (fill at max(open, level)) on the first session whose
     high reaches it, then trail the remaining half with the 10-session-low trail.
-    The trail runs unconditionally from day one, exactly as trail_10 would, so a
-    position that never reaches the target is identical to trail_10 on the full size.
+    The trail runs unconditionally from day one, exactly as trail_10 would (same
+    pre-entry seeding), so a position that never reaches the target is identical
+    to trail_10 on the full size.
 
     "Half" follows the manual-sell convention in lib/paper-db.ts requestSell:
     max(1, floor(shares / 2)) sold, the rest kept.
@@ -117,8 +144,7 @@ def _replay_half_2r(bars: pd.DataFrame, entry_price: float, initial_stop: float,
     target = entry_price + 2 * risk if risk > 0 else None
     half = max(1, shares // 2)
     remaining = shares - half
-    stop = initial_stop
-    lows: list[float] = []
+    stop, lows = _seed_trail(initial_stop, pre_lows, 10)
     sold = False
     legs: list[tuple[float, Any, int, int | None]] = []
     for i, row in enumerate(bars.itertuples(index=False)):
@@ -187,6 +213,7 @@ def replay_position(
     shares: int,
     rule: str,
     pre_closes: list[float] | None = None,
+    pre_lows: list[float] | None = None,
 ) -> dict:
     """Replay one closed position from the session after entry under `rule`.
 
@@ -194,8 +221,11 @@ def replay_position(
     date, o, h, l, c (any order, ascending or not — this sorts by date). Mirrors
     lib/paper-engine.ts: a stop-out fills at min(open, stop); a target fills at
     max(open, target). `rule` is one of kullamagi, trail_5/10/15/20, pct_8,
-    half_2r. `pre_closes` (closes up to and including the entry day) feed the
-    kullamagi rule's moving average; the other rules ignore them.
+    half_2r. `pre_closes` and `pre_lows` are the closes and lows of the sessions
+    up to and including the entry day, oldest first: the kullamagi rule's
+    moving average and the percent trail's peak read the closes, the lowest-low
+    trails seed their window from the lows. Leaving them out reproduces a
+    position with no history before entry.
 
     Returns a dict with exit_price, exit_date, hold (sessions after entry to
     the exit), r ((exit - entry) / (entry - initial_stop), share-weighted
@@ -205,14 +235,16 @@ def replay_position(
     if bars.empty:
         raise ValueError("replay_position needs at least one session after entry")
     bars = bars.sort_values("date").reset_index(drop=True)
+    closes = pre_closes or []
+    lows = pre_lows or []
     if rule == "kullamagi":
-        return _replay_kullamagi(bars, entry_price, initial_stop, shares, pre_closes or [])
+        return _replay_kullamagi(bars, entry_price, initial_stop, shares, closes)
     if rule.startswith("trail_"):
-        return _replay_trail(bars, entry_price, initial_stop, shares, int(rule.split("_", 1)[1]))
+        return _replay_trail(bars, entry_price, initial_stop, shares, int(rule.split("_", 1)[1]), lows)
     if rule == "pct_8":
-        return _replay_pct(bars, entry_price, initial_stop, shares, 0.08)
+        return _replay_pct(bars, entry_price, initial_stop, shares, 0.08, closes)
     if rule == "half_2r":
-        return _replay_half_2r(bars, entry_price, initial_stop, shares)
+        return _replay_half_2r(bars, entry_price, initial_stop, shares, lows)
     raise ValueError(f"unknown replay rule: {rule!r}")
 
 
@@ -282,8 +314,9 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         [ids],
     )
     tickers = sorted(positions["ticker"].unique().tolist())
-    # Twenty calendar days before the first entry: the kullamagi rule's 10-session average needs closes from before entry.
-    since = (pd.Timestamp(positions["entry_date"].min()) - pd.Timedelta(days=20)).date().isoformat()
+    # 35 calendar days (~24 sessions) before the first entry: the 20-session trail
+    # seeds its window from the bars before entry, the kullamagi average needs ten closes.
+    since = (pd.Timestamp(positions["entry_date"].min()) - pd.Timedelta(days=35)).date().isoformat()
     bars = load_bars(conn, tickers=tickers, since=since)
 
     rows_by_track: dict[str, list[dict]] = {"auto": [], "manual": []}
@@ -291,18 +324,22 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         entry_date = pd.Timestamp(pos.entry_date)
         own = bars[bars["ticker"] == pos.ticker]
         pos_bars = own[own["date"] > entry_date].sort_values("date")
-        if pos_bars.empty:
-            continue  # 0 sessions after entry: the entry day itself already closed it out
-        pre_closes = own[own["date"] <= entry_date].sort_values("date")["c"].astype(float).tolist()[-KULLAMAGI_MA:]
+        pre = own[own["date"] <= entry_date].sort_values("date")
+        pre_closes = pre["c"].astype(float).tolist()[-KULLAMAGI_MA:]
+        pre_lows = pre["l"].astype(float).tolist()[-20:]
         pos_exits = exits[exits["position_id"] == pos.id]
         total_shares = int(pos.shares) + int(pos_exits["shares"].sum())
         if total_shares <= 0 or pos_exits.empty:
             continue  # malformed: a closed position must have exited some shares
+        actual = _actual_result(pos_bars, pos_exits, pos.entry_price, pos.initial_stop)
         for rule in RULES:
-            if rule == "actual":
-                result = _actual_result(pos_bars, pos_exits, pos.entry_price, pos.initial_stop)
+            if rule == "actual" or pos_bars.empty:
+                # A position stopped on its own entry day has no session for any rule to
+                # differ on, so every rule books what actually happened — keeping the
+                # replay's trade count and totals equal to the paper page's.
+                result = actual
             else:
-                result = replay_position(pos_bars, pos.entry_price, pos.initial_stop, total_shares, rule, pre_closes)
+                result = replay_position(pos_bars, pos.entry_price, pos.initial_stop, total_shares, rule, pre_closes, pre_lows)
             rows_by_track[pos.track].append({**result, "rule": rule, "entry_date": pos.entry_date})
 
     out_rows = []

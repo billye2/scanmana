@@ -241,3 +241,60 @@ def test_kullamagi_without_pre_closes_averages_what_exists():
     result = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi")
     assert result["mtm"] is True
     assert result["exit_price"] == pytest.approx(99.0)
+
+
+# ---------- (f) pre-entry seeding: the trails look back across the bars before entry ----------
+
+
+def test_trail10_seeds_its_window_from_pre_entry_lows_like_the_live_engine():
+    # Ten lows at 92 before (and on) the entry day: the live engine's 10-bar
+    # lookback puts the stop at 92 from the fill. Day 1's low of 95 does not
+    # lift it (92 is still inside the window); day 2's low of 91.5 breaches it,
+    # so the exit is min(open, 92) = 92 — not day 1's low of 95, which is where
+    # the post-entry-only seeding (the 2026-10-25 bug) had put the stop.
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 101, "h": 103, "l": 95, "c": 100},
+            {"date": _d(2), "o": 96, "h": 97, "l": 91.5, "c": 92},
+        ]
+    )
+    seeded = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="trail_10", pre_lows=[92] * 10)
+    assert seeded["exit_price"] == pytest.approx(92.0)
+    assert seeded["r"] == pytest.approx(-0.8)
+    unseeded = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="trail_10")
+    assert unseeded["exit_price"] == pytest.approx(95.0)
+
+
+def test_trail_seed_never_lowers_the_initial_stop():
+    bars = _bars([{"date": _d(1), "o": 101, "h": 103, "l": 99, "c": 100}])
+    result = replay_position(bars, entry_price=100, initial_stop=95, shares=10, rule="trail_5", pre_lows=[80] * 5)
+    assert result["mtm"] is True  # the stop stayed at 95; nothing breached it
+
+
+def test_half_2r_still_matches_trail_10_when_both_are_seeded():
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 101, "h": 103, "l": 95, "c": 100},
+            {"date": _d(2), "o": 96, "h": 97, "l": 91.5, "c": 92},
+        ]
+    )
+    half = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="half_2r", pre_lows=[92] * 10)
+    trail = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="trail_10", pre_lows=[92] * 10)
+    assert half == trail
+
+
+def test_pct8_seeds_the_peak_at_the_entry_day_close():
+    # Entry day closed at 110 (above the 100 entry). The 8% trail off that
+    # peak is 101.2 once day 1 has been processed; day 2's low of 100 breaches
+    # it. Seeded at entry_price instead, the stop would have been 92 and day 2
+    # would have survived.
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 109, "h": 110, "l": 105, "c": 108},
+            {"date": _d(2), "o": 104, "h": 105, "l": 100, "c": 101},
+        ]
+    )
+    seeded = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="pct_8", pre_closes=[100] * 9 + [110])
+    assert seeded["exit_price"] == pytest.approx(110 * 0.92)
+    unseeded = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="pct_8")
+    assert unseeded["mtm"] is True

@@ -5,6 +5,7 @@ import {
   processSession,
   realized,
   sizeShares,
+  stopProgress,
   type EngineOrder,
   type EnginePosition,
   type SessionInput,
@@ -260,6 +261,21 @@ describe("armDecisions", () => {
       { ticker: "PASS", reason: "verdict pass" },
       { ticker: "GONE", reason: "dropped from the scan" },
     ]);
+  });
+});
+
+describe("stopProgress", () => {
+  it("reports an untouched stop as not moved, locking −1R", () => {
+    expect(stopProgress(position())).toEqual({ moved: false, lockedR: -1 });
+  });
+
+  it("reports a trailed stop above entry as moved with the R it secures", () => {
+    // entry 50, initial stop 45 (risk 5), trail now at 52.5 → +0.5R locked in
+    expect(stopProgress(position({ currentStop: 52.5 }))).toEqual({ moved: true, lockedR: 0.5 });
+  });
+
+  it("gives no R when the initial risk is zero", () => {
+    expect(stopProgress(position({ initialStop: 50, currentStop: 51 }))).toEqual({ moved: true, lockedR: null });
   });
 });
 

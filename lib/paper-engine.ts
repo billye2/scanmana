@@ -330,6 +330,20 @@ export function realized(p: EnginePosition): { pnl: number; r: number } {
   return { pnl, r: risk > 0 ? pnl / risk : 0 };
 }
 
+/**
+ * How far the stop has travelled since entry: `moved` once it sits above the
+ * initial stop (trail or manual raise), `lockedR` the R the current stop secures
+ * — negative while it is under entry, positive once above — or null when the
+ * initial risk is zero.
+ */
+export function stopProgress(p: EnginePosition): { moved: boolean; lockedR: number | null } {
+  const risk = p.entryPrice - p.initialStop;
+  return {
+    moved: p.currentStop > p.initialStop,
+    lockedR: risk > 0 ? (p.currentStop - p.entryPrice) / risk : null,
+  };
+}
+
 export function computeStats(closed: ClosedTrade[]): TrackStats {
   const n = closed.length;
   const wins = closed.filter((t) => t.pnl > 0);

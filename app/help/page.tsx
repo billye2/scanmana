@@ -309,8 +309,8 @@ export default async function Help() {
       <Term name="Auto ledger">
         No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
         trigger first. The stop starts at the box bottom and each night moves up to the lowest low of the last 10 sessions if that is
-        higher; it never moves down. That trail is the only exit. MFE / MAE on each trade show the best and worst price seen while it
-        was open, so you can tell what was available versus what the rule captured.
+        higher; it never moves down. That trail is the only exit. MFE / MAE on each trade (defined below) show the best and worst price
+        seen while it was open, so you can tell what was available versus what the rule captured.
       </Term>
 
       <Term name="Manual ledger">
@@ -338,6 +338,16 @@ export default async function Help() {
         <span className="text-neutral-100">expectancy</span> (average R per trade — the number that matters) and profit factor
         (gross wins ÷ gross losses) are computed from closed trades only, per ledger. A position with several exits is one trade at a
         blended exit price. Equity is cash plus open positions at the last close.
+      </Term>
+
+      <Term name="MFE · MAE">
+        <span className="text-neutral-100">Maximum Favorable Excursion</span> and{" "}
+        <span className="text-neutral-100">Maximum Adverse Excursion</span>: the highest high and the lowest low printed while the trade
+        was open, from the entry bar on. MFE is what was available; the exit price is what the rule captured. MAE shows how close the stop
+        came to being hit before the move. On an open row the stop is amber while it still sits below entry and turns emerald once the
+        trail (or your own raise) has carried it to entry or above; <span className="text-neutral-100">raised from</span> is the stop
+        the trade started with and <span className="text-neutral-100">locks +xR</span> is the profit the current stop now guarantees. A
+        closed row says how far the stop trailed before it was hit.
       </Term>
 
       <Term name="Getting started">

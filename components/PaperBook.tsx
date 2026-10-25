@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
-import type { Track, TrailMode } from "@/lib/paper-engine";
+import { stopProgress, type Track, type TrailMode } from "@/lib/paper-engine";
 import type { ReplayRow } from "@/lib/research";
 import type { Tape } from "@/lib/tape";
 
@@ -114,6 +114,7 @@ export default function PaperBook({ book, replay = [], tape = null }: { book: Bo
                     </span>
                   ))}
                   {" · "}MFE {price(p.mfe)} · MAE {price(p.mae)}
+                  {p.currentStop > p.initialStop && <> · stop trailed from {price(p.initialStop)} to {price(p.currentStop)}</>}
                   {p.late && " · late"}
                   {p.splitFlagged && <span className="text-amber-300"> · check for a split</span>}
                 </div>
@@ -183,6 +184,9 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
 
   const trailText =
     p.trailMode === "percent" ? `${((p.trailParam ?? 0) * 100).toFixed(0)}% under the peak close` : p.trailMode === "lowestlow" ? `${p.trailParam}-session low` : null;
+  // Amber while the stop still risks money, emerald once the trail (or a raise) has carried it to entry or above.
+  const sp = stopProgress(p);
+  const stopTone = p.currentStop >= p.entryPrice ? "text-emerald-400" : "text-amber-400/80";
 
   return (
     <div className="border-b border-neutral-800 py-3 text-xs">
@@ -199,7 +203,9 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
         </span>
       </div>
       <div className="mt-1 text-neutral-400">
-        stop <span className="text-amber-400/80">{price(p.currentStop)}</span>
+        stop <span className={stopTone}>{price(p.currentStop)}</span>
+        {sp.moved && <> · raised from {price(p.initialStop)}</>}
+        {sp.lockedR !== null && sp.lockedR > 0 && <> · locks {rr(sp.lockedR)}</>}
         {trailText && <span className="text-neutral-500"> (trail: {trailText})</span>}
         {" · "}last {p.lastClose !== null ? price(p.lastClose) : "—"}
         {p.lastDate && p.lastDate < p.entryDate && <span className="text-amber-300"> · no data since {p.lastDate}</span>}

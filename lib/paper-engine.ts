@@ -3,22 +3,29 @@
 // per unprocessed session, then armDecisions for tonight's deck, and persists.
 //
 // Two tracks share one rule set except where noted:
-//   auto   — every armed deck signal, flat NOTIONAL, no cash cap, exit by the
-//            mechanical lowest-low trail. Nobody touches it: it measures the scanner.
+//   auto   — Kullamägi's playbook on every boxed Wait card that closes above its
+//            box: buy the next open, stop at the breakout day's low, half off on
+//            day 4 if up, breakeven, out at the next open after a close under the
+//            10-day average. Flat NOTIONAL, no cash cap. Nobody touches it: it
+//            measures the playbook on the scanner's picks.
 //   manual — Billy's picks in a $10k account; cash binds; stop raised by hand or
 //            by a chosen trail; partial sells. It measures Billy plus the scanner.
 import { CONFIG } from "./config";
 import { breakingOut } from "./analysis";
+import { sma } from "./indicators";
 import type { Bar, Candidate } from "./types";
 
 const P = CONFIG.PAPER;
+const K = P.KULLAMAGI;
 
 export type Track = "auto" | "manual";
 export type OrderStatus = "armed" | "filled" | "cancelled";
 /** buy_stop waits for the trigger; market buys at the next open (price already above the trigger — a broker rejects a buy-stop below the market). */
 export type OrderKind = "buy_stop" | "market";
-export type TrailMode = "none" | "percent" | "lowestlow";
-export type ExitReason = "stop" | "manual_sell";
+/** kullamagi = the auto book's rule set (day-4 partial, breakeven, 10-day exit); the others are the manual trails. */
+export type TrailMode = "none" | "percent" | "lowestlow" | "kullamagi";
+/** partial = the day-4 half sale; ma_exit = sold at the open after a close under the 10-day average. */
+export type ExitReason = "stop" | "manual_sell" | "partial" | "ma_exit";
 
 export interface EngineOrder {
   id: number | null;
@@ -59,6 +66,7 @@ export interface EnginePosition {
   mae: number; // lowest low since entry
   late: boolean; // manual take placed after the auto order had already filled
   splitFlagged: boolean;
+  sessionsHeld: number; // sessions processed since entry, the entry day counting 1 — drives the day-4 partial
   status: "open" | "closed";
   closedDate: string | null;
   exits: EngineExit[];
@@ -98,9 +106,8 @@ function lowestLow(bars: Bar[], n: number): number {
   return Math.min(...bars.slice(-n).map((b) => b.l));
 }
 
-/** Where a trail would put the stop after this session, or null when the position has no trail. */
+/** Where a trail would put the stop after this session, or null when the position has no trail (none, or the Kullamägi rule set). */
 function trailLevel(p: EnginePosition, bars: Bar[]): number | null {
-  if (p.track === "auto") return lowestLow(bars, P.TRAIL_LOOKBACK);
   if (p.trailMode === "percent" && p.trailParam) return p.peakClose * (1 - p.trailParam);
   if (p.trailMode === "lowestlow") return lowestLow(bars, Math.max(1, Math.round(p.trailParam ?? P.TRAIL_LOOKBACK)));
   return null;
@@ -117,12 +124,16 @@ function closeOut(p: EnginePosition, exit: EngineExit): void {
 }
 
 /**
- * Advance the book through one session's bars. Per ticker, in order: pending
- * manual sells at the open; stop-outs (low <= stop, filled at min(open, stop));
- * order fills (buy_stop: first high >= trigger at max(open, trigger); market:
- * at the open) with sizing and cash; entry-day worst case (a bar that touches
- * both trigger and stop is a same-day stop-out); then peak/MFE/MAE, trails
- * (ratchet up only) and the split flag. Mutates copies, never the inputs.
+ * Advance the book through one session's bars. Per open position, in order:
+ * queued sells at the open (a manual sell, or the Kullamägi 10-day exit); the
+ * Kullamägi day-4 half sale at the open with the stop moved to breakeven;
+ * stop-outs (low <= stop, filled at min(open, stop)); peak/MFE/MAE; trails
+ * (ratchet up only); the 10-day flag that queues tomorrow's exit; the split
+ * flag. Then orders: buy_stop fills on the first high >= trigger at
+ * max(open, trigger), market at the open (cancelled if the open is already
+ * under the stop), with sizing and cash; entry-day worst case (a bar that
+ * touches both trigger and stop is a same-day stop-out). Mutates copies, never
+ * the inputs.
  */
 export function processSession(input: SessionInput): SessionResult {
   const events: EngineEvent[] = [];
@@ -141,15 +152,31 @@ export function processSession(input: SessionInput): SessionResult {
     const bar = bars?.[bars.length - 1];
     if (!bar || bar.date !== date) continue; // no data this session: leave it alone
     const prev = bars![bars!.length - 2];
+    const kullamagi = p.trailMode === "kullamagi";
+    const day = ++p.sessionsHeld; // the entry day was day 1
 
     if (p.pendingSellShares && p.pendingSellShares > 0) {
       const shares = Math.min(p.pendingSellShares, p.shares);
-      const exit: EngineExit = { date, price: bar.o, shares, reason: "manual_sell" };
+      const exit: EngineExit = { date, price: bar.o, shares, reason: kullamagi ? "ma_exit" : "manual_sell" };
       closeOut(p, exit);
       cash[p.track] += exit.price * shares;
       p.pendingSellShares = null;
       events.push({ type: "exit", track: p.track, ticker: p.ticker, position: p, exit });
       if (p.shares === 0) continue; // sold out entirely at the open
+    }
+
+    // Kullamägi: on day 4, if yesterday closed above entry, sell half at the open and
+    // move the stop to breakeven. A one-share position has nothing to halve but still
+    // earns the breakeven stop.
+    if (kullamagi && day === K.PARTIAL_DAY && prev && prev.c > p.entryPrice) {
+      const shares = Math.floor(p.shares * K.PARTIAL_FRACTION);
+      if (shares > 0) {
+        const exit: EngineExit = { date, price: bar.o, shares, reason: "partial" };
+        closeOut(p, exit);
+        cash[p.track] += exit.price * shares;
+        events.push({ type: "exit", track: p.track, ticker: p.ticker, position: p, exit });
+      }
+      p.currentStop = Math.max(p.currentStop, p.entryPrice);
     }
 
     // Flag before the stop check: a split shows up as a gap that would "stop out" a
@@ -172,6 +199,11 @@ export function processSession(input: SessionInput): SessionResult {
     p.mae = Math.min(p.mae, bar.l);
     const level = trailLevel(p, bars!);
     if (level !== null && level > p.currentStop) p.currentStop = level;
+    // Kullamägi: a close under the 10-day average sells what is left at tomorrow's open.
+    if (kullamagi) {
+      const avg = sma(bars!, K.MA);
+      if (avg !== null && bar.c < avg) p.pendingSellShares = p.shares;
+    }
   }
 
   // 2. Live orders.
@@ -190,6 +222,15 @@ export function processSession(input: SessionInput): SessionResult {
       continue;
     }
     if (openFor(o.track, o.ticker)) continue; // one open position per ticker per track
+
+    // A market buy whose open is already at or under the stop would be a zero-length
+    // round trip at the open; a trader would stand aside, so the order is cancelled.
+    if (o.kind === "market" && bar.o <= o.stop) {
+      o.status = "cancelled";
+      o.cancelledReason = `opened at ${bar.o.toFixed(2)}, under the ${o.stop.toFixed(2)} stop`;
+      events.push({ type: "cancel", track: o.track, ticker: o.ticker, reason: o.cancelledReason });
+      continue;
+    }
 
     let fill: number | null = null;
     if (o.kind === "market") fill = bar.o;
@@ -224,7 +265,7 @@ export function processSession(input: SessionInput): SessionResult {
       shares,
       initialStop: o.stop,
       currentStop: o.stop,
-      trailMode: "none",
+      trailMode: o.track === "auto" ? "kullamagi" : "none",
       trailParam: null,
       pendingSellShares: null,
       peakClose: bar.c,
@@ -232,6 +273,7 @@ export function processSession(input: SessionInput): SessionResult {
       mae: bar.l,
       late,
       splitFlagged: false,
+      sessionsHeld: 1,
       status: "open",
       closedDate: null,
       exits: [],
@@ -268,15 +310,18 @@ export function armBlocker(c: Candidate): string | null {
   const last = c.bars[c.bars.length - 1];
   if (last && last.c < c.box.bottom) return "closed below the box bottom";
   if (last && last.c > c.box.top && !breakingOut(c)) return "broke out earlier";
+  if (!breakingOut(c)) return "waiting for a close above the box";
   return null;
 }
 
 /**
- * Tonight's auto orders: arm (or refresh) an order at the box top with the stop
- * at the box bottom for every boxed "wait" candidate — a buy-stop while price is
- * still inside the box, a market buy at the next open on the day it breaks —
- * skipping names that broke out earlier and tickers with an open auto position. Every live auto order
- * whose ticker is not in that set is cancelled with the reason.
+ * Tonight's auto orders: a market buy at tomorrow's open, with the stop at
+ * today's low, for every boxed "wait" candidate that closed above its box top
+ * today (Kullamägi's entry: the break confirmed by the close, risk to the low of
+ * the breakout day). Nothing is armed while price sits inside the box; names
+ * that broke out earlier and tickers with an open auto position are skipped.
+ * Every live auto order whose ticker is not in that set is cancelled with the
+ * reason — including, on the night this rule shipped, the old buy-stops.
  */
 export function armDecisions(
   candidates: Candidate[],
@@ -292,10 +337,10 @@ export function armDecisions(
     }
     const why = armBlocker(c);
     if (why) blocked.set(c.ticker, why);
-    // Broke the box today (close above the top): a buy-stop at the top would sit under
-    // the market, so it is a market buy at tomorrow's open — the app's own "buy tomorrow's
-    // open if it holds" rule — with the stop still at the box bottom.
-    else arm.push({ ticker: c.ticker, trigger: c.box!.top, stop: c.box!.bottom, kind: breakingOut(c) ? "market" : "buy_stop" });
+    else {
+      const last = c.bars[c.bars.length - 1];
+      arm.push({ ticker: c.ticker, trigger: c.box!.top, stop: last.l, kind: "market" });
+    }
   }
   const armed = new Set(arm.map((a) => a.ticker));
   const cancel: { ticker: string; reason: string }[] = [];

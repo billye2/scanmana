@@ -176,3 +176,68 @@ def test_summarize_empty_is_zero_trades():
     metrics = summarize([])
     assert metrics["trades"] == 0
     assert metrics["avg_r"] is None
+
+
+# ---------- (e) kullamagi: the Auto book's live exit ----------
+
+
+def test_kullamagi_sells_half_on_day_4_when_up_then_stops_the_rest_at_breakeven():
+    # Entry day = 1, so bars[0] is day 2. Day 4 opens at 105 with day 3 having
+    # closed at 104 > 100: half (5 of 10) sells at the open and the stop moves
+    # to breakeven (100). Day 5's low (99) breaches it: the rest exits at
+    # min(open, stop) = 100. The 10-session average never gets above the close.
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 101, "h": 103, "l": 99, "c": 102},
+            {"date": _d(2), "o": 102, "h": 105, "l": 101, "c": 104},
+            {"date": _d(3), "o": 105, "h": 106, "l": 103, "c": 105},
+            {"date": _d(4), "o": 104, "h": 104, "l": 99, "c": 100},
+        ]
+    )
+    result = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi", pre_closes=[100] * 10)
+    assert result["pnl"] == pytest.approx((105 - 100) * 5 + (100 - 100) * 5)
+    assert result["r"] == pytest.approx((((105 - 100) / 10) * 5 + 0) / 10)
+    assert result["exit_price"] == pytest.approx(100.0)
+    assert result["hold"] == 4
+    assert result["mtm"] is False
+
+
+def test_kullamagi_skips_the_partial_when_day_3_closed_under_entry():
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 101, "h": 103, "l": 99, "c": 102},
+            {"date": _d(2), "o": 101, "h": 102, "l": 98, "c": 99.5},
+            {"date": _d(3), "o": 99, "h": 101, "l": 98, "c": 100.5},
+            {"date": _d(4), "o": 100, "h": 101, "l": 89, "c": 90},
+        ]
+    )
+    # Prior closes at 95 keep the 10-session average under every close here, so only the partial rule is in play.
+    result = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi", pre_closes=[95] * 10)
+    # No partial, stop never moved: the day-5 breach exits all ten at the 90 stop for −1R.
+    assert result["r"] == pytest.approx(-1.0)
+    assert result["exit_price"] == pytest.approx(90.0)
+    assert result["hold"] == 4
+
+
+def test_kullamagi_sells_at_the_next_open_after_a_close_under_the_10_day_average():
+    # Ten closes at 100 then 99: the average is 99.9, the close is under it, so
+    # the whole position sells at day 3's open (98.5). The stop (90) was never hit.
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 101, "h": 102, "l": 98, "c": 99},
+            {"date": _d(2), "o": 98.5, "h": 100, "l": 97, "c": 99.5},
+        ]
+    )
+    result = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi", pre_closes=[100] * 10)
+    assert result["exit_price"] == pytest.approx(98.5)
+    assert result["r"] == pytest.approx(-0.15)
+    assert result["hold"] == 2
+    assert result["mtm"] is False
+
+
+def test_kullamagi_without_pre_closes_averages_what_exists():
+    # One post-entry close only: the "average" is that close itself, never under it.
+    bars = _bars([{"date": _d(1), "o": 101, "h": 102, "l": 98, "c": 99}])
+    result = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi")
+    assert result["mtm"] is True
+    assert result["exit_price"] == pytest.approx(99.0)

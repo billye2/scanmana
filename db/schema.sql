@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS paper_positions (
   shares integer NOT NULL,
   initial_stop double precision NOT NULL,
   current_stop double precision NOT NULL,
-  trail_mode text NOT NULL DEFAULT 'none' CHECK (trail_mode IN ('none', 'percent', 'lowestlow')),
+  trail_mode text NOT NULL DEFAULT 'none' CHECK (trail_mode IN ('none', 'percent', 'lowestlow', 'kullamagi')),
   trail_param double precision,
   pending_sell_shares integer,
   peak_close double precision NOT NULL,
@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS paper_positions (
   mae double precision NOT NULL,
   late boolean NOT NULL DEFAULT false,
   split_flagged boolean NOT NULL DEFAULT false,
+  sessions_held integer NOT NULL DEFAULT 0,
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
   closed_date date,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -120,11 +121,34 @@ CREATE TABLE IF NOT EXISTS paper_exits (
   exit_date date NOT NULL,
   exit_price double precision NOT NULL,
   shares integer NOT NULL,
-  reason text NOT NULL CHECK (reason IN ('stop', 'manual_sell')),
+  reason text NOT NULL CHECK (reason IN ('stop', 'manual_sell', 'partial', 'ma_exit')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS paper_exits_position_idx ON paper_exits (position_id);
+
+-- 1.3.7: the Auto book trades Kullamägi's playbook (lib/paper-engine.ts). An
+-- existing database gets the new column and the wider CHECKs here. The
+-- DROP CONSTRAINT IF EXISTS + ADD CONSTRAINT pair is idempotent, and the names
+-- are the ones Postgres gives inline column CHECKs.
+
+ALTER TABLE paper_positions ADD COLUMN IF NOT EXISTS sessions_held integer NOT NULL DEFAULT 0;
+
+ALTER TABLE paper_positions DROP CONSTRAINT IF EXISTS paper_positions_trail_mode_check;
+
+ALTER TABLE paper_positions ADD CONSTRAINT paper_positions_trail_mode_check CHECK (trail_mode IN ('none', 'percent', 'lowestlow', 'kullamagi'));
+
+ALTER TABLE paper_exits DROP CONSTRAINT IF EXISTS paper_exits_reason_check;
+
+ALTER TABLE paper_exits ADD CONSTRAINT paper_exits_reason_check CHECK (reason IN ('stop', 'manual_sell', 'partial', 'ma_exit'));
+
+-- Auto positions opened under the old rule keep their old exit, the 10-session-low
+-- trail, and never see the day-4 partial. New auto positions are inserted with
+-- trail_mode kullamagi and sessions_held 1, so neither statement touches them.
+
+UPDATE paper_positions SET trail_mode = 'lowestlow', trail_param = 10 WHERE track = 'auto' AND trail_mode = 'none';
+
+UPDATE paper_positions SET sessions_held = 99 WHERE status = 'open' AND sessions_held = 0;
 
 CREATE TABLE IF NOT EXISTS paper_skips (
   id bigserial PRIMARY KEY,

@@ -1,8 +1,10 @@
 """Replay every closed paper position under alternative exit rules.
 
 Reads paper_positions (status = 'closed') and paper_exits, replays each
-position's post-entry bars under seven stop/exit rules, and writes per-(track,
-rule) metrics to research_replay. Nothing about the live ledger (lib/paper-db.ts,
+position's post-entry bars under the stop/exit rules in RULES (the Auto book's
+live Kullamägi routine, four lowest-low trails, a percent trail, half off at
++2R, and what actually happened), and writes per-(track, rule) metrics to
+research_replay. Nothing about the live ledger (lib/paper-db.ts,
 lib/paper-engine.ts) is touched or re-decided; this is read-only research on
 top of it.
 
@@ -21,7 +23,7 @@ this module: a position whose real entry day breached its own stop closes the
 same day (closed_date == entry_date) and so has zero bars after entry — it is
 skipped by the "fewer than 1 session of bars after entry" rule below, for every
 rule including 'actual'. Every other closed position's entry-day price action
-was already survived in reality, so all seven rules agree on day zero and only
+was already survived in reality, so all the rules agree on day zero and only
 need to diverge from the session after.
 """
 from __future__ import annotations
@@ -37,8 +39,13 @@ from .util import JobContext
 # lib/config.ts CONFIG.PAPER.MANUAL_START_CASH — Python can't import the TS
 # config, so this is kept in sync by hand.
 MANUAL_START_CASH = 10_000
+# lib/config.ts CONFIG.PAPER.KULLAMAGI — the Auto book's live exit since 1.3.7, kept in sync by hand.
+KULLAMAGI_PARTIAL_DAY = 4  # entry day = 1
+KULLAMAGI_PARTIAL_FRACTION = 0.5
+KULLAMAGI_MA = 10
 
 RULES: dict[str, str] = {
+    "kullamagi": "Kullamägi: half off day 4, breakeven, 10-day exit",
     "trail_5": "Trail 5-session low",
     "trail_10": "Trail 10-session low",
     "trail_15": "Trail 15-session low",
@@ -47,6 +54,8 @@ RULES: dict[str, str] = {
     "half_2r": "Sell half at +2R, trail rest",
     "actual": "What actually happened",
 }
+# The rule each track trades live, so the paper page can say "vs the current rule".
+CURRENT_RULE: dict[str, str] = {"auto": "kullamagi", "manual": "trail_10"}
 
 
 def _combine(
@@ -130,13 +139,63 @@ def _replay_half_2r(bars: pd.DataFrame, entry_price: float, initial_stop: float,
     return _combine(entry_price, initial_stop, legs, True)
 
 
-def replay_position(bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, rule: str) -> dict:
+def _replay_kullamagi(
+    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pre_closes: list[float]
+) -> dict:
+    """The Auto book's live exit (lib/paper-engine.ts processSession, kullamagi
+    branch): stop at `initial_stop`; on day KULLAMAGI_PARTIAL_DAY (entry day = 1),
+    if the previous close is above entry, sell the partial fraction at the open
+    and raise the stop to breakeven; after any close under the KULLAMAGI_MA-session
+    average, sell what is left at the next open. `pre_closes` are the closes up to
+    and including the entry day (oldest first) so the average has history from
+    the first post-entry session; without them it is taken over what exists.
+    """
+    stop = initial_stop
+    held = shares
+    legs: list[tuple[float, Any, int, int | None]] = []
+    closes = list(pre_closes)
+    pending = False
+    prev_close = closes[-1] if closes else entry_price
+    for i, row in enumerate(bars.itertuples(index=False)):
+        day = i + 2  # bars start the session after entry
+        if pending:
+            legs.append((row.o, row.date, held, i + 1))
+            return _combine(entry_price, initial_stop, legs, False)
+        if day == KULLAMAGI_PARTIAL_DAY and held == shares and prev_close > entry_price:
+            sell = int(held * KULLAMAGI_PARTIAL_FRACTION)
+            if sell > 0:
+                legs.append((row.o, row.date, sell, i + 1))
+                held -= sell
+            stop = max(stop, entry_price)
+        if row.l <= stop:
+            legs.append((min(row.o, stop), row.date, held, i + 1))
+            return _combine(entry_price, initial_stop, legs, False)
+        closes.append(row.c)
+        prev_close = row.c
+        window = closes[-KULLAMAGI_MA:]
+        if row.c < sum(window) / len(window):
+            pending = True
+    last = bars.iloc[-1]
+    legs.append((last.c, last.date, held, len(bars)))
+    return _combine(entry_price, initial_stop, legs, True)
+
+
+def replay_position(
+    bars: pd.DataFrame,
+    entry_price: float,
+    initial_stop: float,
+    shares: int,
+    rule: str,
+    pre_closes: list[float] | None = None,
+) -> dict:
     """Replay one closed position from the session after entry under `rule`.
 
     `bars` must be that ticker's sessions strictly after entry_date, columns
     date, o, h, l, c (any order, ascending or not — this sorts by date). Mirrors
     lib/paper-engine.ts: a stop-out fills at min(open, stop); a target fills at
-    max(open, target). `rule` is one of trail_5/10/15/20, pct_8, half_2r.
+    max(open, target). `rule` is one of kullamagi, trail_5/10/15/20, pct_8,
+    half_2r. `pre_closes` (closes up to and including the entry day) feed the
+    kullamagi rule's moving average; the other rules ignore them.
 
     Returns a dict with exit_price, exit_date, hold (sessions after entry to
     the exit), r ((exit - entry) / (entry - initial_stop), share-weighted
@@ -146,6 +205,8 @@ def replay_position(bars: pd.DataFrame, entry_price: float, initial_stop: float,
     if bars.empty:
         raise ValueError("replay_position needs at least one session after entry")
     bars = bars.sort_values("date").reset_index(drop=True)
+    if rule == "kullamagi":
+        return _replay_kullamagi(bars, entry_price, initial_stop, shares, pre_closes or [])
     if rule.startswith("trail_"):
         return _replay_trail(bars, entry_price, initial_stop, shares, int(rule.split("_", 1)[1]))
     if rule == "pct_8":
@@ -201,7 +262,7 @@ def summarize(results: list[dict]) -> dict:
 
 
 def run(conn: psycopg.Connection, ctx: JobContext) -> str:
-    """Replay every closed paper position under the seven rules in RULES and
+    """Replay every closed paper position under the rules in RULES and
     write research_replay (track, rule) rows. Idempotent: replace_table wipes
     and refills the whole table each run."""
     positions = read_df(
@@ -221,15 +282,18 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         [ids],
     )
     tickers = sorted(positions["ticker"].unique().tolist())
-    since = positions["entry_date"].min()
+    # Twenty calendar days before the first entry: the kullamagi rule's 10-session average needs closes from before entry.
+    since = (pd.Timestamp(positions["entry_date"].min()) - pd.Timedelta(days=20)).date().isoformat()
     bars = load_bars(conn, tickers=tickers, since=since)
 
     rows_by_track: dict[str, list[dict]] = {"auto": [], "manual": []}
     for pos in positions.itertuples():
         entry_date = pd.Timestamp(pos.entry_date)
-        pos_bars = bars[(bars["ticker"] == pos.ticker) & (bars["date"] > entry_date)].sort_values("date")
+        own = bars[bars["ticker"] == pos.ticker]
+        pos_bars = own[own["date"] > entry_date].sort_values("date")
         if pos_bars.empty:
             continue  # 0 sessions after entry: the entry day itself already closed it out
+        pre_closes = own[own["date"] <= entry_date].sort_values("date")["c"].astype(float).tolist()[-KULLAMAGI_MA:]
         pos_exits = exits[exits["position_id"] == pos.id]
         total_shares = int(pos.shares) + int(pos_exits["shares"].sum())
         if total_shares <= 0 or pos_exits.empty:
@@ -238,7 +302,7 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
             if rule == "actual":
                 result = _actual_result(pos_bars, pos_exits, pos.entry_price, pos.initial_stop)
             else:
-                result = replay_position(pos_bars, pos.entry_price, pos.initial_stop, total_shares, rule)
+                result = replay_position(pos_bars, pos.entry_price, pos.initial_stop, total_shares, rule, pre_closes)
             rows_by_track[pos.track].append({**result, "rule": rule, "entry_date": pos.entry_date})
 
     out_rows = []
@@ -260,7 +324,7 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
                         metrics["avg_hold"],
                         metrics["total_pnl"],
                         metrics["trades"],
-                        rule == "trail_10" and track == "auto",
+                        CURRENT_RULE.get(track) == rule,
                         ctx.scan_date,
                     )
                 )

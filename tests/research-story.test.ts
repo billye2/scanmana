@@ -25,7 +25,7 @@ describe("rule-change registry", () => {
       expect(c.effective).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(["verdict_gap", "deck_hit", "paper_avg_r"]).toContain(c.lens);
     }
-    expect(lastChangeDate()).toBe("2026-09-21");
+    expect(lastChangeDate()).toBe("2026-10-27");
     expect(lastChangeDate([])).toBeNull();
   });
   it("first read is ten sessions (14 calendar days) after the change takes effect", () => {

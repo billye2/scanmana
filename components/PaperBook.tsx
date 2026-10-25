@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CONFIG } from "@/lib/config";
 import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
-import { stopProgress, type Track, type TrailMode } from "@/lib/paper-engine";
+import { stopProgress, type ExitReason, type Track, type TrailMode } from "@/lib/paper-engine";
 import type { ReplayRow } from "@/lib/research";
 import type { Tape } from "@/lib/tape";
 
@@ -13,6 +14,8 @@ const BTN = "rounded-lg bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 acti
 const INPUT = "w-24 rounded-lg border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-100";
 const CHIP = "rounded-full bg-neutral-800 px-2 py-0.5 text-[11px] text-neutral-300 active:bg-neutral-700";
 
+const K = CONFIG.PAPER.KULLAMAGI;
+const EXIT_LABEL: Record<ExitReason, string> = { stop: "stop", manual_sell: "sold", partial: "half off", ma_exit: `${K.MA}-day exit` };
 const money = (x: number) => `${x < 0 ? "−" : ""}$${Math.abs(x).toFixed(0)}`;
 const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : ""}${x.toFixed(2)}R`);
 const pnlTone = (x: number | null) => (x === null ? "text-neutral-400" : x > 0 ? "text-emerald-400" : x < 0 ? "text-red-400" : "text-neutral-300");
@@ -54,7 +57,7 @@ export default function PaperBook({ book, replay = [], tape = null }: { book: Bo
       <p className="text-[12px] leading-relaxed text-neutral-500">
         {track === "manual"
           ? "Your picks: $10,000 start, $500 per position, cash binds. Raise the stop, pick a trail, or sell some at the next open."
-          : "Every boxed Wait card, $500 each, no cash cap, stop trails the 10-session low. Hands off — this measures the scanner."}
+          : `Kullamägi's playbook on every boxed Wait card: bought at the open after a close above the box, stop at the breakout day's low, half off on day ${K.PARTIAL_DAY} if it is up, stop to breakeven, out on a close under the ${K.MA}-day. $500 at full size, no cash cap. Hands off — this measures the playbook.`}
       </p>
       <Stats t={t} />
       {tape && <TapeLine tape={tape} />}
@@ -110,7 +113,7 @@ export default function PaperBook({ book, replay = [], tape = null }: { book: Bo
                   {p.exits.map((e, i) => (
                     <span key={i}>
                       {i > 0 && ", "}
-                      {price(e.price)} ×{e.shares} {e.reason === "stop" ? "stop" : "sold"}
+                      {price(e.price)} ×{e.shares} {EXIT_LABEL[e.reason]}
                     </span>
                   ))}
                   {" · "}MFE {price(p.mfe)} · MAE {price(p.mae)}
@@ -152,15 +155,31 @@ function Stats({ t }: { t: BookTrack }) {
     ["Avg win / loss", `${rr(s.avgWinR)} / ${rr(s.avgLossR)}`],
     ["Profit factor", s.profitFactor === null ? "—" : s.profitFactor.toFixed(2)],
   ];
+  // The Bullish bucket always shows, so its absence is visible; the others only once they hold a trade.
+  const buckets = t.statsByTape.filter((b) => b.key === "bullish" || b.stats.trades > 0);
   return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 rounded-xl bg-neutral-900 p-3 sm:grid-cols-4">
-      {cells.map(([k, v, tone]) => (
-        <div key={k}>
-          <dt className="text-[10px] tracking-wide text-neutral-500 uppercase">{k}</dt>
-          <dd className={`text-sm font-semibold ${tone ?? "text-neutral-100"}`}>{v}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="rounded-xl bg-neutral-900 p-3">
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+        {cells.map(([k, v, tone]) => (
+          <div key={k}>
+            <dt className="text-[10px] tracking-wide text-neutral-500 uppercase">{k}</dt>
+            <dd className={`text-sm font-semibold ${tone ?? "text-neutral-100"}`}>{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {s.trades > 0 && (
+        <p className="mt-2 border-t border-neutral-800 pt-2 text-[11px] text-neutral-500">
+          By tape at entry
+          {buckets.map((b) => (
+            <span key={b.key}>
+              {" · "}
+              <span className="text-neutral-300">{b.label}:</span>{" "}
+              {b.stats.trades === 0 ? "no trades yet" : `${b.stats.trades} trades, ${pct(b.stats.winRate)} win, ${rr(b.stats.expectancyR)}`}
+            </span>
+          ))}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -184,6 +203,16 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
 
   const trailText =
     p.trailMode === "percent" ? `${((p.trailParam ?? 0) * 100).toFixed(0)}% under the peak close` : p.trailMode === "lowestlow" ? `${p.trailParam}-session low` : null;
+  // Where a Kullamägi-rule position stands: before the day-4 decision, after the half sale, or past day 4 without one.
+  const halved = p.exits.some((e) => e.reason === "partial");
+  const ruleText =
+    p.trailMode !== "kullamagi"
+      ? null
+      : halved
+        ? "half sold, stop at entry"
+        : p.sessionsHeld < K.PARTIAL_DAY
+          ? `half off on day ${K.PARTIAL_DAY} if up (day ${p.sessionsHeld})`
+          : `no half-off (under water on day ${K.PARTIAL_DAY})`;
   // Amber while the stop still risks money, emerald once the trail (or a raise) has carried it to entry or above.
   const sp = stopProgress(p);
   const stopTone = p.currentStop >= p.entryPrice ? "text-emerald-400" : "text-amber-400/80";
@@ -207,11 +236,16 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
         {sp.moved && <> · raised from {price(p.initialStop)}</>}
         {sp.lockedR !== null && sp.lockedR > 0 && <> · locks {rr(sp.lockedR)}</>}
         {trailText && <span className="text-neutral-500"> (trail: {trailText})</span>}
+        {ruleText && <span className="text-neutral-500"> · {ruleText}</span>}
         {" · "}last {p.lastClose !== null ? price(p.lastClose) : "—"}
         {p.lastDate && p.lastDate < p.entryDate && <span className="text-amber-300"> · no data since {p.lastDate}</span>}
         {" · "}MFE {price(p.mfe)}
-        {p.exits.length > 0 && <> · sold {p.exits.reduce((s, e) => s + e.shares, 0)} so far</>}
-        {p.pendingSellShares && <span className="text-sky-300"> · selling {p.pendingSellShares} at the next open</span>}
+        {p.exits.length > 0 && !halved && <> · sold {p.exits.reduce((s, e) => s + e.shares, 0)} so far</>}
+        {p.pendingSellShares && (
+          <span className="text-sky-300">
+            {" · "}selling {p.pendingSellShares} at the next open{p.trailMode === "kullamagi" ? ` (closed under the ${K.MA}-day)` : ""}
+          </span>
+        )}
         {p.splitFlagged && <span className="text-amber-300"> · check for a split</span>}
       </div>
       {editable && (

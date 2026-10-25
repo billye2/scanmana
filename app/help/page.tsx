@@ -205,7 +205,7 @@ export default async function Help() {
         The sweep moves one screen floor at a time and shows deck size against hit rate, for retuning{" "}
         <span className="font-mono text-[12px]">lib/config.ts</span>; its first line names the one knob whose best
         value is furthest above the current one, or says nothing needs retuning. The replay runs every closed paper trade under
-        other exit rules (5/10/15/20-session trails, a fixed 8% trail, half off at +2R) and reports which would have
+        other exit rules (the Kullamägi routine the Auto book trades, 5/10/15/20-session trails, a fixed 8% trail, half off at +2R) and reports which would have
         made more. Both are reports; the live rules stay as they are until you change them.
       </Term>
 
@@ -263,8 +263,8 @@ export default async function Help() {
           <Amber>stop</Amber> line (or under the breakout day&apos;s low if that is tighter).
         </li>
         <li>
-          Sell a third to a half into strength after 3–5 days — Kullamägi&apos;s rule of thumb — and trail the rest on
-          the <Blue>10-day</Blue> or 20-day average.
+          Sell a third to a half into strength after 3–5 days — Kullamägi&apos;s rule of thumb — move the stop to breakeven, and
+          trail the rest on the <Blue>10-day</Blue> or 20-day average. The paper book&apos;s Auto ledger runs exactly this routine.
         </li>
         <li>If a breakout closes back inside the box, it failed. Take the small loss; there is another deck tomorrow.</li>
       </ol>
@@ -281,19 +281,23 @@ export default async function Help() {
       <Term name="What arms, and when">
         The nightly scan runs the paper book right after it stores the deck (weeknights ~midnight ET). It first settles the day just
         closed — fills, stops, queued sells, trails — then arms tonight&apos;s orders. The Auto ledger arms one order per card that has
-        a box <em>and</em> a Wait verdict: a buy-stop at the <Amber>trigger</Amber> (solid amber) with the stop at the{" "}
-        <Amber>stop</Amber> line (dashed amber). Pass cards and pivot-only cards never arm. A card that closed above its box top
-        today is a market buy at tomorrow&apos;s open instead (a buy-stop under the market is not an order a broker takes); one that
-        broke out days ago is skipped — the app&apos;s own rule is that only a pullback to the box gives an entry then. Orders follow
-        the deck: a card that reappears with a new box gets the new numbers, a card that drops out or closes under its box is
-        cancelled. The book you see is always <em>as of the last processed session</em>; nothing changes during the day.
+        a box <em>and</em> a Wait verdict <em>and</em> closed above its <Amber>trigger</Amber> today: a buy at tomorrow&apos;s open with
+        the stop at today&apos;s low — Kullamägi&apos;s entry, the break confirmed by the close and the risk measured to the low of the
+        breakout day. A card still inside its box arms nothing; it is only a candidate. Why the close and not the first touch: on the
+        scanner&apos;s own history (1,222 boxed Wait cards, March–September 2026) a buy-stop at the trigger filled 979 times and 501 of
+        those days closed back inside the box, averaging −0.42R; waiting for the close costs a little on the open and removes them.
+        Pass cards and pivot-only cards never arm; a card that broke out days ago is skipped — only a pullback to the box gives an
+        entry then. Orders follow the deck: a card that drops out or closes under its box is cancelled. The book you see is always{" "}
+        <em>as of the last processed session</em>; nothing changes during the day.
       </Term>
 
       <Term name="How fills work">
-        A buy-stop fills on the first session whose high reaches the trigger, at the trigger — or at the open if the stock gapped past
-        it. A stop fills on any session whose low touches it, at the stop — or at the open if it gapped under. If the entry day also
-        touches the stop, the trade counts as stopped out that same day: the order of the two touches is unknowable, so the book
-        assumes the worse one. $500 per position at full size, in whole shares, so a name that costs more than the notional per share is skipped and listed under Skipped.
+        An Auto order buys at the next open; if that open is already at or under the stop the order is cancelled instead of booking a
+        zero-length trade. A manual buy-stop fills on the first session whose high reaches the trigger, at the trigger — or at the open
+        if the stock gapped past it. A stop fills on any session whose low touches it, at the stop — or at the open if it gapped under.
+        If the entry day also touches the stop, the trade counts as stopped out that same day: the order of the two touches is
+        unknowable, so the book assumes the worse one. Rule sells (the Auto book&apos;s half-off and 10-day exit) and queued manual
+        sells fill at the next open. $500 per position at full size, in whole shares, so a name that costs more than the notional per share is skipped and listed under Skipped.
         No commissions, no slippage, dividends and splits ignored; a 40%+ overnight gap is flagged &ldquo;check for a split&rdquo;.
       </Term>
 
@@ -308,9 +312,14 @@ export default async function Help() {
 
       <Term name="Auto ledger">
         No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
-        trigger first. The stop starts at the box bottom and each night moves up to the lowest low of the last 10 sessions if that is
-        higher; it never moves down. That trail is the only exit. MFE / MAE on each trade (defined below) show the best and worst price
-        seen while it was open, so you can tell what was available versus what the rule captured.
+        trigger first. From the fill on it runs Kullamägi&apos;s exits, nothing else: the stop sits at the breakout day&apos;s low; on
+        day 4 (the entry day is day 1), if the previous close is above entry, half the shares are sold at the open and the stop moves to
+        breakeven; after any close under the 10-day average the rest is sold at the next open. No lowest-low trail. The numbers behind
+        the choice, measured 2026-10-25 on the scanner&apos;s history with this entry: the old box-bottom stop with a 10-session-low trail
+        averaged +0.04R at a 30% win rate over 14 sessions; this routine −0.03R at 42% over 5 sessions. It was adopted anyway, as the
+        playbook to measure — the Auto book exists to show what these rules do on these picks, not to be tuned. Positions opened before
+        the change keep the old trail until they close. MFE / MAE on each trade (defined below) show the best and worst price seen while
+        it was open, so you can tell what was available versus what the rule captured.
       </Term>
 
       <Term name="Manual ledger">
@@ -337,7 +346,10 @@ export default async function Help() {
         initial stop, times shares): −1R is a full stop-out, +2R made twice the risk. Win rate, average win and loss in R,{" "}
         <span className="text-neutral-100">expectancy</span> (average R per trade — the number that matters) and profit factor
         (gross wins ÷ gross losses) are computed from closed trades only, per ledger. A position with several exits is one trade at a
-        blended exit price. Equity is cash plus open positions at the last close.
+        blended exit price. Equity is cash plus open positions at the last close. The line under the tiles,{" "}
+        <span className="text-neutral-100">By tape at entry</span>, splits the closed trades by whether the index filter read Bullish
+        on the day they were entered — Kullamägi&apos;s own first rule, and on the scanner&apos;s history the difference between +0.11R
+        and −0.11R a trade — so a run of losses in a weak tape reads as the tape, not the scanner.
       </Term>
 
       <Term name="MFE · MAE">

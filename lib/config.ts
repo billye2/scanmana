@@ -102,6 +102,17 @@ export const CONFIG = {
     // (share of the universe above its 20-day average). Measured 2026-09-20 on 149
     // sessions: the same setups averaged +0.11R when Bullish and −0.11R when not.
     TAPE: { BREADTH_MIN: 0.5, ONE_SIGNAL: 0.5, NO_SIGNAL: 0.25 },
+    // The Auto book trades Kullamägi's playbook end to end (since 1.3.7, 2026-10-25):
+    // buy the next open after a close above the box, stop at the breakout day's low,
+    // sell half at the open of PARTIAL_DAY if the prior close is above entry, stop to
+    // breakeven after that, and sell the rest at the next open after a close under the
+    // MA-session average. Measured 2026-10-25 on 1,222 boxed Wait deck rows (138 sessions):
+    //   entry — first-touch buy-stop −0.03R (979 fills) vs close-above-then-open +0.05R (834);
+    //   exit, with that entry fixed — box-bottom stop + 10-low trail +0.04R / 30% win,
+    //   this playbook −0.03R / 42% win / 5-session hold, breakeven at +1R +0.02R,
+    //   half off at +2R +0.01R. Billy adopted the playbook knowing the trail scored higher:
+    //   the Auto book is there to measure the rules he would actually trade.
+    KULLAMAGI: { PARTIAL_DAY: 4, PARTIAL_FRACTION: 0.5, MA: 10 },
   },
 
   // Data requirements

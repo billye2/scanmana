@@ -19,7 +19,7 @@ import {
   type TrackStats,
   type TrailMode,
 } from "./paper-engine";
-import { latestTape, tapeFor, type Tape } from "./tape";
+import { latestTape, tapeFor, tapeMultiplier, type SizeLabel, type Tape } from "./tape";
 import type { Bar, ScanPayload } from "./types";
 
 const P = CONFIG.PAPER;
@@ -70,6 +70,7 @@ interface PositionRow {
   mae: number;
   late: boolean;
   split_flagged: boolean;
+  sessions_held: number;
   status: "open" | "closed";
   closed_date: string | null;
 }
@@ -91,6 +92,7 @@ const toPosition = (r: PositionRow, exits: EngineExit[]): EnginePosition => ({
   mae: r.mae,
   late: r.late,
   splitFlagged: r.split_flagged,
+  sessionsHeld: r.sessions_held,
   status: r.status,
   closedDate: r.closed_date,
   exits,
@@ -98,7 +100,7 @@ const toPosition = (r: PositionRow, exits: EngineExit[]): EnginePosition => ({
 
 const ORDER_COLS = `id, track, ticker, trigger_price AS trigger, stop_price AS stop, kind, status, late, armed_date::text AS armed_date, cancelled_reason`;
 const POSITION_COLS = `id, track, ticker, order_id, entry_date::text AS entry_date, entry_price, shares, initial_stop, current_stop,
-  trail_mode, trail_param, pending_sell_shares, peak_close, mfe, mae, late, split_flagged, status, closed_date::text AS closed_date`;
+  trail_mode, trail_param, pending_sell_shares, peak_close, mfe, mae, late, split_flagged, sessions_held, status, closed_date::text AS closed_date`;
 
 async function liveOrders(userId: string): Promise<EngineOrder[]> {
   const sql = getSql();
@@ -182,6 +184,8 @@ export interface PaperNight {
   tape?: Tape | null;
   filled: number;
   stopped: number;
+  /** Rule sells on the auto book: day-4 partials and 10-day exits. */
+  sold: number;
   armed: number;
   cancelled: number;
 }
@@ -194,7 +198,7 @@ export interface PaperNight {
  */
 export async function runPaperNight(date: string): Promise<PaperNight> {
   const sql = getSql();
-  const totals: PaperNight = { tape: null, filled: 0, stopped: 0, armed: 0, cancelled: 0 };
+  const totals: PaperNight = { tape: null, filled: 0, stopped: 0, sold: 0, armed: 0, cancelled: 0 };
   const users = (await sql`SELECT DISTINCT user_id FROM paper_accounts`) as { user_id: string }[];
   for (const { user_id: userId } of users) {
     const [{ last }] = (await sql`
@@ -213,6 +217,7 @@ export async function runPaperNight(date: string): Promise<PaperNight> {
       const t = await processOneSession(userId, d);
       totals.filled += t.filled;
       totals.stopped += t.stopped;
+      totals.sold += t.sold;
     }
     if (claimedTonight) {
       const t = await armTonight(userId, date);
@@ -224,11 +229,13 @@ export async function runPaperNight(date: string): Promise<PaperNight> {
   return totals;
 }
 
-async function processOneSession(userId: string, date: string): Promise<{ filled: number; stopped: number }> {
+type SessionCounts = { filled: number; stopped: number; sold: number };
+
+async function processOneSession(userId: string, date: string): Promise<SessionCounts> {
   const sql = getSql();
   const orders = await liveOrders(userId);
   const positions = await loadPositions(userId, "open");
-  if (orders.length === 0 && positions.length === 0) return { filled: 0, stopped: 0 };
+  if (orders.length === 0 && positions.length === 0) return { filled: 0, stopped: 0, sold: 0 };
   const cash = await loadCash(userId);
   const tickers = [...new Set([...orders.map((o) => o.ticker), ...positions.map((p) => p.ticker)])];
   const bars = await loadBarsUntil(tickers, date, P.TRAIL_LOOKBACK + 2);
@@ -246,9 +253,9 @@ async function processOneSession(userId: string, date: string): Promise<{ filled
     if (p.id !== null) continue;
     const [{ id }] = (await sql`
       INSERT INTO paper_positions (user_id, track, ticker, order_id, entry_date, entry_price, shares, initial_stop, current_stop,
-        trail_mode, trail_param, pending_sell_shares, peak_close, mfe, mae, late, split_flagged, status, closed_date)
+        trail_mode, trail_param, pending_sell_shares, peak_close, mfe, mae, late, split_flagged, sessions_held, status, closed_date)
       VALUES (${userId}, ${p.track}, ${p.ticker}, ${p.orderId}, ${p.entryDate}, ${p.entryPrice}, ${p.shares}, ${p.initialStop}, ${p.currentStop},
-        ${p.trailMode}, ${p.trailParam}, ${p.pendingSellShares}, ${p.peakClose}, ${p.mfe}, ${p.mae}, ${p.late}, ${p.splitFlagged}, ${p.status}, ${p.closedDate})
+        ${p.trailMode}, ${p.trailParam}, ${p.pendingSellShares}, ${p.peakClose}, ${p.mfe}, ${p.mae}, ${p.late}, ${p.splitFlagged}, ${p.sessionsHeld}, ${p.status}, ${p.closedDate})
       RETURNING id
     `) as { id: number }[];
     p.id = id;
@@ -267,7 +274,7 @@ async function processOneSession(userId: string, date: string): Promise<{ filled
     if (positions.every((x) => x.id !== p.id)) continue; // just inserted above with its final state
     await sql`
       UPDATE paper_positions SET shares = ${p.shares}, current_stop = ${p.currentStop}, pending_sell_shares = ${p.pendingSellShares},
-        peak_close = ${p.peakClose}, mfe = ${p.mfe}, mae = ${p.mae}, split_flagged = ${p.splitFlagged},
+        peak_close = ${p.peakClose}, mfe = ${p.mfe}, mae = ${p.mae}, split_flagged = ${p.splitFlagged}, sessions_held = ${p.sessionsHeld},
         status = ${p.status}, closed_date = ${p.closedDate}, updated_at = now()
       WHERE id = ${p.id}
     `;
@@ -279,14 +286,16 @@ async function processOneSession(userId: string, date: string): Promise<{ filled
   return countEvents(r.events);
 }
 
-function countEvents(events: EngineEvent[]): { filled: number; stopped: number } {
+function countEvents(events: EngineEvent[]): SessionCounts {
   let filled = 0;
   let stopped = 0;
+  let sold = 0;
   for (const e of events) {
     if (e.type === "fill") filled++;
     if (e.type === "exit" && e.exit.reason === "stop") stopped++;
+    if (e.type === "exit" && (e.exit.reason === "partial" || e.exit.reason === "ma_exit")) sold++;
   }
-  return { filled, stopped };
+  return { filled, stopped, sold };
 }
 
 async function armTonight(userId: string, date: string): Promise<{ armed: number; cancelled: number }> {
@@ -461,7 +470,11 @@ export interface BookPosition extends EnginePosition {
   /** Stop suggestions for the manual track: the entry day's low and the box bottom from tonight's deck (if still there). */
   entryDayLow: number | null;
   latestBoxBottom: number | null;
+  /** The tape as it stood on the entry date (the reading that sized the fill); null before any scan or breadth existed. */
+  tapeAtEntry: { bullish: boolean | null; label: SizeLabel } | null;
 }
+
+export type TapeBucket = "bullish" | "not_bullish" | "unknown";
 
 export interface BookTrack {
   cash: number;
@@ -472,6 +485,8 @@ export interface BookTrack {
   closed: BookPosition[];
   stats: TrackStats;
   skips: { ticker: string; date: string; reason: string }[];
+  /** The closed-trade stats split by the index verdict at entry — a bad tape should read as a bad tape, not a bad scanner. */
+  statsByTape: { key: TapeBucket; label: string; stats: TrackStats }[];
 }
 
 export type Book = Record<Track, BookTrack> & { asOf: string | null };
@@ -508,6 +523,25 @@ export async function getBook(userId: string): Promise<Book> {
     SELECT track, ticker, date::text AS date, reason FROM paper_skips WHERE user_id = ${userId} ORDER BY id DESC LIMIT 50
   `) as { track: Track; ticker: string; date: string; reason: string }[];
 
+  // The tape on each entry date, read the way tapeFor read it when it sized the fill:
+  // the latest index verdict and the latest breadth row on or before that date.
+  const verdicts = (await sql`
+    SELECT date::text AS date, payload->'market'->>'verdict' AS verdict FROM scan_results ORDER BY date
+  `) as { date: string; verdict: string | null }[];
+  const breadthRows = (await sql`
+    SELECT date::text AS date, pct_above_20::double precision AS p FROM research_breadth ORDER BY date
+  `) as { date: string; p: number | null }[];
+  const tapeAt = (date: string): BookPosition["tapeAtEntry"] => {
+    let v: (typeof verdicts)[number] | undefined;
+    for (const row of verdicts) if (row.date <= date) v = row;
+    let b: (typeof breadthRows)[number] | undefined;
+    for (const row of breadthRows) if (row.date <= date) b = row;
+    if (!v && !b) return null;
+    const bullish = v?.verdict ? v.verdict === "bullish" : null;
+    const breadth = b?.p === null || b?.p === undefined ? null : Number(b.p);
+    return { bullish, label: tapeMultiplier(bullish, breadth).label };
+  };
+
   const decorate = (p: EnginePosition): BookPosition => {
     const bar = last.get(p.ticker) ?? null;
     const risk = p.entryPrice - p.initialStop;
@@ -524,8 +558,17 @@ export async function getBook(userId: string): Promise<Book> {
       realizedR: r,
       entryDayLow: entryLows.get(p.id!) ?? null,
       latestBoxBottom: boxBottoms.get(p.ticker) ?? null,
+      tapeAtEntry: tapeAt(p.entryDate),
     };
   };
+  const toTrade = (p: BookPosition) => ({ closedDate: p.closedDate!, pnl: p.realizedPnl, r: p.realizedR });
+  const bucketOf = (p: BookPosition): TapeBucket =>
+    p.tapeAtEntry?.bullish === true ? "bullish" : p.tapeAtEntry?.bullish === false ? "not_bullish" : "unknown";
+  const BUCKETS: { key: TapeBucket; label: string }[] = [
+    { key: "bullish", label: "Bullish" },
+    { key: "not_bullish", label: "Not bullish" },
+    { key: "unknown", label: "Unknown tape" },
+  ];
 
   const book = { asOf: last_processed } as Book;
   for (const track of TRACKS) {
@@ -551,7 +594,8 @@ export async function getBook(userId: string): Promise<Book> {
         })),
       open,
       closed,
-      stats: computeStats(closed.map((p) => ({ closedDate: p.closedDate!, pnl: p.realizedPnl, r: p.realizedR }))),
+      stats: computeStats(closed.map(toTrade)),
+      statsByTape: BUCKETS.map((b) => ({ ...b, stats: computeStats(closed.filter((p) => bucketOf(p) === b.key).map(toTrade)) })),
       skips: skips.filter((s) => s.track === track),
     };
   }

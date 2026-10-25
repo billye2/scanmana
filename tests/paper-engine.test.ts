@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  armBlocker,
   armDecisions,
   computeStats,
   processSession,
@@ -45,11 +46,21 @@ const position = (over: Partial<EnginePosition> = {}): EnginePosition => ({
   mae: 50,
   late: false,
   splitFlagged: false,
+  sessionsHeld: 1,
   status: "open",
   closedDate: null,
   exits: [],
   ...over,
 });
+
+/** A Kullamägi-rule auto position: in at $50 on a $47 breakout-day low, `held` sessions processed so far. */
+const autoPosition = (held: number, over: Partial<EnginePosition> = {}): EnginePosition =>
+  position({ track: "auto", trailMode: "kullamagi", initialStop: 47, currentStop: 47, sessionsHeld: held, ...over });
+
+/** `history` then `last` (dated 2026-02-01) for ticker X. */
+function sessionWith(history: Bar[], last: Bar): { date: string; bars: Map<string, Bar[]> } {
+  return { date: "2026-02-01", bars: new Map([["X", [...history, { ...last, date: "2026-02-01" }]]]) };
+}
 
 /** 11 quiet bars at $48 (lows $47.04) then the given session bar, all for ticker X. */
 function session(last: Bar, ticker = "X"): { date: string; bars: Map<string, Bar[]> } {
@@ -77,9 +88,17 @@ describe("processSession — fills", () => {
     const r = run({ orders: [order()] }, bar(48, 51, 47.5, 50.5));
     expect(r.orders[0].status).toBe("filled");
     expect(r.positions).toHaveLength(1);
-    // The auto trail applies from the entry day: the 10-session low (47.04) already sits above the box bottom.
-    expect(r.positions[0]).toMatchObject({ entryPrice: 50, shares: 10, initialStop: 45, currentStop: 47.04, late: false, status: "open" });
+    // An auto fill opens under the Kullamägi rule set: no trail, the stop stays where the order put it.
+    expect(r.positions[0]).toMatchObject({ entryPrice: 50, shares: 10, initialStop: 45, currentStop: 45, trailMode: "kullamagi", sessionsHeld: 1, late: false, status: "open" });
     expect(r.events[0]).toMatchObject({ type: "fill", price: 50, shares: 10 });
+  });
+
+  it("cancels a market order whose open is already at or under the stop", () => {
+    const r = run({ orders: [order({ kind: "market" })] }, bar(44.5, 46, 44, 45.5));
+    expect(r.orders[0].status).toBe("cancelled");
+    expect(r.orders[0].cancelledReason).toMatch(/opened at 44.50, under the 45.00 stop/);
+    expect(r.positions).toHaveLength(0);
+    expect(r.events[0]).toMatchObject({ type: "cancel", ticker: "X" });
   });
 
   it("gap above the trigger fills at the open, not the trigger", () => {
@@ -161,7 +180,7 @@ describe("processSession — open positions", () => {
     expect(gap.positions[0].exits[0].price).toBe(40);
   });
 
-  it("auto trail ratchets the stop up to the 10-session low and never lowers it", () => {
+  it("the lowest-low trail (legacy auto positions, manual N-low) ratchets the stop up to the 10-session low and never lowers it", () => {
     resetDays();
     const history = flatBars(11, 60, 0.04); // lows 58.8
     const up = { ...bar(60, 62, 59, 61), date: "2026-02-01" };
@@ -169,7 +188,7 @@ describe("processSession — open positions", () => {
       date: "2026-02-01",
       bars: new Map([["X", [...history, up]]]),
       orders: [],
-      positions: [position({ track: "auto", currentStop: 45 })],
+      positions: [position({ track: "auto", trailMode: "lowestlow", trailParam: 10, currentStop: 45 })],
       cash: { auto: 0, manual: 0 },
     });
     expect(r1.positions[0].currentStop).toBeCloseTo(58.8, 6);
@@ -232,8 +251,68 @@ const cand = (over: Partial<Candidate>): Candidate => {
   };
 };
 
+describe("processSession — Kullamägi exits (auto track)", () => {
+  const up = () => {
+    resetDays();
+    return [...flatBars(10, 48, 0.04), bar(51, 53, 50.5, 52)]; // yesterday closed at 52, above the $50 entry
+  };
+
+  it("day 4: sells half at the open when yesterday closed above entry, and moves the stop to breakeven", () => {
+    const s = sessionWith(up(), bar(52, 54, 51.5, 53));
+    const r = processSession({ ...s, orders: [], positions: [autoPosition(3)], cash: { auto: 0, manual: 0 } });
+    const p = r.positions[0];
+    expect(p.exits).toEqual([{ date: "2026-02-01", price: 52, shares: 5, reason: "partial" }]);
+    expect(p).toMatchObject({ shares: 5, currentStop: 50, sessionsHeld: 4, status: "open" });
+    expect(r.cash.auto).toBe(52 * 5);
+    expect(r.events[0]).toMatchObject({ type: "exit", exit: { reason: "partial" } });
+  });
+
+  it("day 4 with one share: nothing to halve, the stop still goes to breakeven", () => {
+    const s = sessionWith(up(), bar(52, 54, 51.5, 53));
+    const r = processSession({ ...s, orders: [], positions: [autoPosition(3, { shares: 1 })], cash: { auto: 0, manual: 0 } });
+    expect(r.positions[0]).toMatchObject({ shares: 1, exits: [], currentStop: 50 });
+  });
+
+  it("day 4 under water: no sale, stop unchanged", () => {
+    resetDays();
+    const history = [...flatBars(10, 48, 0.04), bar(49, 49.5, 48, 49)];
+    const s = sessionWith(history, bar(49, 50, 48.5, 49.5));
+    const r = processSession({ ...s, orders: [], positions: [autoPosition(3)], cash: { auto: 0, manual: 0 } });
+    expect(r.positions[0]).toMatchObject({ shares: 10, exits: [], currentStop: 47, sessionsHeld: 4 });
+  });
+
+  it("not day 4: a close above entry alone sells nothing", () => {
+    const s = sessionWith(up(), bar(52, 54, 51.5, 53));
+    const r = processSession({ ...s, orders: [], positions: [autoPosition(2)], cash: { auto: 0, manual: 0 } });
+    expect(r.positions[0]).toMatchObject({ shares: 10, exits: [], currentStop: 47, sessionsHeld: 3 });
+  });
+
+  it("a close under the 10-day average queues the rest for the next open, which then sells as a 10-day exit", () => {
+    // Ten closes at 48 then 47.2: the 10-day average is 47.92, the close is under it (the low stays above the $47 stop).
+    const first = session(bar(47.5, 48, 47.1, 47.2));
+    const r1 = processSession({ ...first, orders: [], positions: [autoPosition(5)], cash: { auto: 0, manual: 0 } });
+    expect(r1.positions[0]).toMatchObject({ pendingSellShares: 10, status: "open", exits: [] });
+    const next = session(bar(47.6, 48, 47.3, 47.8));
+    const r2 = processSession({ ...next, orders: [], positions: r1.positions, cash: r1.cash });
+    expect(r2.positions[0].exits).toEqual([{ date: "2026-02-01", price: 47.6, shares: 10, reason: "ma_exit" }]);
+    expect(r2.positions[0].status).toBe("closed");
+    expect(r2.cash.auto).toBe(47.6 * 10);
+  });
+
+  it("a close above the 10-day average queues nothing", () => {
+    const r = processSession({ ...session(bar(48, 49, 47.8, 48.5)), orders: [], positions: [autoPosition(5)], cash: { auto: 0, manual: 0 } });
+    expect(r.positions[0].pendingSellShares).toBeNull();
+  });
+
+  it("an auto position left on the old lowest-low trail still ratchets and never halves", () => {
+    const legacy = position({ track: "auto", trailMode: "lowestlow", trailParam: 10, sessionsHeld: 99 });
+    const r = processSession({ ...session(bar(48, 49, 47.5, 48.5)), orders: [], positions: [legacy], cash: { auto: 0, manual: 0 } });
+    expect(r.positions[0]).toMatchObject({ currentStop: 47.04, shares: 10, exits: [], pendingSellShares: null });
+  });
+});
+
 describe("armDecisions", () => {
-  it("arms boxed wait candidates, skips pass, pivot-only, open and broke-earlier names, keeps today's break", () => {
+  it("arms only today's confirmed breaks as market buys with the stop at the day's low; everything else is blocked with a reason", () => {
     const bars = flatBars(12, 48, 0.04);
     const brokeToday = [...bars.slice(0, 11), { ...bars[11], c: 51 }];
     const brokeEarlier = [...bars.slice(0, 10), { ...bars[10], c: 51 }, { ...bars[11], c: 52 }];
@@ -253,14 +332,20 @@ describe("armDecisions", () => {
       order({ ticker: "MANUAL", track: "manual" }),
     ];
     const d = armDecisions(cs, live, new Set(["OPEN"]));
-    expect(d.arm.map((a) => a.ticker)).toEqual(["OK", "TODAY"]);
-    expect(d.arm[0]).toEqual({ ticker: "OK", trigger: 50, stop: 45, kind: "buy_stop" });
-    // Broke the box today: price is above the trigger, so it is a market buy at tomorrow's open, not a buy-stop.
-    expect(d.arm[1]).toEqual({ ticker: "TODAY", trigger: 50, stop: 45, kind: "market" });
+    // Only the confirmed break arms: a market buy at tomorrow's open, risk to today's low (47.04), not the box bottom.
+    expect(d.arm).toEqual([{ ticker: "TODAY", trigger: 50, stop: 47.04, kind: "market" }]);
+    // OK is still inside its box, so its old buy-stop is cancelled with the reason — the one-time clean-up on the night this rule shipped.
     expect(d.cancel).toEqual([
+      { ticker: "OK", reason: "waiting for a close above the box" },
       { ticker: "PASS", reason: "verdict pass" },
       { ticker: "GONE", reason: "dropped from the scan" },
     ]);
+  });
+
+  it("a close exactly at the box top is not a break", () => {
+    const bars = flatBars(12, 48, 0.04);
+    expect(armBlocker(cand({ ticker: "ATTOP", bars: [...bars.slice(0, 11), { ...bars[11], c: 50 }] }))).toBe("waiting for a close above the box");
+    expect(armBlocker(cand({ ticker: "ABOVE", bars: [...bars.slice(0, 11), { ...bars[11], c: 50.01 }] }))).toBeNull();
   });
 });
 

@@ -23,6 +23,12 @@ export const RULE_CHANGES: RuleChange[] = [
   { effective: "2026-09-21", version: "1.3.0", label: "Livermore out of the verdict", lens: "verdict_gap" },
   { effective: "2026-09-21", version: "1.3.2", label: "Screen within 5% of the high", lens: "deck_hit" },
   { effective: "2026-09-21", version: "1.3.2", label: "Paper size scaled by the tape", lens: "paper_avg_r" },
+  {
+    effective: "2026-10-27",
+    version: "1.3.7",
+    label: "Auto trades Kullamägi's playbook: buy the open after a close above the box, stop at the day's low, half off day 4, breakeven, 10-day exit",
+    lens: "paper_avg_r",
+  },
 ];
 
 /** Labelled rows (or closed trades) the "after" side needs before its number is shown in colour. */

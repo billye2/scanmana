@@ -1,4 +1,5 @@
 import Link from "next/link";
+import MarketReason from "@/components/MarketReason";
 import { CONFIG } from "@/lib/config";
 import type { BreadthRow } from "@/lib/research";
 import { tapeMultiplier } from "@/lib/tape";
@@ -19,8 +20,8 @@ export default function MarketBar({ market, breadth }: { market: MarketHealth | 
   }
   const t = TONE[market.verdict];
   return (
-    <Link href="/help#market" className="mb-3 block rounded-xl bg-neutral-900 px-3 py-2 active:bg-neutral-800">
-      <div className="flex items-center gap-2 text-xs">
+    <div className="mb-3 rounded-xl bg-neutral-900 px-3 py-2">
+      <Link href="/help#market" className="flex items-center gap-2 text-xs active:opacity-70">
         <span className={`inline-block h-2 w-2 rounded-full ${t.dot}`} />
         <span className={`font-semibold ${t.text}`}>Market {t.label}</span>
         <span className="ml-auto flex gap-2 font-mono text-[11px]">
@@ -46,10 +47,10 @@ export default function MarketBar({ market, breadth }: { market: MarketHealth | 
             </span>
           ))}
         </span>
-      </div>
-      <div className="mt-0.5 text-[11px] text-neutral-500">{market.reason}</div>
+      </Link>
+      <MarketReason reason={market.reason} />
       {breadth && <BreadthLine b={breadth.today} prev={breadth.prev} bullish={market.verdict === "bullish"} />}
-    </Link>
+    </div>
   );
 }
 

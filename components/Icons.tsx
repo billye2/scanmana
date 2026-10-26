@@ -93,6 +93,15 @@ export function ChevronLeftIcon(p: P) {
   );
 }
 
+/** Chevron down: a folded line that expands (the market reason). */
+export function ChevronDownIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="m6 9 6 6 6-6" />
+    </Svg>
+  );
+}
+
 /** Chevron right: next card. */
 export function ChevronRightIcon(p: P) {
   return (

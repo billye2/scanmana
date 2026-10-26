@@ -12,9 +12,10 @@ const ICONS: { href: string; label: string; Icon: typeof ListIcon }[] = [
 ];
 
 /**
- * The one top navigation for every signed-in page: the Scanmana logo always
- * links home, a page line sits under it, and the same six icons sit on the
- * right (the current page's icon is lit). `extra` slots page-specific controls
+ * The one top navigation for every signed-in page: the logo ("SCM" — the full
+ * word left the six icons no room on a phone, 1.3.9) always links home, a page
+ * line sits under it, and the same six icons sit on the right (the current
+ * page's icon is lit). `extra` slots page-specific controls
  * before the icons (the symbol page's Live toggle).
  */
 export default function TopNav({ subtitle, current, extra }: { subtitle?: ReactNode; current?: string; extra?: ReactNode }) {
@@ -22,7 +23,7 @@ export default function TopNav({ subtitle, current, extra }: { subtitle?: ReactN
     <header className="mb-3 flex items-center justify-between">
       <h1 className="min-w-0 text-lg leading-tight font-bold tracking-tight">
         <Link href="/" className="active:opacity-70" aria-label="Scanmana — home">
-          <span className="text-emerald-400">◎</span> Scanmana
+          <span className="text-emerald-400">◎</span> SCM
         </Link>
         {subtitle && <span className="block truncate text-xs font-normal text-neutral-500">{subtitle}</span>}
       </h1>

@@ -9,7 +9,7 @@ import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
-import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, ExternalLinkIcon, ListIcon, StarIcon } from "@/components/Icons";
+import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { CardResearch } from "@/lib/research";
@@ -403,16 +403,16 @@ export default function Deck({
               </button>
             </>
           )}
-          <span className="text-neutral-600">
-            {idx + 1}/{candidates.length}
-          </span>
         </span>
       </div>
       {takeError && <p className="mt-1 text-xs text-red-300">{takeError}</p>}
 
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).
-          Same line icons as the top nav, icon-only in equal columns, because the
-          old text buttons (‹ › ☆ ★ ↗) rendered in mismatched fallback fonts on iPhone. */}
+          Same line icons as the top nav in the top nav's order (paper before deck), icon-only
+          in equal columns, because the old text buttons (‹ › ☆ ★ ↗) rendered in mismatched
+          fallback fonts on iPhone. The Google button left 2026-10-26 (1.4.0, rarely tapped;
+          the chip beside Analysis and the space key remain) and its column shows the card
+          counter instead. */}
       <nav
         aria-label="Deck navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
@@ -429,17 +429,17 @@ export default function Deck({
           >
             <StarIcon size={25} fill={isSaved ? "currentColor" : "none"} />
           </button>
+          <Link href="/paper" className={BAR_ITEM} aria-label="Paper trading book">
+            <BriefcaseIcon size={25} />
+          </Link>
           {live && (
             <Link href="/deck" className={BAR_ITEM} aria-label="Tonight's deck — the whole list, grouped live">
               <ListIcon size={25} />
             </Link>
           )}
-          <Link href="/paper" className={BAR_ITEM} aria-label="Paper trading book">
-            <BriefcaseIcon size={25} />
-          </Link>
-          <a href={googleUrl} target="_blank" rel="noopener noreferrer" className={BAR_ITEM} aria-label="Google this symbol (opens a new tab)">
-            <ExternalLinkIcon size={25} />
-          </a>
+          <span className={`${BAR_ITEM} text-[11px] tabular-nums text-neutral-500`} aria-live="polite" aria-label={`Card ${idx + 1} of ${candidates.length}`}>
+            {idx + 1} of {candidates.length}
+          </span>
           <button onClick={() => go(1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Next card">
             <ChevronRightIcon size={25} />
           </button>

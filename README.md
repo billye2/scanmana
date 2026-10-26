@@ -28,7 +28,7 @@ overlays. A Python research layer scores the scanner's own history every night
   embeds bars only for the card on screen and its neighbours — ~12 KB gzipped
   instead of ~75 KB — and fetches the rest per card from `GET /api/scan/bars`
   as you page, neighbours prefetched), paged from a
-  fixed bottom bar of line icons (prev · watch · deck list · paper book · Google · next)
+  fixed bottom bar of line icons (prev · watch · paper book · deck list · "n of N" counter · next)
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
   page that carries the **↻ Run scan for previous day** button
@@ -106,7 +106,7 @@ overlays. A Python research layer scores the scanner's own history every night
 - **List** icon (header, next to ★): every setup in tonight's deck on one screen
   with its Wait / Pass chip, price, box and ★ markers, and a tally at the
   top — no need to page through each card. Tap a row to jump the deck to it.
-- **Google ↗** (a chip beside the Analysis button and a button beside ☆ Watch) opens a `<symbol> stock` Google search in a new tab (Google's COOP header
+- **Google ↗** (a chip beside the Analysis button) opens a `<symbol> stock` Google search in a new tab (Google's COOP header
   forbids single-tab reuse; the iOS PWA shows it in one in-app sheet anyway). On
   desktop, pressing space opens the search for the current card.
 - Watchlist symbols come from ☆ on cards or the **Add** field on `/watchlist`

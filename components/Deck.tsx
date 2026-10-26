@@ -412,7 +412,7 @@ export default function Deck({
           in equal columns, because the old text buttons (‹ › ☆ ★ ↗) rendered in mismatched
           fallback fonts on iPhone. The Google button left 2026-10-26 (1.4.0, rarely tapped;
           the chip beside Analysis and the space key remain) and its column shows the card
-          counter instead. */}
+          counter instead; tapping the counter pages forward like ›. */}
       <nav
         aria-label="Deck navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
@@ -437,9 +437,14 @@ export default function Deck({
               <ListIcon size={25} />
             </Link>
           )}
-          <span className={`${BAR_ITEM} text-[11px] tabular-nums text-neutral-500`} aria-live="polite" aria-label={`Card ${idx + 1} of ${candidates.length}`}>
+          <button
+            onClick={() => go(1)}
+            disabled={candidates.length < 2}
+            className={`${BAR_ITEM} text-[11px] tabular-nums text-neutral-500`}
+            aria-label={`Card ${idx + 1} of ${candidates.length} — tap for the next card`}
+          >
             {idx + 1} of {candidates.length}
-          </span>
+          </button>
           <button onClick={() => go(1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Next card">
             <ChevronRightIcon size={25} />
           </button>

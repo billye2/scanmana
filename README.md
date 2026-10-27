@@ -34,10 +34,12 @@ overlays. A Python research layer scores the scanner's own history every night
   page that carries the **↻ Run scan for previous day** button
   (`POST /api/scan/run` — no secret, never forces, so it can only run the scan
   the cron would).
-- **One top nav on every page** (`components/TopNav.tsx`): the ◎ Scanmana logo
-  always goes home, a page line sits under it, and the same four icons sit on
-  the right — Help, symbol lookup, ★ Watchlist, paper book, deck list — with the current
-  page's icon lit. The symbol page adds its Live toggle beside them.
+- **One top nav on every page** (`components/TopNav.tsx`): the ◎ SCM logo
+  (the full wordmark left no room once the bar had six icons) always goes home,
+  a page line sits under it, and the same six icons sit on the right — Help,
+  symbol lookup, ★ Watchlist, paper book, research, deck list — with the current
+  page's icon lit. The symbol page adds its Live toggle beside them. The market
+  strip's reason line is folded to one line with a chevron; tap to read it all.
 - **Paper trading** (`/paper`, `lib/paper-engine.ts` + `lib/paper-db.ts`): two
   ledgers priced on the same end-of-day bars, run right after each nightly scan.
   *Auto* arms a buy-stop at the box top of every boxed Wait card (stop at the box

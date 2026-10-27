@@ -372,6 +372,48 @@ export default async function Help() {
         night after that, once the session they happened in has closed.
       </Term>
 
+      <H>
+        <span id="sim">Stop simulator</span>
+      </H>
+      <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
+        <Link href="/sim" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/sim</Link> is for
+        the trade you opened before writing the plan. Type the symbol and what you paid; add the entry date if it was not today and the
+        share count if you want dollars. It prices the stop Kullamägi&apos;s rules would have set, shows the levels around it, and lays out
+        the rest of the routine. It reads the bar store (and today&apos;s live quote when the entry is today) and writes nothing — the paper
+        book is not touched. Linked from the lookup page and the paper page too.
+      </p>
+
+      <Term name="Which stop it picks" who="Kullamägi">
+        The low of the day you bought, when that is within one <span className="text-neutral-100">ADR</span> of the entry — his stop,
+        and a normal session cannot take it out. If that low is farther away, the tightest level price has respected inside one ADR:
+        the breakout day&apos;s low, then the box bottom. If nothing fits, it keeps the entry-day low, marks it{" "}
+        <span className="text-amber-300">wide</span>, and says how many shares keep the risk at 1% of the account — his answer to a
+        wide stop is a smaller position, not a tighter line. Bought at the low of the day, there is no level under you, so it falls
+        back to one ADR under the entry and says so.
+      </Term>
+
+      <Term name="The ladder">
+        Every level the playbook ever uses, sorted by price: entry-day low, breakout-day low (the session that closed above its box,
+        looked for in the ten sessions to your entry), box bottom, 10-session low (the Auto book&apos;s old trail), the{" "}
+        <Blue>10-day</Blue> and 20-day averages as of the last close (the trail lines — shown, never recommended), and the one-ADR cap.
+        Each row carries its distance in percent and either the dollars at risk on your shares or the share count for 1% risk.
+        Amber rows are wider than one ADR; grey rows are not under your entry.
+      </Term>
+
+      <Term name="The rest of the playbook">
+        The same four steps the Auto ledger runs: the stop, half off at the open of day 4 if day 3 closes above the entry (the entry
+        day is day 1), the stop to breakeven after that, the rest sold at the next open after a close under the 10-day average. With
+        an entry date in the past each step says where you stand — day 2 of 3, half due at tomorrow&apos;s open, already stopped out on
+        such a date — so you can see whether the plan you did not write would already have you out.
+      </Term>
+
+      <Term name="Same numbers as the Take button">
+        The page and the paper book price a stop with one function (<code>lib/stop-plan.ts</code>). A card that reads{" "}
+        <span className="text-neutral-100">Take at open</span> stops at that session&apos;s low, which is what the simulator recommends
+        for an entry at that close; a card still under its trigger keeps the box bottom, because the day whose low would be the stop has
+        not happened yet.
+      </Term>
+
       <p className="mt-8 text-[11px] leading-relaxed text-neutral-600">
         Thresholds are fixed in <code>lib/config.ts</code>. End-of-day data only; nothing here is investment advice.
         Sources: Kullamägi&apos;s public screen settings (2019–21); Darvas, <em>How I Made $2,000,000 in the Stock

@@ -84,7 +84,7 @@ export default async function SimPage({ searchParams }: { searchParams: Promise<
         <Result plan={plan} ticker={ticker} bars={bars} shares={shares} note={note} />
       ) : null}
       <p className="mt-6 text-[11px] text-neutral-600">
-        Rules from <Link href="/help#paper" className="underline decoration-neutral-700 underline-offset-4">Help</Link>. The Take
+        Rules from <Link href="/help#sim" className="underline decoration-neutral-700 underline-offset-4">Help</Link>. The Take
         button on a card prices its stop with the same function, so this page and the paper book never disagree.
       </p>
     </main>

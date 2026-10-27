@@ -12,7 +12,7 @@
 //            by a chosen trail; partial sells. It measures Billy plus the scanner.
 import { CONFIG } from "./config";
 import { breakingOut } from "./analysis";
-import { sma } from "./indicators";
+import { lowestLow, sma } from "./indicators";
 import type { Bar, Candidate } from "./types";
 
 const P = CONFIG.PAPER;
@@ -100,10 +100,6 @@ export interface SessionResult {
 /** Whole shares for the notional × the tape multiplier; 0 means one share costs more than that. */
 export function sizeShares(price: number, sizeMult = 1): number {
   return Math.floor((P.NOTIONAL * sizeMult) / price);
-}
-
-function lowestLow(bars: Bar[], n: number): number {
-  return Math.min(...bars.slice(-n).map((b) => b.l));
 }
 
 /** Where a trail would put the stop after this session, or null when the position has no trail (none, or the Kullamägi rule set). */
@@ -338,6 +334,8 @@ export function armDecisions(
     const why = armBlocker(c);
     if (why) blocked.set(c.ticker, why);
     else {
+      // Stop at the breakout day's low — the same rule `defaultTakeStop` (lib/stop-plan.ts)
+      // applies to a manual "Take at open", so both books price one entry the same way.
       const last = c.bars[c.bars.length - 1];
       arm.push({ ticker: c.ticker, trigger: c.box!.top, stop: last.l, kind: "market" });
     }

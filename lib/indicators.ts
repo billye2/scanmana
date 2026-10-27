@@ -34,6 +34,11 @@ export function sma(bars: Bar[], period: number, offset = 0): number | null {
   return sum / period;
 }
 
+/** Lowest low of the last `n` bars (the old auto trail and the stop planner's 10-session line). */
+export function lowestLow(bars: Bar[], n: number): number {
+  return Math.min(...bars.slice(-n).map((b) => b.l));
+}
+
 export function smaRising(bars: Bar[], period: number, slopeLookback: number): boolean {
   const now = sma(bars, period);
   const then = sma(bars, period, slopeLookback);

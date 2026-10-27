@@ -4,15 +4,19 @@ import { getSql } from "@/lib/db";
 import { takeSignal } from "@/lib/paper-db";
 import { latestScan, loadBars } from "@/lib/scan";
 import { buildCandidate } from "@/lib/screen";
+import { defaultTakeStop } from "@/lib/stop-plan";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Take a signal into the manual book: the same trigger the deck shows (box top,
- * else the bare pivot) with the box bottom as the stop — a buy-stop if price is
- * still under the trigger, a market buy at the next open if it is already above. A watchlist row supplies
- * the same two numbers; any other symbol gets them from its stored bars (as the
- * watchlist Add does). A pivot-only name has no stop line, so `stop` must be typed.
+ * else the bare pivot) — a buy-stop with the box bottom as the stop if price is
+ * still under the trigger; a market buy at the next open with the last session's
+ * low as the stop if it is already above (`defaultTakeStop`: the rule the Auto
+ * book arms with, so both books price one entry the same way). A watchlist row
+ * supplies the trigger and box bottom; any other symbol gets them from its stored
+ * bars (as the watchlist Add does). A typed `stop` wins; a pivot-only name has no
+ * stop line, so one must be typed.
  */
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -42,6 +46,10 @@ export async function POST(req: Request) {
     }
   }
   if (trigger === null) return NextResponse.json({ error: `${ticker} has no trigger to arm` }, { status: 400 });
+  if (lastClose !== null && lastClose > trigger) {
+    const bars = c?.bars ?? (await loadBars([ticker])).get(ticker) ?? [];
+    stop = defaultTakeStop(bars, trigger, stop);
+  }
   if (typeof body.stop === "number" && Number.isFinite(body.stop)) stop = body.stop;
   if (stop === null) return NextResponse.json({ error: `${ticker} has no stop line — type one` }, { status: 400 });
   const r = await takeSignal(userId, ticker, trigger, stop, lastClose);

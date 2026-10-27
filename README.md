@@ -128,6 +128,17 @@ overlays. A Python research layer scores the scanner's own history every night
   from the cache with their age; a 60-name deck is fully fresh every two
   polls. One bad symbol drops only itself and a 429 halts the refresh
   instead of failing it.
+- **Stop simulator** (`/sim`, linked from the lookup page, the paper book and Help): for a
+  position opened without a plan, type the symbol, the entry price, an optional entry date
+  and share count. `lib/stop-plan.ts` prices the stop by Kullamägi's rules — the low of the
+  day you bought when it is within one ADR, else the tightest structural level (breakout-day
+  low, box bottom), else the entry-day low with the share count that keeps the risk at 1% —
+  shows the ladder of levels around it (10-session low, 10/20-day averages, the one-ADR cap)
+  with the dollars at risk, draws entry and stop on the chart, and walks the rest of the
+  playbook (half off at the day-4 open, breakeven, out on a close under the 10-day) with
+  where a past entry stands. The same module gives the Take button its default stop, so the
+  page and the paper book never disagree. Reads bars (plus today's live quote when the entry
+  is today); writes nothing.
 - **Look up any symbol** (search icon in the header → `/s`): type AAPL or NVDA and get the
   same card the deck shows plus a **Scan fit** checklist — each hard rule of
   the nightly screen (`explainScreen` in `lib/screen.ts`, the same list
@@ -238,7 +249,7 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
   runs them (`POST /api/research_job?job=a,b&force=1&budget=S`, Bearer
   `CRON_SECRET`); `.python-version`, `requirements.txt`, `vercel.json`
   `functions` block
-- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/research`, `/s/[ticker]` symbol page (same card for
+- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/research`, `/sim` stop simulator, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
   `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`,

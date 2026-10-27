@@ -309,6 +309,7 @@ function TapeLine({ tape }: { tape: Tape }) {
     <p className="mt-2 text-[11px] text-neutral-500">
       Next fills at <span className={`font-semibold ${tone}`}>{tape.label} size</span> ({money(500 * tape.mult)} per position): {tape.reason}.
       <Link href="/help#paper" className="ml-1 underline decoration-neutral-700 underline-offset-4">Why</Link>
+      {" · "}Opened a position without a plan? <Link href="/sim" className="underline decoration-neutral-700 underline-offset-4">Price the stop</Link>
     </p>
   );
 }

@@ -2,6 +2,7 @@ import { BriefcaseIcon, ListIcon, SearchIcon } from "@/components/Icons";
 import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
 import IndexCharts from "@/components/IndexCharts";
+import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import RunScanButton from "@/components/RunScanButton";
 import { CONFIG } from "@/lib/config";
@@ -259,8 +260,10 @@ export default async function Help() {
           refresh within a minute or two (a free-tier budget, oldest first); off-hours the chips show the close.
         </li>
         <li>
-          Buy the break of the <Amber>trigger</Amber>, ideally in the first hour on rising volume. Stop just under the{" "}
-          <Amber>stop</Amber> line (or under the breakout day&apos;s low if that is tighter).
+          Buy the break of the <Amber>trigger</Amber>, ideally in the first hour on rising volume. Stop under the low of the day you
+          bought when that is within one ADR (Kullamägi&apos;s stop; the <Amber>stop</Amber> line, the box bottom, is the wider
+          fallback). Already in a trade with no plan? <Link href="/sim" className="text-neutral-100 underline decoration-neutral-700 underline-offset-4">/sim</Link>{" "}
+          prices that stop from the symbol and your entry, with the dollars at risk and the rest of this routine.
         </li>
         <li>
           Sell a third to a half into strength after 3–5 days — Kullamägi&apos;s rule of thumb — move the stop to breakeven, and
@@ -326,7 +329,8 @@ export default async function Help() {
         $10,000 to start, the same tape-sized notional per position, and cash binds — a take that does not fit is refused with the reason. Tap{" "}
         <span className="text-neutral-100">Take</span> on a deck card or a watchlist row to arm the same trigger and stop the card
         shows; a pivot-only name has no stop line, so it asks you to type one. When price is already above the trigger the button reads{" "}
-        <span className="text-neutral-100">Take at open</span>: a market buy at the next open with the same stop. If the Auto
+        <span className="text-neutral-100">Take at open</span>: a market buy at the next open with the stop at that session&apos;s low — the
+        Auto ledger&apos;s rule, so both books price a breakout-day entry the same way (since 1.4.2; before that it kept the box bottom). If the Auto
         ledger already filled that name before you took it, your fill is at the next open and the trade is marked{" "}
         <em>late</em>. An armed order can be removed from the paper page until it fills. One open position per name; after it
         closes, a fresh signal can be taken again.

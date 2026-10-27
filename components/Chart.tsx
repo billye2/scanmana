@@ -35,11 +35,20 @@ const SMA_COLORS: Record<number, string> = { 10: "#60a5fa", 20: "#c084fc", 50: "
  * `onZoomChange` make it controlled (the deck shares one state across cards);
  * without them each chart keeps its own.
  */
+export interface ChartLine {
+  price: number;
+  color: string;
+  title: string;
+  style?: "solid" | "dashed" | "dotted";
+}
+const LINE_STYLE = { solid: LineStyle.Solid, dashed: LineStyle.Dashed, dotted: LineStyle.Dotted } as const;
+
 export default function Chart({
   bars,
   box,
   pivot,
   smas = [10, 20],
+  lines,
   zoomed: zoomedProp,
   onZoomChange,
 }: {
@@ -47,6 +56,8 @@ export default function Chart({
   box: DarvasBox | null;
   pivot: number | null;
   smas?: readonly number[];
+  /** Extra horizontal levels (the simulator's entry and stop). Pass a stable array: it is an effect dependency. */
+  lines?: readonly ChartLine[];
   zoomed?: boolean;
   onZoomChange?: (zoomed: boolean) => void;
 }) {
@@ -147,6 +158,9 @@ export default function Chart({
         title: "pivot",
       });
     }
+    for (const l of lines ?? []) {
+      candles.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: LINE_STYLE[l.style ?? "solid"], title: l.title });
+    }
 
     chartRef.current = chart;
     applyViewRef.current(chart);
@@ -159,7 +173,7 @@ export default function Chart({
       chartRef.current = null;
       chart.remove();
     };
-  }, [bars, box, pivot, smas]);
+  }, [bars, box, pivot, smas, lines]);
 
   useEffect(() => {
     if (chartRef.current) applyView(chartRef.current);

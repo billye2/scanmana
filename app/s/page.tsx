@@ -1,3 +1,4 @@
+import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import SymbolLookup from "@/components/SymbolLookup";
 
@@ -8,6 +9,13 @@ export default function LookupPage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-2xl pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),8px)]">
       <TopNav current="/s" subtitle="Look up a symbol — any US stock in the bar store; read-only, never changes the nightly deck" />
       <SymbolLookup autoFocus />
+      <p className="mt-2 text-[11px] text-neutral-500">
+        Already in a trade with no plan?{" "}
+        <Link href="/sim" className="text-neutral-300 underline decoration-neutral-700 underline-offset-4">
+          Price the stop
+        </Link>{" "}
+        from the symbol and your entry.
+      </p>
       <p className="mt-4 text-[13px] leading-relaxed text-neutral-400">
         You get the same card the deck shows — chart with Darvas box and Livermore pivot, badges, the Wait / Pass analysis — plus a
         <span className="text-neutral-200"> Scan fit</span> checklist: each hard rule of the nightly screen with the number behind it, so

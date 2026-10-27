@@ -19,6 +19,7 @@ import {
   type TrackStats,
   type TrailMode,
 } from "./paper-engine";
+import { takeStopError } from "./stop-plan";
 import { latestTape, tapeFor, tapeMultiplier, type SizeLabel, type Tape } from "./tape";
 import type { Bar, ScanPayload } from "./types";
 
@@ -342,17 +343,20 @@ export async function manualTakenTickers(userId: string): Promise<string[]> {
 /**
  * Place the manual order. A buy-stop at the trigger while the last close is still
  * under it; a market buy at the next open when price is already above it (a broker
- * rejects a buy-stop below the market) — either way with the given stop. Refuses when
+ * rejects a buy-stop below the market) — either way with the given stop (the route
+ * defaults it: box bottom for a buy-stop, the last session's low for a market take,
+ * `defaultTakeStop` in lib/stop-plan.ts). Refuses when
  * one share exceeds the notional or the cash on hand; `late` when the auto order
  * already filled, so the record shows the take came after the signal.
  */
 export async function takeSignal(userId: string, ticker: string, trigger: number, stop: number, lastClose: number | null): Promise<Outcome> {
-  if (!(stop < trigger)) return { ok: false, status: 400, error: "the stop must sit below the trigger" };
-  await ensureAccounts(userId);
-  const sql = getSql();
   const kind: OrderKind = lastClose !== null && lastClose > trigger ? "market" : "buy_stop";
   const est = kind === "market" ? lastClose! : trigger; // the price the fill will be near
-  if (!(stop < est)) return { ok: false, status: 400, error: `the stop must sit below the last close (${est.toFixed(2)})` };
+  // Checked by order kind: a market take's stop (the breakout day's low) may sit above the box top.
+  const bad = takeStopError(kind, stop, trigger, est);
+  if (bad) return { ok: false, status: 400, error: bad };
+  await ensureAccounts(userId);
+  const sql = getSql();
   const tape = await latestTape();
   const shares = sizeShares(est, tape.mult);
   if (shares === 0) return { ok: false, status: 400, error: `one share at ${est.toFixed(2)} costs more than the $${Math.round(P.NOTIONAL * tape.mult)} notional (${tape.label} size: ${tape.reason})` };

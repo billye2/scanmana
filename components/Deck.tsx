@@ -184,15 +184,17 @@ export default function Deck({
   }
 
   /**
-   * Take the card into the manual paper book: the same buy-stop as ☆ Watch (box
-   * top, else the bare pivot) with the box bottom as the stop. A pivot-only card
-   * has no stop line, so the first tap opens an input for one.
+   * Take the card into the manual paper book: the same trigger as ☆ Watch (box
+   * top, else the bare pivot). Under the trigger it is a buy-stop with the box
+   * bottom as the stop; already above it ("Take at open") the server stops at the
+   * last session's low, the Auto book's rule, so no stop is sent. A pivot-only
+   * card has no stop line, so the first tap opens an input for one.
    */
   async function take() {
     const trigger = c.box?.top ?? c.pivot ?? null;
     if (trigger === null) return;
-    let stop: number | null = c.box?.bottom ?? null;
-    if (stop === null) {
+    let stop: number | null = c.box && c.price <= trigger ? c.box.bottom : null;
+    if (stop === null && !c.box) {
       if (takeStop === null) {
         setTakeStop("");
         return;
@@ -207,7 +209,7 @@ export default function Deck({
     const res = await fetch("/api/paper/take", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticker: c.ticker, stop }),
+      body: JSON.stringify(stop === null ? { ticker: c.ticker } : { ticker: c.ticker, stop }),
     });
     if (res.ok) {
       setTaken((cur) => new Set(cur).add(c.ticker));

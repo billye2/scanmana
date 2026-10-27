@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import Link from "next/link";
 import LiveWatch from "@/components/LiveWatch";
 import TopNav from "@/components/TopNav";
 import WatchlistAdd from "@/components/WatchlistAdd";
@@ -35,6 +36,13 @@ export default async function WatchlistPage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-4">
       <TopNav current="/watchlist" subtitle="★ Watchlist" />
       <WatchlistAdd />
+      <p className="-mt-1 mb-3 text-[11px] text-neutral-500">
+        Already in a trade with no plan?{" "}
+        <Link href="/sim" className="text-neutral-300 underline decoration-neutral-700 underline-offset-4">
+          Price the stop
+        </Link>{" "}
+        from the symbol and your entry.
+      </p>
       {items.length > 0 && <LiveWatch />}
       <WatchlistView items={items} taken={taken} />
     </main>

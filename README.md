@@ -28,7 +28,7 @@ overlays. A Python research layer scores the scanner's own history every night
   embeds bars only for the card on screen and its neighbours — ~12 KB gzipped
   instead of ~75 KB — and fetches the rest per card from `GET /api/scan/bars`
   as you page, neighbours prefetched), paged from a
-  fixed bottom bar of line icons (prev · watch · paper book · deck list · "n of N" counter (tap = next) · next)
+  fixed bottom bar of line icons (prev · watch · paper book · deck list · "n of N" counter (tap = next))
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
   page that carries the **↻ Run scan for previous day** button

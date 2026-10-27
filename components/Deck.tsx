@@ -9,7 +9,7 @@ import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
-import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ChevronRightIcon, ListIcon, StarIcon } from "@/components/Icons";
+import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { CardResearch } from "@/lib/research";
@@ -414,12 +414,13 @@ export default function Deck({
           in equal columns, because the old text buttons (‹ › ☆ ★ ↗) rendered in mismatched
           fallback fonts on iPhone. The Google button left 2026-10-26 (1.4.0, rarely tapped;
           the chip beside Analysis and the space key remain) and its column shows the card
-          counter instead; tapping the counter pages forward like ›. */}
+          counter instead; tapping the counter pages forward, which made › redundant (gone
+          in 1.4.5; the keyboard's → / j still work). */}
       <nav
         aria-label="Deck navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
       >
-        <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-6" : "grid-cols-5"}`}>
+        <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-5" : "grid-cols-4"}`}>
           <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
             <ChevronLeftIcon size={25} />
           </button>
@@ -442,13 +443,10 @@ export default function Deck({
           <button
             onClick={() => go(1)}
             disabled={candidates.length < 2}
-            className={`${BAR_ITEM} text-[11px] tabular-nums text-neutral-500`}
+            className={`${BAR_ITEM} text-sm font-medium tabular-nums`}
             aria-label={`Card ${idx + 1} of ${candidates.length} — tap for the next card`}
           >
             {idx + 1} of {candidates.length}
-          </button>
-          <button onClick={() => go(1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Next card">
-            <ChevronRightIcon size={25} />
           </button>
         </div>
       </nav>

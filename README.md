@@ -85,7 +85,7 @@ overlays. A Python research layer scores the scanner's own history every night
   `GET /api/analysis`. `npm run analyze` recomputes for the latest scan.
 - **Research** (flask icon → `/research`, `research/*.py` on a Vercel Python
   3.13 function chained after each scan): every loose-screen passer is
-  recorded nightly in `scan_history`, then six jobs score it — **outcomes**
+  recorded nightly in `scan_history`, then seven jobs score it — **outcomes**
   (did each deck name close above its level within 10 sessions; the level is
   the box top, else the pivot while overhead, else the 20-session high — hit
   rate by verdict, badge and which framework objected), **threshold sweep**
@@ -95,13 +95,18 @@ overlays. A Python research layer scores the scanner's own history every night
   links the deck-mates), **splits** (unadjusted gaps that look like splits;
   confirmed ones rescale the bars the scan and charts use, ambiguous ones wait
   in a review list), **breadth** (per day, back to the start of the bars), and
-  **paper replay** (closed paper trades under trail 5/10/15/20, a fixed 8% and
-  half-off-at-2R). The page reads top-down as one question — is the scanner
+  **paper replay** (closed paper trades under the Auto book's Kullamägi routine,
+  the same with a 20-day exit or skipping any stop wider than one ADR, trail
+  5/10/15/20, a fixed 8% and half-off-at-2R), and the **episodic-pivot study**
+  (every 10%+ gap on 3× volume in the whole bars table — Kullamägi's main
+  setup, which the momentum screen cannot show — traded at the next open with
+  the stop at the gap day's low, split by how neglected the name was before the
+  gap and by the volume multiple). The page reads top-down as one question — is the scanner
   working, did the last rule change help: a **scorecard** (four numbers, all
   history vs since the last change), the **rule changes** (`RULE_CHANGES` in
   `lib/research-story.ts`, one entry per shipped change with the number it is
   scored on, grey until 30 rows), then the rates, the sweep (headline knob
-  first, curves folded), breadth and tonight's themes; splits, replay and the
+  first, curves folded), the episodic-pivot study, breadth and tonight's themes; splits, replay and the
   job log live under a collapsed Maintenance block. Each deck card shows
   "Setups like this: N% broke out within 10d (n=…)" for its shape. `npm run research -- --jobs outcomes,sweep --force`
   runs jobs locally against the same DB (needs the `.venv`, see Setup).

@@ -346,6 +346,127 @@ export async function getReplay(): Promise<ReplayRow[]> {
   }
 }
 
+/* ---------- episodic-pivot study (research/ep.py) ---------- */
+
+/** A name is "neglected" before its gap when its 3-month return was under this — the screen's own 1-month momentum floor. */
+export const EP_NEGLECT_RET_3M = CONFIG.MOMENTUM.M1;
+/** Volume-multiple buckets the page splits on; the job stores every multiple from CONFIG.EP.VOL_MULT up. */
+export const EP_VOL_BUCKETS = [CONFIG.EP.VOL_MULT, 5, 10] as const;
+
+export interface EpGroup {
+  key: string;
+  label: string;
+  n: number; // rows with a known R
+  winRate: number | null;
+  avgR: number | null;
+  avgMfe20: number | null; // mean best close over the 20 sessions after entry, against the entry
+}
+export interface EpRecent {
+  date: string;
+  ticker: string;
+  gapPct: number;
+  volMult: number | null;
+  ret3mBefore: number | null;
+  heldGap: boolean;
+  taken: boolean | null;
+  r: number | null;
+}
+export interface EpStudy {
+  candidates: number;
+  taken: number;
+  labelled: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  overall: EpGroup;
+  byNeglect: EpGroup[];
+  byVolume: EpGroup[];
+  byHeld: EpGroup[];
+  byBoth: EpGroup[]; // the interview's own description: neglected and the volume surge together
+  recent: EpRecent[];
+}
+
+const EP_EMPTY: EpStudy = {
+  candidates: 0, taken: 0, labelled: 0, firstDate: null, lastDate: null,
+  overall: { key: "all", label: "All", n: 0, winRate: null, avgR: null, avgMfe20: null },
+  byNeglect: [], byVolume: [], byHeld: [], byBoth: [], recent: [],
+};
+
+type EpAgg = { key: string; n: number; win: number | null; avg_r: number | null; mfe: number | null };
+const epGrp = (key: string, label: string, a: EpAgg | undefined): EpGroup => ({
+  key,
+  label,
+  n: Number(a?.n ?? 0),
+  winRate: a?.win == null ? null : Number(a.win),
+  avgR: a?.avg_r == null ? null : Number(a.avg_r),
+  avgMfe20: a?.mfe == null ? null : Number(a.mfe),
+});
+
+/**
+ * Kullamägi's episodic pivot, as the stored history would have traded it at the
+ * next open with the stop at the gap day's low: how often it paid, split by how
+ * neglected the name was before the gap, by the volume multiple, and by whether
+ * the gap day closed above its open. Reads research_ep only. Never throws.
+ */
+export async function getEpStudy(): Promise<EpStudy> {
+  const sql = getSql();
+  try {
+    const [tot] = (await sql`
+      SELECT count(*)::int AS candidates, count(*) FILTER (WHERE taken)::int AS taken, count(r_at_exit)::int AS labelled,
+             min(date)::text AS first_date, max(date)::text AS last_date
+      FROM research_ep
+    `) as { candidates: number; taken: number; labelled: number; first_date: string | null; last_date: string | null }[];
+    const agg = (await sql`
+      SELECT g.key, count(r_at_exit)::int AS n, avg((r_at_exit > 0)::int) FILTER (WHERE r_at_exit IS NOT NULL) AS win,
+             avg(r_at_exit) AS avg_r, avg(mfe_20) AS mfe
+      FROM research_ep e,
+           LATERAL unnest(ARRAY[
+             'all',
+             CASE WHEN ret_3m_before IS NULL THEN 'unknown' WHEN ret_3m_before < ${EP_NEGLECT_RET_3M} THEN 'neglected' ELSE 'extended' END,
+             CASE WHEN vol_mult IS NULL THEN 'vol_unknown' WHEN vol_mult >= ${EP_VOL_BUCKETS[2]} THEN 'vol_10' WHEN vol_mult >= ${EP_VOL_BUCKETS[1]} THEN 'vol_5' ELSE 'vol_3' END,
+             CASE WHEN held_gap THEN 'held' ELSE 'faded' END,
+             CASE WHEN ret_3m_before < ${EP_NEGLECT_RET_3M} AND vol_mult >= ${EP_VOL_BUCKETS[2]} THEN 'both' ELSE 'rest' END,
+             CASE WHEN ret_3m_before < ${EP_NEGLECT_RET_3M} AND vol_mult >= ${EP_VOL_BUCKETS[2]} AND held_gap THEN 'both_held' ELSE 'rest2' END
+           ]) AS g(key)
+      WHERE taken GROUP BY g.key
+    `) as EpAgg[];
+    const recent = (await sql`
+      SELECT date::text AS date, ticker, gap_pct, vol_mult, ret_3m_before, held_gap, taken, r_at_exit
+      FROM research_ep ORDER BY date DESC, vol_mult DESC NULLS LAST LIMIT 10
+    `) as { date: string; ticker: string; gap_pct: number; vol_mult: number | null; ret_3m_before: number | null; held_gap: boolean; taken: boolean | null; r_at_exit: number | null }[];
+    const by = new Map(agg.map((r) => [r.key, r]));
+    const num = (x: number | null) => (x === null ? null : Number(x));
+    return {
+      candidates: tot.candidates,
+      taken: tot.taken,
+      labelled: tot.labelled,
+      firstDate: tot.first_date,
+      lastDate: tot.last_date,
+      overall: epGrp("all", "All taken", by.get("all")),
+      byNeglect: [
+        epGrp("neglected", `Neglected (3M < +${Math.round(EP_NEGLECT_RET_3M * 100)}%)`, by.get("neglected")),
+        epGrp("extended", `Already up (3M ≥ +${Math.round(EP_NEGLECT_RET_3M * 100)}%)`, by.get("extended")),
+      ],
+      byVolume: [
+        epGrp("vol_3", `${EP_VOL_BUCKETS[0]}–${EP_VOL_BUCKETS[1]}× volume`, by.get("vol_3")),
+        epGrp("vol_5", `${EP_VOL_BUCKETS[1]}–${EP_VOL_BUCKETS[2]}×`, by.get("vol_5")),
+        epGrp("vol_10", `${EP_VOL_BUCKETS[2]}×+`, by.get("vol_10")),
+      ],
+      byHeld: [epGrp("held", "Closed above its open", by.get("held")), epGrp("faded", "Closed under its open", by.get("faded"))],
+      byBoth: [
+        epGrp("both", `Neglected and ${EP_VOL_BUCKETS[2]}×+ (his description)`, by.get("both")),
+        epGrp("both_held", `… and closed above its open`, by.get("both_held")),
+        epGrp("rest", "Everything else", by.get("rest")),
+      ],
+      recent: recent.map((r) => ({
+        date: r.date, ticker: r.ticker, gapPct: Number(r.gap_pct), volMult: num(r.vol_mult), ret3mBefore: num(r.ret_3m_before),
+        heldGap: r.held_gap, taken: r.taken, r: num(r.r_at_exit),
+      })),
+    };
+  } catch {
+    return EP_EMPTY;
+  }
+}
+
 /* ---------- per-card research (deck) ---------- */
 
 export interface LikeThis {

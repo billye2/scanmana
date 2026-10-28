@@ -166,7 +166,7 @@ export default async function Help() {
         Every night, after the scan, a separate Python job replays the scanner&apos;s own history and writes a
         handful of tables the app reads. Nothing here changes the scan, the verdicts or the paper book; it measures
         them. The page answers one question — is the scanner working, and did the last rule change help — in this
-        order: a scorecard, the rule changes, the breakout rates, the threshold sweep, breadth, tonight&apos;s themes.
+        order: a scorecard, the rule changes, the breakout rates, the episodic-pivot study, the threshold sweep, breadth, tonight&apos;s themes.
         Splits, the paper replay and the job log sit under <em>Maintenance</em> at the bottom. The deck, the market
         strip and the paper page each show one line from it.
       </Term>
@@ -186,6 +186,17 @@ export default async function Help() {
         On a deck card: of past deck names with the same shape (boxed or not, EP badge or not, Wait or Pass), the share
         whose close cleared its level within ten sessions (the box top, else the pivot while still overhead, else the 20-session high), and how many such names there were. Wait should beat
         Pass; when it stops doing so, the rules need a look.
+      </Term>
+      <Term name="Episodic pivot study" who="Kullamägi">
+        His main setup is the one the deck cannot show: a stock that gaps up 10%+ on a volume surge after real
+        news, best when it had been <em>neglected</em> — sideways for months, not already up — bought on the gap
+        day and held for weeks with the stop at that day&apos;s low. The screen&apos;s momentum and near-the-high
+        floors drop exactly those names until the gap itself delivers them. So the Research page measures the
+        setup on the whole stored history instead: every gap day that fits the shape (price ≥ $
+        {CONFIG.MIN_PRICE}, ≥ ${(CONFIG.MIN_DOLLAR_VOLUME / 1e6).toFixed(0)}M/day), traded the only way end-of-day
+        data allows — bought at the next open, stop at the gap day&apos;s low, sold by the Auto ledger&apos;s routine —
+        split by how neglected the name was and by the volume multiple. Nothing is armed from it; if the neglected,
+        high-volume group pays at the next open, an EP list earns a place on the deck.
       </Term>
       <Term name="Theme">
         Stocks that moved together over the last three months, grouped from price alone (no sector data exists here).

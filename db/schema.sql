@@ -287,6 +287,33 @@ CREATE TABLE IF NOT EXISTS research_breadth (
   new_lows integer NOT NULL
 );
 
+-- Episodic-pivot study (research/ep.py): every gap day in bars that fits
+-- Kullamägi's EP shape, how neglected the name was before it, and the
+-- end-of-day version of his trade (next open, stop at the gap day's low, the
+-- Auto book's exit). Read by /research only, nothing on the deck uses it.
+CREATE TABLE IF NOT EXISTS research_ep (
+  date date NOT NULL,
+  ticker text NOT NULL,
+  gap_pct double precision NOT NULL,
+  vol_mult double precision,
+  day_pct double precision NOT NULL,
+  held_gap boolean NOT NULL,
+  ret_3m_before double precision,
+  ret_6m_before double precision,
+  dist_high_before double precision,
+  taken boolean,
+  entry double precision,
+  stop double precision,
+  r_at_exit double precision,
+  hold smallint,
+  mfe_20 double precision,
+  mae_20 double precision,
+  sessions_after smallint NOT NULL,
+  complete boolean NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (date, ticker)
+);
+
 CREATE TABLE IF NOT EXISTS research_replay (
   track text NOT NULL,
   rule text NOT NULL,

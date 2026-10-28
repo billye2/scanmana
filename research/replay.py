@@ -2,8 +2,9 @@
 
 Reads paper_positions (status = 'closed') and paper_exits, replays each
 position's post-entry bars under the stop/exit rules in RULES (the Auto book's
-live Kullamägi routine, four lowest-low trails, a percent trail, half off at
-+2R, and what actually happened), and writes per-(track, rule) metrics to
+live Kullamägi routine, the same with a 20-day exit, the same skipping any
+trade whose stop is wider than one ADR, four lowest-low trails, a percent
+trail, half off at +2R, and what actually happened), and writes per-(track, rule) metrics to
 research_replay. Nothing about the live ledger (lib/paper-db.ts,
 lib/paper-engine.ts) is touched or re-decided; this is read-only research on
 top of it.
@@ -47,6 +48,8 @@ KULLAMAGI_MA = 10
 
 RULES: dict[str, str] = {
     "kullamagi": "Kullamägi: half off day 4, breakeven, 10-day exit",
+    "kullamagi_20": "Kullamägi, 20-day exit",
+    "kullamagi_adr": "Kullamägi, skipped when the stop is wider than one ADR",
     "trail_5": "Trail 5-session low",
     "trail_10": "Trail 10-session low",
     "trail_15": "Trail 15-session low",
@@ -166,15 +169,17 @@ def _replay_half_2r(
 
 
 def _replay_kullamagi(
-    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pre_closes: list[float]
+    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pre_closes: list[float], ma: int = KULLAMAGI_MA
 ) -> dict:
     """The Auto book's live exit (lib/paper-engine.ts processSession, kullamagi
     branch): stop at `initial_stop`; on day KULLAMAGI_PARTIAL_DAY (entry day = 1),
     if the previous close is above entry, sell the partial fraction at the open
-    and raise the stop to breakeven; after any close under the KULLAMAGI_MA-session
-    average, sell what is left at the next open. `pre_closes` are the closes up to
-    and including the entry day (oldest first) so the average has history from
-    the first post-entry session; without them it is taken over what exists.
+    and raise the stop to breakeven; after any close under the `ma`-session
+    average (KULLAMAGI_MA live; 20 for the kullamagi_20 rule — Kullamägi trails
+    the more extended names on the 20-day), sell what is left at the next open.
+    `pre_closes` are the closes up to and including the entry day (oldest first)
+    so the average has history from the first post-entry session; without them
+    it is taken over what exists.
     """
     stop = initial_stop
     held = shares
@@ -198,12 +203,18 @@ def _replay_kullamagi(
             return _combine(entry_price, initial_stop, legs, False)
         closes.append(row.c)
         prev_close = row.c
-        window = closes[-KULLAMAGI_MA:]
+        window = closes[-ma:]
         if row.c < sum(window) / len(window):
             pending = True
     last = bars.iloc[-1]
     legs.append((last.c, last.date, held, len(bars)))
     return _combine(entry_price, initial_stop, legs, True)
+
+
+def _skipped(initial_stop: float, first_date: Any) -> dict:
+    """A trade the rule would not have taken: zero R, zero dollars, no hold, so the
+    rule's trade count and totals stay comparable with the rules that took it."""
+    return {"exit_price": float(initial_stop), "exit_date": first_date, "hold": 0, "r": 0.0, "pnl": 0.0, "mtm": False, "skipped": True}
 
 
 def replay_position(
@@ -214,18 +225,23 @@ def replay_position(
     rule: str,
     pre_closes: list[float] | None = None,
     pre_lows: list[float] | None = None,
+    adr: float | None = None,
 ) -> dict:
     """Replay one closed position from the session after entry under `rule`.
 
     `bars` must be that ticker's sessions strictly after entry_date, columns
     date, o, h, l, c (any order, ascending or not — this sorts by date). Mirrors
     lib/paper-engine.ts: a stop-out fills at min(open, stop); a target fills at
-    max(open, target). `rule` is one of kullamagi, trail_5/10/15/20, pct_8,
-    half_2r. `pre_closes` and `pre_lows` are the closes and lows of the sessions
-    up to and including the entry day, oldest first: the kullamagi rule's
-    moving average and the percent trail's peak read the closes, the lowest-low
-    trails seed their window from the lows. Leaving them out reproduces a
-    position with no history before entry.
+    max(open, target). `rule` is one of kullamagi, kullamagi_20, kullamagi_adr,
+    trail_5/10/15/20, pct_8, half_2r. `pre_closes` and `pre_lows` are the closes
+    and lows of the sessions up to and including the entry day, oldest first: the
+    kullamagi rules' moving average and the percent trail's peak read the closes,
+    the lowest-low trails seed their window from the lows. Leaving them out
+    reproduces a position with no history before entry. `adr` is the average
+    daily range (high / low − 1, mean of the 20 sessions to the entry day) as a
+    fraction: kullamagi_adr skips the trade — zero R, zero hold — when the stop
+    is farther under the entry than that, Kullamägi's "I wouldn't take the
+    trade" rule; without `adr` it trades like kullamagi.
 
     Returns a dict with exit_price, exit_date, hold (sessions after entry to
     the exit), r ((exit - entry) / (entry - initial_stop), share-weighted
@@ -239,6 +255,12 @@ def replay_position(
     lows = pre_lows or []
     if rule == "kullamagi":
         return _replay_kullamagi(bars, entry_price, initial_stop, shares, closes)
+    if rule == "kullamagi_20":
+        return _replay_kullamagi(bars, entry_price, initial_stop, shares, closes, ma=20)
+    if rule == "kullamagi_adr":
+        if adr is not None and entry_price > 0 and (entry_price - initial_stop) / entry_price > adr:
+            return _skipped(initial_stop, bars.iloc[0]["date"])
+        return _replay_kullamagi(bars, entry_price, initial_stop, shares, closes)
     if rule.startswith("trail_"):
         return _replay_trail(bars, entry_price, initial_stop, shares, int(rule.split("_", 1)[1]), lows)
     if rule == "pct_8":
@@ -246,6 +268,19 @@ def replay_position(
     if rule == "half_2r":
         return _replay_half_2r(bars, entry_price, initial_stop, shares, lows)
     raise ValueError(f"unknown replay rule: {rule!r}")
+
+
+def adr_pct(pre: pd.DataFrame, window: int = 20) -> float | None:
+    """Average daily range as a fraction over the last `window` sessions of `pre`
+    (columns h, l): mean of high / low − 1, lib/indicators.ts adrPct without the
+    ×100. None with fewer sessions than the window or a non-positive low."""
+    if len(pre) < window:
+        return None
+    tail = pre.tail(window)
+    lows = tail["l"].astype(float)
+    if (lows <= 0).any():
+        return None
+    return float((tail["h"].astype(float) / lows - 1).mean())
 
 
 def _actual_result(bars: pd.DataFrame, exits: pd.DataFrame, entry_price: float, initial_stop: float) -> dict:
@@ -315,7 +350,7 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
     )
     tickers = sorted(positions["ticker"].unique().tolist())
     # 35 calendar days (~24 sessions) before the first entry: the 20-session trail
-    # seeds its window from the bars before entry, the kullamagi average needs ten closes.
+    # seeds its window from the bars before entry, the 20-day exit and the ADR need twenty.
     since = (pd.Timestamp(positions["entry_date"].min()) - pd.Timedelta(days=35)).date().isoformat()
     bars = load_bars(conn, tickers=tickers, since=since)
 
@@ -325,8 +360,9 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         own = bars[bars["ticker"] == pos.ticker]
         pos_bars = own[own["date"] > entry_date].sort_values("date")
         pre = own[own["date"] <= entry_date].sort_values("date")
-        pre_closes = pre["c"].astype(float).tolist()[-KULLAMAGI_MA:]
+        pre_closes = pre["c"].astype(float).tolist()[-20:]  # the 20-day variant needs twenty
         pre_lows = pre["l"].astype(float).tolist()[-20:]
+        adr = adr_pct(pre)
         pos_exits = exits[exits["position_id"] == pos.id]
         total_shares = int(pos.shares) + int(pos_exits["shares"].sum())
         if total_shares <= 0 or pos_exits.empty:
@@ -339,15 +375,21 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
                 # replay's trade count and totals equal to the paper page's.
                 result = actual
             else:
-                result = replay_position(pos_bars, pos.entry_price, pos.initial_stop, total_shares, rule, pre_closes, pre_lows)
+                result = replay_position(pos_bars, pos.entry_price, pos.initial_stop, total_shares, rule, pre_closes, pre_lows, adr)
             rows_by_track[pos.track].append({**result, "rule": rule, "entry_date": pos.entry_date})
 
     out_rows = []
     for track, results in rows_by_track.items():
         for rule, label in RULES.items():
-            metrics = summarize([r for r in results if r["rule"] == rule])
+            own = [r for r in results if r["rule"] == rule]
+            metrics = summarize(own)
             if metrics["trades"] == 0:
                 continue
+            skipped = sum(1 for r in own if r.get("skipped"))
+            if skipped:
+                # The row scores the same signals as the others with the skipped ones at zero,
+                # so say how many that was: a rule that skipped everything scores 0.00R.
+                label = f"{label} ({skipped} of {len(own)} skipped)"
             out_rows.append(
                 tuple(
                     pyval(v)

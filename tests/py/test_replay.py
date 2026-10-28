@@ -298,3 +298,48 @@ def test_pct8_seeds_the_peak_at_the_entry_day_close():
     assert seeded["exit_price"] == pytest.approx(110 * 0.92)
     unseeded = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="pct_8")
     assert unseeded["mtm"] is True
+
+
+# ---------- (g) the interview's two variants: 20-day exit, skip a wide stop ----------
+
+
+def test_kullamagi_20_holds_through_a_close_under_the_10_day_but_over_the_20_day():
+    # Ten closes at 100 then ten at 110 before entry: the 10-day average is 110,
+    # the 20-day 105. A post-entry close of 108 is under the 10-day (sells at the
+    # next open under the live rule) but over the 20-day (the 20-day rule holds).
+    pre = [100] * 10 + [110] * 10
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 109, "h": 110, "l": 107, "c": 108},
+            {"date": _d(2), "o": 107, "h": 109, "l": 106, "c": 108.5},
+        ]
+    )
+    ten = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi", pre_closes=pre)
+    twenty = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi_20", pre_closes=pre)
+    assert ten["exit_price"] == pytest.approx(107.0)  # sold at day 3's open
+    assert ten["mtm"] is False
+    assert twenty["mtm"] is True  # still held, marked to the last close
+    assert twenty["exit_price"] == pytest.approx(108.5)
+
+
+def test_kullamagi_adr_skips_a_stop_wider_than_one_adr_and_trades_a_tighter_one():
+    bars = _bars([{"date": _d(1), "o": 101, "h": 103, "l": 99, "c": 102}])
+    # Stop 10% under the entry, ADR 5%: not taken — zero R, zero hold.
+    wide = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi_adr", adr=0.05)
+    assert wide == {"exit_price": 90.0, "exit_date": _d(1), "hold": 0, "r": 0.0, "pnl": 0.0, "mtm": False, "skipped": True}
+    # Stop 4% under with the same ADR: identical to the live rule.
+    tight = replay_position(bars, entry_price=100, initial_stop=96, shares=10, rule="kullamagi_adr", adr=0.05)
+    live = replay_position(bars, entry_price=100, initial_stop=96, shares=10, rule="kullamagi")
+    assert tight == live
+    # Without an ADR the rule cannot judge width and trades like the live rule.
+    assert replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi_adr") == replay_position(
+        bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi"
+    )
+
+
+def test_adr_pct_mirrors_the_typescript_indicator():
+    from research.replay import adr_pct
+
+    pre = pd.DataFrame({"h": [105.0] * 20, "l": [100.0] * 20})
+    assert adr_pct(pre) == pytest.approx(0.05)
+    assert adr_pct(pre.head(19)) is None

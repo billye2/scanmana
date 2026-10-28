@@ -4,10 +4,12 @@ import { ClusterAlias, ResearchRefresh, SplitActions } from "@/components/Resear
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
 import {
+  EP_NEGLECT_RET_3M,
   SWEEP_CURRENT,
   closedTrades,
   getBreadth,
   getClusters,
+  getEpStudy,
   getReplay,
   getResearchSummary,
   getSplits,
@@ -70,7 +72,7 @@ function Tile({ label, all, since, n, sinceN, sinceDate, firstRead }: {
 export default async function ResearchPage() {
   const scan = await latestScan().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
-  const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades] = await Promise.all([
+  const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades, ep] = await Promise.all([
     getResearchSummary(),
     getStory(),
     getSweep(),
@@ -79,6 +81,7 @@ export default async function ResearchPage() {
     getBreadth(120),
     getReplay(),
     closedTrades("auto"),
+    getEpStudy(),
   ]);
   const ran = summary.runs.some((r) => r.ok);
   const health = researchHealth(summary.runs, scan?.date ?? null);
@@ -90,6 +93,8 @@ export default async function ResearchPage() {
   const autoRs = autoTrades.map((t) => t.r);
   const { all, since } = story;
   const n = (x: number) => x.toLocaleString();
+  const epGroups = [ep.overall, ...ep.byNeglect, ...ep.byVolume, ...ep.byHeld, ...ep.byBoth];
+  const epReady = ep.overall.n >= MIN_AFTER_N;
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
@@ -174,6 +179,55 @@ export default async function ResearchPage() {
         </Card>
       </div>
 
+      {/* ---------- 3b. Episodic pivots ---------- */}
+      <H id="ep" sub={`Kullamägi's main setup, which the deck cannot show: a gap of 10%+ on 3× volume in the whole market (price ≥ $10, ≥ $20M/day), bought at the next open with the stop at the gap day's low and sold by the Auto book's routine. ${n(ep.candidates)} gap days${ep.firstDate ? ` since ${ep.firstDate}` : ""}, ${n(ep.taken)} tradeable, ${n(ep.labelled)} with a result. A study only — nothing is armed from it.`}>
+        Episodic pivots, had the book traded them
+      </H>
+      {ep.candidates === 0 ? (
+        <Card className="text-xs text-neutral-500">No gap days scored yet — the ep job fills this after the next research run.</Card>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-[1fr_300px]">
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full">
+              <thead><tr><th className={TH}>Group</th><th className={`${TH} text-right`}>Trades</th><th className={`${TH} text-right`}>Win</th><th className={`${TH} text-right`}>Avg R</th><th className={`${TH} text-right`}>Best close in 20</th></tr></thead>
+              <tbody>
+                {epGroups.map((g, i) => (
+                  <tr key={g.key} className={`border-t border-neutral-800 ${g.key === "all" ? "bg-amber-900/15" : g.key === "both" ? "bg-emerald-900/15" : ""} ${g.n < MIN_AFTER_N ? "text-neutral-500" : ""}`}>
+                    <td className={`${TD} whitespace-normal ${g.n >= MIN_AFTER_N ? "text-neutral-100" : ""}`}>{g.label}{i === 1 && <span className="ml-1 text-[10px] text-neutral-500">before the gap</span>}</td>
+                    <td className={NUM}>{n(g.n)}</td>
+                    <td className={NUM}>{pc(g.winRate)}</td>
+                    <td className={`${NUM} ${g.n >= MIN_AFTER_N && g.avgR !== null ? (g.avgR >= 0 ? "text-emerald-300" : "text-red-300") : ""}`}>{rr(g.avgR)}</td>
+                    <td className={NUM}>{g.avgMfe20 === null ? "—" : pct(g.avgMfe20)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="px-3 py-2 text-[11px] leading-relaxed text-neutral-500">
+              {epReady
+                ? "Neglected should beat already-up and 10×+ should beat 3–5×, as he says. If neglected 10×+ pays and the rest does not, an EP list earns its place on the deck; if nothing pays at the next open, the gap-day entry his method needs is not available to end-of-day data and the study stays a study."
+                : `Grey until a group has ${MIN_AFTER_N} results; one night's run labels the whole stored history, so the first read is immediate.`}
+            </p>
+          </Card>
+          <Card>
+            <div className="mb-1 text-[11px] font-semibold text-neutral-400">Latest gap days</div>
+            <table className="w-full">
+              <tbody>
+                {ep.recent.map((r) => (
+                  <tr key={`${r.ticker}-${r.date}`} className="border-t border-neutral-800 first:border-t-0">
+                    <td className={`${TD} px-1 py-1 font-semibold text-neutral-100`}><Link href={`/s/${r.ticker}`} className="underline decoration-neutral-700 underline-offset-4">{r.ticker}</Link></td>
+                    <td className={`${TD} px-1 py-1 font-mono text-[10px] text-neutral-500`}>{r.date.slice(5)}</td>
+                    <td className={`${NUM} px-1 py-1`}>{pct(r.gapPct)}</td>
+                    <td className={`${NUM} px-1 py-1`}>{r.volMult === null ? "—" : `${r.volMult.toFixed(0)}×`}</td>
+                    <td className={`${TD} px-1 py-1 text-[10px] ${r.ret3mBefore !== null && r.ret3mBefore < EP_NEGLECT_RET_3M ? "text-emerald-300" : "text-neutral-500"}`}>{r.ret3mBefore === null ? "" : r.ret3mBefore < EP_NEGLECT_RET_3M ? "neglected" : "up already"}</td>
+                    <td className={`${NUM} px-1 py-1 ${r.r === null ? "text-neutral-600" : r.r >= 0 ? "text-emerald-300" : "text-red-300"}`}>{r.taken === false ? "not taken" : r.r === null ? "open" : rr(r.r)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </div>
+      )}
+
       {/* ---------- 4. Sweep ---------- */}
       <H id="sweep" sub="One screen floor moved at a time, the other three held at today's values, the deck cap re-applied. A report for retuning lib/config.ts, nothing on the deck reads it.">
         Threshold sweep
@@ -255,7 +309,7 @@ export default async function ResearchPage() {
         <summary className={SUMMARY}>
           <span className="text-sm font-semibold tracking-wide text-neutral-400 uppercase">Maintenance</span>
           <span className="ml-2 text-[11px] text-neutral-500">
-            {reviewSplits} split{reviewSplits === 1 ? "" : "s"} to review · {autoRs.length} replayed auto trade{autoRs.length === 1 ? "" : "s"} · {okJobs} of {summary.runs.length || 6} jobs ok
+            {reviewSplits} split{reviewSplits === 1 ? "" : "s"} to review · {autoRs.length} replayed auto trade{autoRs.length === 1 ? "" : "s"} · {okJobs} of {summary.runs.length || 7} jobs ok
           </span>
         </summary>
         <div className="mt-3">
@@ -330,7 +384,7 @@ export default async function ResearchPage() {
           </div>
         )}
 
-        <H id="runs" sub="One row per job. A job is skipped when it is already current for the latest scan; Refresh forces all six.">
+        <H id="runs" sub="One row per job. A job is skipped when it is already current for the latest scan; Refresh forces all seven.">
           Job log
         </H>
         <Card className="overflow-x-auto p-0">

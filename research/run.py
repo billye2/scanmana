@@ -18,10 +18,10 @@ from typing import Any
 from . import util
 from .db import connect
 
-# Dependency order: sweep reads outcomes; the rest are independent.
-ORDER = ["outcomes", "breadth", "splits", "clusters", "sweep", "replay"]
+# Dependency order: sweep reads outcomes; ep reuses replay's exit routine but no table; the rest are independent.
+ORDER = ["outcomes", "breadth", "splits", "clusters", "sweep", "replay", "ep"]
 # Rough seconds each job needs; a job is deferred when less than this remains.
-MIN_SECONDS = {"outcomes": 40, "breadth": 30, "splits": 30, "clusters": 40, "sweep": 15, "replay": 15}
+MIN_SECONDS = {"outcomes": 40, "breadth": 30, "splits": 30, "clusters": 40, "sweep": 15, "replay": 15, "ep": 40}
 
 
 def run_jobs(jobs: list[str] | None = None, force: bool = False, budget: float = 250.0) -> dict[str, Any]:

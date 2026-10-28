@@ -43,11 +43,20 @@ export interface ChartLine {
 }
 const LINE_STYLE = { solid: LineStyle.Solid, dashed: LineStyle.Dashed, dotted: LineStyle.Dotted } as const;
 
+// Module-level so the default is the SAME array on every render. An inline
+// `smas = [10, 20]` default made a fresh array each time the deck re-rendered,
+// which the build effect below reads as a changed dependency: the whole chart
+// (seven canvases, the candle and SMA series, the price lines) was torn down and
+// rebuilt on every live-poll tick, every neighbour card's bars arriving after a
+// page turn, every zoom or watch toggle — and on a phone the next tap on the
+// counter landed while that rebuild held the main thread (mistakes.md 2026-10-27).
+const DEFAULT_SMAS: readonly number[] = [10, 20];
+
 export default function Chart({
   bars,
   box,
   pivot,
-  smas = [10, 20],
+  smas = DEFAULT_SMAS,
   lines,
   zoomed: zoomedProp,
   onZoomChange,

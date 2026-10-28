@@ -1,6 +1,6 @@
 # HANDOFF — Scanmana (Vercel project `scanmana`, named `rc02` until 2026-08-31)
 
-_Last updated: 2026-10-27 (1.4.8). Read this first when picking up the project._
+_Last updated: 2026-10-27 (1.4.9). Read this first when picking up the project._
 
 ## What this is
 

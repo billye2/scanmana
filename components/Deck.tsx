@@ -440,10 +440,13 @@ export default function Deck({
               <ListIcon size={25} />
             </Link>
           )}
+          {/* Bordered pill, inset from the column: the border shows where the tap lands, and
+              the inset keeps "of N" clear of the iPhone's right screen edge, where iOS holds
+              touches to test for a forward swipe (1.4.9, mistakes.md 2026-10-27). */}
           <button
             onClick={() => go(1)}
             disabled={candidates.length < 2}
-            className={`${BAR_ITEM} text-sm font-medium tabular-nums`}
+            className="mx-2 my-0.5 flex items-center justify-center rounded-lg border border-neutral-600 py-2 text-sm font-medium tabular-nums text-neutral-300 active:bg-neutral-800 active:text-neutral-100 disabled:opacity-30"
             aria-label={`Card ${idx + 1} of ${candidates.length} — tap for the next card`}
           >
             {idx + 1} of {candidates.length}

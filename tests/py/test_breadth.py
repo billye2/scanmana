@@ -99,3 +99,18 @@ def test_compute_breadth_skips_thin_universe():
     # default min_universe (100) is far above the single ticker available
     out = compute_breadth(close, volume, exclude=set())
     assert out.empty
+
+
+def test_breadth_sql_windows_match_the_pandas_spec():
+    """BREADTH_SQL is compute_breadth inside Postgres: its frames must be the
+    same sizes the pandas path rolls over (20-day dollar volume and SMA, 10- and
+    50-day SMAs, 63-session highs/lows), each counted so short histories read as
+    null where min_periods did."""
+    from research.breadth import BREADTH_SQL, MIN_PRIOR_SESSIONS
+
+    assert MIN_PRIOR_SESSIONS == 63
+    for n in (10, 20, 50, 63):
+        assert f"ROWS BETWEEN {n - 1} PRECEDING AND CURRENT ROW" in BREADTH_SQL, n
+    assert "n50 >= 50" in BREADTH_SQL and "n63 >= 63" in BREADTH_SQL and "n20 >= 20" in BREADTH_SQL and "n10 >= 10" in BREADTH_SQL
+    for key in ("%(since)s", "%(emit_from)s", "%(exclude)s", "%(min_price)s", "%(min_dv)s", "%(min_universe)s"):
+        assert key in BREADTH_SQL, key

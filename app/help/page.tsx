@@ -6,7 +6,7 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import RunScanButton from "@/components/RunScanButton";
 import { CONFIG } from "@/lib/config";
-import { latestScan, loadBars } from "@/lib/scan";
+import { latestScanSlim, loadBars } from "@/lib/scan";
 import type { Bar, MarketHealth } from "@/lib/types";
 
 export const metadata = { title: "Help — Scanmana" };
@@ -34,7 +34,7 @@ export default async function Help() {
   let indexBars = new Map<string, Bar[]>();
   let market: MarketHealth | undefined;
   try {
-    const [scan, bars] = await Promise.all([latestScan(), loadBars([...CONFIG.MARKET.INDICES])]);
+    const [scan, bars] = await Promise.all([latestScanSlim(), loadBars([...CONFIG.MARKET.INDICES])]);
     market = scan?.market;
     indexBars = bars;
   } catch {

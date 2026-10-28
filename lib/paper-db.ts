@@ -517,9 +517,14 @@ export async function getBook(userId: string): Promise<Book> {
     `) as { id: number; l: number }[];
     for (const r of rows) entryLows.set(r.id, r.l);
   }
-  const latest = (await sql`SELECT date::text AS date, payload FROM scan_results ORDER BY date DESC LIMIT 1`) as { date: string; payload: ScanPayload }[];
+  // Ticker and box bottom per card, projected inside Postgres (the whole payload is ~475 KB, mostly bars).
+  const latest = (await sql`
+    SELECT c->>'ticker' AS ticker, (c->'box'->>'bottom')::double precision AS bottom
+    FROM scan_results s, jsonb_array_elements(s.payload->'candidates') c
+    WHERE s.date = (SELECT max(date) FROM scan_results) AND c->'box' IS NOT NULL AND jsonb_typeof(c->'box') = 'object'
+  `) as { ticker: string; bottom: number | null }[];
   const boxBottoms = new Map<string, number>();
-  for (const c of latest[0]?.payload.candidates ?? []) if (c.box) boxBottoms.set(c.ticker, c.box.bottom);
+  for (const r of latest) if (r.bottom !== null) boxBottoms.set(r.ticker, Number(r.bottom));
   const [{ last_processed }] = (await sql`
     SELECT max(date)::text AS last_processed FROM paper_processed_dates WHERE user_id = ${userId}
   `) as { last_processed: string | null }[];

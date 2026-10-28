@@ -17,7 +17,7 @@ import {
   getSweep,
 } from "@/lib/research";
 import { LENS_LABEL, MIN_AFTER_N, formatLens, researchHealth, sweepHeadline } from "@/lib/research-story";
-import { latestScan } from "@/lib/scan";
+import { latestScanSlim } from "@/lib/scan";
 
 export const metadata = { title: "Research — Scanmana" };
 export const dynamic = "force-dynamic";
@@ -70,7 +70,7 @@ function Tile({ label, all, since, n, sinceN, sinceDate, firstRead }: {
 }
 
 export default async function ResearchPage() {
-  const scan = await latestScan().catch(() => null);
+  const scan = await latestScanSlim().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
   const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades, ep] = await Promise.all([
     getResearchSummary(),

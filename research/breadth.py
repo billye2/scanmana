@@ -3,6 +3,15 @@
 Universe each day = tickers with close >= $5 and a 20-session average
 dollar volume >= $5M (lib/screen.ts LOOSE_LIMITS), excluding the index ETFs
 that also live in the bars table (lib/market.ts CONFIG.MARKET.INDICES).
+
+Two implementations of the same numbers: `compute_breadth` (pandas, pure,
+the spec the tests exercise) and BREADTH_SQL (window functions inside
+Postgres, what `run` executes). The nightly increment needs 73 sessions of
+history for every ticker — 430,000 bars rows, ~17 MB of Neon egress a night
+when they were pulled into pandas (the largest single read in the app as of
+2026-10-27, mistakes.md). The SQL returns one row per date instead. The two
+must agree; `tests/py/test_breadth.py` pins the window sizes, and the SQL was
+checked against 30 stored pandas-computed dates on production when it shipped.
 """
 from __future__ import annotations
 
@@ -11,8 +20,8 @@ from datetime import timedelta
 import pandas as pd
 import psycopg
 
-from .db import load_bars, pyval, read_df, write_rows
-from .util import JobContext, as_date, close_matrix, sma
+from .db import pyval, read_df, write_rows
+from .util import JobContext, as_date, sma
 
 EXCLUDE_TICKERS = {"QQQ", "SPY", "IWM"}  # lib/config.ts CONFIG.MARKET.STORED
 MIN_PRICE = 5.0  # lib/screen.ts LOOSE_LIMITS.MIN_PRICE
@@ -25,8 +34,62 @@ LOOKBACK_DAYS = 470  # calendar days of bars to load when research_breadth is em
 # first of them MIN_PRIOR_SESSIONS of history (110 calendar days >= 73 sessions).
 INCREMENT_LOOKBACK_DAYS = 110
 WRITE_WINDOW_DAYS = 400  # calendar days of output to keep (matches CONFIG.PRUNE_DAYS)
+BOOTSTRAP_SKIP_DAYS = 95  # ~MIN_PRIOR_SESSIONS sessions in calendar days: the first dates of a bootstrap window have no 63-session history
 
 BREADTH_COLUMNS = ["date", "universe", "pct_above_20", "pct_above_50", "pct_10_over_20", "new_highs", "new_lows"]
+
+# compute_breadth in SQL: per ticker, rolling averages / extremes over its own
+# rows (ROWS BETWEEN n-1 PRECEDING AND CURRENT ROW, counted so a short history
+# reads as null exactly where pandas' min_periods did), then one row per date
+# over the universe. `since` bounds the window, `emit_from` the dates returned.
+BREADTH_SQL = """
+WITH w AS (
+  SELECT ticker, date, c,
+    avg(c * v::double precision) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS dv20,
+    count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS n20,
+    avg(c) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) AS s10,
+    count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 9 PRECEDING AND CURRENT ROW) AS n10,
+    avg(c) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 19 PRECEDING AND CURRENT ROW) AS s20,
+    avg(c) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS s50,
+    count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 49 PRECEDING AND CURRENT ROW) AS n50,
+    max(c) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 62 PRECEDING AND CURRENT ROW) AS mx63,
+    min(c) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 62 PRECEDING AND CURRENT ROW) AS mn63,
+    count(*) OVER (PARTITION BY ticker ORDER BY date ROWS BETWEEN 62 PRECEDING AND CURRENT ROW) AS n63
+  FROM bars
+  WHERE date >= %(since)s AND ticker <> ALL(%(exclude)s)
+)
+SELECT date, count(*)::int AS universe,
+  avg((c > s20)::int) AS pct_above_20,
+  avg((c > s50)::int) FILTER (WHERE n50 >= 50) AS pct_above_50,
+  avg((s10 > s20)::int) FILTER (WHERE n10 >= 10) AS pct_10_over_20,
+  count(*) FILTER (WHERE n63 >= 63 AND c >= mx63)::int AS new_highs,
+  count(*) FILTER (WHERE n63 >= 63 AND c <= mn63)::int AS new_lows
+FROM w
+WHERE n20 >= 20 AND c >= %(min_price)s AND dv20 >= %(min_dv)s AND date >= %(emit_from)s
+GROUP BY date
+HAVING count(*) >= %(min_universe)s
+ORDER BY date
+"""
+
+
+def breadth_sql(conn: psycopg.Connection, since: "date", emit_from: "date") -> pd.DataFrame:
+    """compute_breadth evaluated inside Postgres: one row per date from `emit_from`
+    on, with `since` giving the window its history. Columns = BREADTH_COLUMNS."""
+    df = read_df(
+        conn,
+        BREADTH_SQL,
+        {
+            "since": since, "emit_from": emit_from, "exclude": sorted(EXCLUDE_TICKERS),
+            "min_price": MIN_PRICE, "min_dv": MIN_DOLLAR_VOLUME, "min_universe": MIN_UNIVERSE,
+        },
+    )
+    if df.empty:
+        return pd.DataFrame(columns=BREADTH_COLUMNS)
+    df["date"] = pd.to_datetime(df["date"])
+    for col in ("pct_above_20", "pct_above_50", "pct_10_over_20"):
+        df[col] = df[col].astype(float)
+    df["pct_above_50"] = df["pct_above_50"].where(df["pct_above_50"].notna(), None)
+    return df[BREADTH_COLUMNS]
 
 
 def compute_breadth(
@@ -116,13 +179,11 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         last_stored = as_date(last_stored)
         since = last_stored - timedelta(days=INCREMENT_LOOKBACK_DAYS)
         write_from = pd.Timestamp(last_stored)
-    bars = load_bars(conn, since=since.isoformat(), columns=("c", "v"))
-    if bars.empty:
-        return "0 dates written"
-
-    close = close_matrix(bars, "c")
-    volume = close_matrix(bars, "v")
-    out = compute_breadth(close, volume, EXCLUDE_TICKERS)
+    # Emit from the last stored date (so a rescan of it is picked up), or, on the
+    # bootstrap, once the window holds MIN_PRIOR_SESSIONS sessions — the same
+    # dates compute_breadth would have produced from the loaded frame.
+    emit_from = last_stored if write_from is not None else since + timedelta(days=BOOTSTRAP_SKIP_DAYS)
+    out = breadth_sql(conn, since, emit_from)
     if out.empty:
         return "0 dates written"
 

@@ -1,18 +1,18 @@
 import DeckLiveList from "@/components/DeckLiveList";
 import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
-import { latestScan, slimDeck } from "@/lib/scan";
-import type { ScanPayload } from "@/lib/types";
+import { latestScanSlim } from "@/lib/scan";
+import type { SlimScanPayload } from "@/lib/types";
 
 export const metadata = { title: "Tonight's deck — Scanmana" };
 export const dynamic = "force-dynamic";
 
 /** Tonight's deck on one page — verdicts, and live grouping while quotes are available. */
 export default async function DeckPage() {
-  let payload: ScanPayload | null = null;
+  let payload: SlimScanPayload | null = null;
   let saved: string[] = [];
   try {
-    payload = await latestScan();
+    payload = await latestScanSlim();
     const rows = (await getSql()`SELECT ticker FROM watchlist`) as { ticker: string }[];
     saved = rows.map((r) => r.ticker);
   } catch {
@@ -28,7 +28,7 @@ export default async function DeckPage() {
       {!payload || payload.candidates.length === 0 ? (
         <p className="mt-16 text-center text-sm text-neutral-500">No scan yet — nothing to list.</p>
       ) : (
-        <DeckLiveList candidates={slimDeck(payload.candidates, [])} saved={saved} />
+        <DeckLiveList candidates={payload.candidates} saved={saved} />
       )}
     </main>
   );

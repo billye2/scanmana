@@ -7,20 +7,20 @@ import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
 import { manualTakenTickers } from "@/lib/paper-db";
 import { latestBreadth } from "@/lib/research";
-import { latestScan, slimDeck } from "@/lib/scan";
-import type { ScanPayload } from "@/lib/types";
+import { latestScanSlim } from "@/lib/scan";
+import type { SlimScanPayload } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home({ searchParams }: { searchParams: Promise<{ i?: string }> }) {
   const initialIndex = Number((await searchParams).i ?? 0) || 0;
-  let payload: ScanPayload | null = null;
+  let payload: SlimScanPayload | null = null;
   let savedTickers: string[] = [];
   let takenTickers: string[] = [];
   let breadth: Awaited<ReturnType<typeof latestBreadth>> = null;
   let dbError = false;
   try {
-    payload = await latestScan();
+    payload = await latestScanSlim({ indices: [initialIndex - 1, initialIndex, initialIndex + 1] });
     const sql = getSql();
     const rows = (await sql`SELECT ticker FROM watchlist`) as { ticker: string }[];
     savedTickers = rows.map((r) => r.ticker);
@@ -47,7 +47,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
       ) : (
         <>
           <MarketBar market={payload.market} breadth={breadth} />
-          <Deck candidates={slimDeck(payload.candidates, [initialIndex - 1, initialIndex, initialIndex + 1])} alerts={payload.watchlistAlerts} savedTickers={savedTickers} takenTickers={takenTickers} date={payload.date} live initialIndex={initialIndex} />
+          <Deck candidates={payload.candidates} alerts={payload.watchlistAlerts} savedTickers={savedTickers} takenTickers={takenTickers} date={payload.date} live initialIndex={initialIndex} />
         </>
       )}
 

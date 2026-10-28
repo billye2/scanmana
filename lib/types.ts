@@ -83,6 +83,9 @@ export interface ScanPayload {
   market?: MarketHealth; // absent on scans before market health existed
 }
 
+/** The payload with bars kept only for the cards a page will draw first (`latestScanSlim` in lib/scan.ts). */
+export type SlimScanPayload = Omit<ScanPayload, "candidates"> & { candidates: DeckCard[] };
+
 export type Verdict = "wait" | "pass"; // no "take": EOD data can never justify an entry — the earliest action is tomorrow's open
 
 export interface FrameworkView {

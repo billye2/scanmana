@@ -2,7 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { getSql } from "@/lib/db";
 import { takeSignal } from "@/lib/paper-db";
-import { latestScan, loadBars } from "@/lib/scan";
+import { latestScanSlim, loadBars } from "@/lib/scan";
 import { buildCandidate } from "@/lib/screen";
 import { defaultTakeStop } from "@/lib/stop-plan";
 
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "ticker required" }, { status: 400 });
   }
   const ticker = body.ticker.toUpperCase();
-  const payload = await latestScan();
+  const payload = await latestScanSlim({ tickers: [ticker] });
   const c = payload?.candidates.find((x) => x.ticker === ticker);
   let trigger: number | null = c?.box?.top ?? c?.pivot ?? null;
   let stop: number | null = c?.box?.bottom ?? null;

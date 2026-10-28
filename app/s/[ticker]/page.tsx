@@ -2,7 +2,7 @@ import TopNav from "@/components/TopNav";
 import Link from "next/link";
 import Deck from "@/components/Deck";
 import { getSql } from "@/lib/db";
-import { latestScan, loadBars } from "@/lib/scan";
+import { latestScanSlim, loadBars } from "@/lib/scan";
 import { analyzeCandidate } from "@/lib/analysis";
 import type { Analysis } from "@/lib/types";
 import { buildCandidate } from "@/lib/screen";
@@ -34,10 +34,10 @@ export default async function SymbolPage({
 
   try {
     const sql = getSql();
-    const scan = await latestScan();
+    const scan = await latestScanSlim({ tickers: [ticker] });
     const watch = (await sql`SELECT ticker FROM watchlist`) as { ticker: string }[];
     savedTickers = watch.map((r) => r.ticker);
-    const fromDeck = live ? null : (scan?.candidates.find((c) => c.ticker === ticker) ?? null);
+    const fromDeck = live ? null : ((scan?.candidates.find((c) => c.ticker === ticker && c.bars) as Candidate | undefined) ?? null);
     let b: Bar[] = [];
     if (live) {
       // Live mode: provisional today-bar from Finnhub + market filter recomputed

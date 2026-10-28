@@ -6,7 +6,7 @@ import { assessMarket } from "./market";
 import { fetchGroupedDaily, fetchTickers, sleep, type GroupedBar } from "./massive";
 import { LOOSE_LIMITS, rankCandidates, screenBoth } from "./screen";
 import { toHistoryRow, upsertScanHistory, type HistoryRow } from "./scan-history";
-import type { DeckCard, Analysis, Bar, Candidate, ScanPayload, WatchlistAlert } from "./types";
+import type { DeckCard, Analysis, Bar, Candidate, ScanPayload, SlimScanPayload, WatchlistAlert } from "./types";
 
 const TICKER_REFRESH_DAYS = 7;
 const MIN_MARKET_BARS = 1000; // fewer grouped rows than this => holiday / data not ready
@@ -284,6 +284,39 @@ export async function latestScan(): Promise<ScanPayload | null> {
   const rows = (await sql`
     SELECT payload FROM scan_results ORDER BY date DESC LIMIT 1
   `) as { payload: ScanPayload }[];
+  return rows[0]?.payload ?? null;
+}
+
+/**
+ * The latest payload with the bars stripped from every card except the ones a
+ * page draws first — by deck position (`indices`, wrapped like `slimDeck`) or by
+ * ticker. Done inside Postgres: the full payload is ~475 KB on the wire and bars
+ * are 96% of it, so a page that lists tickers or reads the market strip was
+ * shipping the whole deck's charts out of Neon on every open (mistakes.md
+ * 2026-10-27). The deck fetches the other cards' bars per card from
+ * `GET /api/scan/bars` as before. Null before the first scan.
+ */
+export async function latestScanSlim(keep: { indices?: number[]; tickers?: string[] } = {}): Promise<SlimScanPayload | null> {
+  const sql = getSql();
+  const indices = keep.indices ?? [];
+  const tickers = keep.tickers ?? [];
+  const rows = (await sql`
+    SELECT jsonb_set(
+      s.payload, '{candidates}',
+      coalesce((
+        SELECT jsonb_agg(
+          CASE WHEN (t.ord - 1)::int = ANY(
+                 SELECT ((i % n.cnt) + n.cnt) % n.cnt FROM unnest(${indices}::int[]) AS i
+               ) OR (t.c->>'ticker') = ANY(${tickers}::text[])
+               THEN t.c ELSE t.c - 'bars' END
+          ORDER BY t.ord
+        )
+        FROM jsonb_array_elements(s.payload->'candidates') WITH ORDINALITY AS t(c, ord),
+             LATERAL (SELECT greatest(jsonb_array_length(s.payload->'candidates'), 1) AS cnt) AS n
+      ), '[]'::jsonb)
+    ) AS payload
+    FROM scan_results s ORDER BY s.date DESC LIMIT 1
+  `) as { payload: SlimScanPayload }[];
   return rows[0]?.payload ?? null;
 }
 

@@ -431,7 +431,7 @@ export async function getEpStudy(): Promise<EpStudy> {
     `) as EpAgg[];
     const recent = (await sql`
       SELECT date::text AS date, ticker, gap_pct, vol_mult, ret_3m_before, held_gap, taken, r_at_exit
-      FROM research_ep ORDER BY date DESC, vol_mult DESC NULLS LAST LIMIT 10
+      FROM research_ep ORDER BY date DESC, vol_mult DESC NULLS LAST LIMIT 20
     `) as { date: string; ticker: string; gap_pct: number; vol_mult: number | null; ret_3m_before: number | null; held_gap: boolean; taken: boolean | null; r_at_exit: number | null }[];
     const by = new Map(agg.map((r) => [r.key, r]));
     const num = (x: number | null) => (x === null ? null : Number(x));

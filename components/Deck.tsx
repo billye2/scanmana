@@ -11,11 +11,18 @@ import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
 import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
+import { autoPlan, takeRisk, type PlanTone } from "@/lib/plan-line";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { CardResearch } from "@/lib/research";
 import type { Analysis, Bar, DeckCard, WatchlistAlert } from "@/lib/types";
 import { verdictChip, verdictLabel } from "@/lib/verdict";
 import { APP_VERSION } from "@/lib/version";
+
+const PLAN_TONE: Record<PlanTone, string> = {
+  green: "bg-emerald-900/40 text-emerald-300",
+  red: "bg-red-900/40 text-red-300",
+  neutral: "bg-neutral-800 text-neutral-300",
+};
 
 // Bottom bar items: one column each, the same icon size and colours as the top nav.
 const BAR_ITEM = "flex items-center justify-center py-2.5 text-neutral-400 active:text-neutral-100 disabled:opacity-30";
@@ -43,6 +50,8 @@ export default function Deck({
   analysisOverride,
   live = false,
   initialIndex = 0,
+  tape,
+  autoBook = true,
 }: {
   candidates: DeckCard[];
   alerts: WatchlistAlert[];
@@ -56,6 +65,10 @@ export default function Deck({
   live?: boolean;
   /** Card to open first (the /deck page links back with ?i=). */
   initialIndex?: number;
+  /** Tonight's tape size (lib/tape.ts) for the shares a Take would buy; full size when absent. */
+  tape?: { mult: number; label: string };
+  /** False on a symbol page for a name outside tonight's deck: the Auto book never sees it, so the plan box is not drawn. */
+  autoBook?: boolean;
 }) {
   const [idx, setIdx] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, candidates.length - 1)));
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -224,6 +237,10 @@ export default function Deck({
   const canTake = takeTrigger !== null;
   // Already above the trigger: a buy-stop would sit under the market, so the take is a market buy at the next open.
   const takeAtOpen = takeTrigger !== null && c.price > takeTrigger;
+  // The plan box (1.5.1): the Auto book's decision in words and what a Take would risk,
+  // both from the functions the books run on (lib/plan-line.ts). Null until the bars load.
+  const auto = autoBook ? autoPlan(c, bars) : null;
+  const risk = takeRisk(c, bars, tape?.mult ?? 1);
 
   // Distance to the trigger from the live price when we have one, else from the stored close.
   const toTrigger = c.box ? (c.box.top / (liveRow?.price ?? c.price) - 1) : null;
@@ -358,12 +375,28 @@ export default function Deck({
         )}
       </div>
 
+      {auto && (
+        <div className="mt-2 rounded-xl bg-neutral-900 px-3 py-2 text-xs">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-neutral-200">Auto book tonight</span>
+            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${PLAN_TONE[auto.tone]}`}>{auto.chip}</span>
+          </div>
+          <p className="mt-1 leading-snug text-neutral-500">{auto.detail}</p>
+        </div>
+      )}
+
       <div className="mt-2 flex items-center justify-between gap-2 text-xs text-neutral-400">
         {c.box ? (
           <span>
             trigger <span className="font-semibold text-amber-400">{price(c.box.top)}</span>
             {toTrigger !== null && <span className="text-neutral-500"> ({pct(toTrigger, 1)}{liveRow ? " live" : ""})</span>}
-            {" · "}stop <span className="font-semibold text-amber-400/80">{price(c.box.bottom)}</span>
+            {" · "}stop <span className="font-semibold text-amber-400/80">{price(risk?.stop ?? c.box.bottom)}</span>
+            {risk && (
+              <span className="text-neutral-500">
+                {" · "}risk <span className="text-neutral-300">{(risk.riskPct * 100).toFixed(1)}%</span> · <span className="text-neutral-300">{risk.shares} sh</span>
+                {tape && tape.label !== "full" ? ` at ${tape.label} size` : ""}
+              </span>
+            )}
           </span>
         ) : c.pivot !== null ? (
           <span>

@@ -300,7 +300,7 @@ export interface ArmDecision {
 }
 
 /** Why a deck candidate is not an auto order tonight, or null when it is. */
-export function armBlocker(c: Candidate): string | null {
+export function armBlocker(c: Pick<Candidate, "box" | "verdict" | "bars">): string | null {
   if (!c.box) return "no box";
   if (c.verdict !== "wait") return "verdict pass";
   const last = c.bars[c.bars.length - 1];

@@ -98,7 +98,7 @@ export default async function SymbolPage({
       {liveNote && <p className="mb-2 text-[11px] text-sky-300/80">{liveNote}</p>}
       {live && liveMarket && <MarketBar market={liveMarket} />}
       {candidate ? (
-        <Deck candidates={[candidate]} alerts={[]} savedTickers={savedTickers} date={scanDate} analysisOverride={freshAnalysis ?? undefined} />
+        <Deck candidates={[candidate]} alerts={[]} savedTickers={savedTickers} date={scanDate} analysisOverride={freshAnalysis ?? undefined} autoBook={inDeck} />
       ) : (
         <p className="mt-16 text-center text-sm text-neutral-500">{error}</p>
       )}

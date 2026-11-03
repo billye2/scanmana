@@ -1,0 +1,98 @@
+import { CONFIG } from "./config";
+import { armBlocker, sizeShares } from "./paper-engine";
+import { defaultTakeStop } from "./stop-plan";
+import type { Bar, Candidate } from "./types";
+
+/**
+ * The card's plan box, in words: what the Auto book does with this card on the
+ * scan night (`autoPlan`) and what a manual Take would risk (`takeRisk`). Pure —
+ * the sentences are written from the same functions the books run on
+ * (`armBlocker`, `defaultTakeStop`, `sizeShares`), so the card can never say
+ * one thing and the ledger do another.
+ */
+
+const K = CONFIG.PAPER.KULLAMAGI;
+
+export type PlanTone = "green" | "red" | "neutral";
+
+export interface AutoPlan {
+  arms: boolean;
+  /** Short chip text, e.g. "arms · buy at open". */
+  chip: string;
+  tone: PlanTone;
+  /** One or two sentences under the chip. */
+  detail: string;
+}
+
+const fmt = (n: number) => n.toFixed(2);
+const signedPct = (x: number) => `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
+
+const RULE = "Arms only a boxed Wait card on its first close above the box: a buy at the next open, stop at that day's low.";
+
+/** What the Auto book does with this card tonight. Null until the card's bars are loaded. */
+export function autoPlan(card: Pick<Candidate, "box" | "verdict">, bars: Bar[] | null): AutoPlan | null {
+  if (!bars || bars.length === 0) return null;
+  const last = bars[bars.length - 1];
+  const why = armBlocker({ box: card.box, verdict: card.verdict, bars });
+  if (why === null) {
+    return {
+      arms: true,
+      chip: "arms · buy at open",
+      tone: "green",
+      detail: `Closed above the box. Stop at that day's low ${fmt(last.l)} (${signedPct(last.l / last.c - 1)} from the close); half off at the day-${K.PARTIAL_DAY} open if day ${K.PARTIAL_DAY - 1} closes above entry, then breakeven, out on a close under the ${K.MA}-day.`,
+    };
+  }
+  switch (why) {
+    case "no box":
+      return { arms: false, chip: "not armed · no box", tone: "neutral", detail: RULE };
+    case "verdict pass":
+      return { arms: false, chip: "not armed · verdict Pass", tone: "red", detail: `${RULE} A Pass card is never bought, whatever price does.` };
+    case "closed below the box bottom":
+      return {
+        arms: false,
+        chip: "not armed · under the box",
+        tone: "red",
+        detail: `Closed below the box bottom ${fmt(card.box!.bottom)}: the box has failed.`,
+      };
+    case "broke out earlier":
+      return {
+        arms: false,
+        chip: "not armed · broke out earlier",
+        tone: "neutral",
+        detail: "The first close above the box came before this session, and the Auto book buys only that one. A manual Take at open is still priced below.",
+      };
+    default:
+      return {
+        arms: false,
+        chip: "waits · inside the box",
+        tone: "neutral",
+        detail: `Arms on a close above ${fmt(card.box!.top)} (${signedPct(card.box!.top / last.c - 1)} from the close), buying the next open with the stop at that day's low.`,
+      };
+  }
+}
+
+export interface TakeRisk {
+  entry: number;
+  stop: number;
+  /** (entry − stop) / entry */
+  riskPct: number;
+  /** Whole shares at the notional × tape multiplier (0 = one share costs more). */
+  shares: number;
+  atOpen: boolean;
+}
+
+/**
+ * What a Take would risk, priced the way the Take route prices it: under the
+ * trigger a buy-stop at the trigger with the box bottom as the stop; above it a
+ * buy at the next open (entry ≈ the last close) with `defaultTakeStop`. Null when
+ * there is no trigger or no stop line.
+ */
+export function takeRisk(card: Pick<Candidate, "box" | "pivot" | "price">, bars: Bar[] | null, tapeMult = 1): TakeRisk | null {
+  const trigger = card.box?.top ?? card.pivot ?? null;
+  if (trigger === null) return null;
+  const atOpen = card.price > trigger;
+  const entry = atOpen ? card.price : trigger;
+  const stop = bars && bars.length > 0 ? defaultTakeStop(bars, trigger, card.box?.bottom ?? null) : (card.box?.bottom ?? null);
+  if (stop === null || stop >= entry) return null;
+  return { entry, stop, riskPct: 1 - stop / entry, shares: sizeShares(entry, tapeMult), atOpen };
+}

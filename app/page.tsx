@@ -8,6 +8,7 @@ import { getSql } from "@/lib/db";
 import { manualTakenTickers } from "@/lib/paper-db";
 import { latestBreadth } from "@/lib/research";
 import { latestScanSlim } from "@/lib/scan";
+import { tapeMultiplier } from "@/lib/tape";
 import type { SlimScanPayload } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,16 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
       ) : (
         <>
           <MarketBar market={payload.market} breadth={breadth} />
-          <Deck candidates={payload.candidates} alerts={payload.watchlistAlerts} savedTickers={savedTickers} takenTickers={takenTickers} date={payload.date} live initialIndex={initialIndex} />
+          <Deck
+            candidates={payload.candidates}
+            alerts={payload.watchlistAlerts}
+            savedTickers={savedTickers}
+            takenTickers={takenTickers}
+            date={payload.date}
+            live
+            initialIndex={initialIndex}
+            tape={tapeMultiplier(payload.market ? payload.market.verdict === "bullish" : null, breadth?.today.pctAbove20 ?? null)}
+          />
         </>
       )}
 

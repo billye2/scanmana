@@ -324,6 +324,14 @@ export default async function Help() {
         the trade.
       </Term>
 
+      <Term name="Auto book tonight">
+        The box under every deck chart says what the Auto book does with that card on the scan night, written from the same function
+        that arms the orders: <em>arms · buy at open</em> on the first close above the box (with the stop at that day&apos;s low and the
+        day-4 and 10-day rules spelled out), <em>waits · inside the box</em> with the distance to the top, or <em>not armed</em> with the
+        reason — a Pass verdict, a close under the box bottom, a breakout before this session, no box. The trigger line below it adds what a
+        manual Take would risk: the stop it would be given, the risk from entry to that stop in percent, and the whole shares the $500
+        notional buys at tonight&apos;s tape size. A symbol outside tonight&apos;s deck shows no box: the Auto book never sees it.
+      </Term>
       <Term name="Auto ledger">
         No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
         trigger first. From the fill on it runs Kullamägi&apos;s exits, nothing else: the stop sits at the breakout day&apos;s low; on

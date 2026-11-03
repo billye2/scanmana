@@ -30,7 +30,7 @@ export function overallVerdict(v: { qullamaggie: Verdict; livermore: Verdict; da
 }
 
 /** Closed above the box top today, having closed inside it yesterday — the break is one session old. */
-export function breakingOut(c: Candidate): boolean {
+export function breakingOut(c: Pick<Candidate, "box" | "bars">): boolean {
   const last = c.bars[c.bars.length - 1];
   const prev = c.bars[c.bars.length - 2];
   return !!c.box && !!last && !!prev && last.c > c.box.top && prev.c <= c.box.top;

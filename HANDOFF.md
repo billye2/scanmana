@@ -1,6 +1,8 @@
 # HANDOFF — Scanmana (Vercel project `scanmana`, named `rc02` until 2026-08-31)
 
-_Last updated: 2026-11-02 (1.5.0). Read this first when picking up the project._
+_Last updated: 2026-11-03 (1.5.1). Read this first when picking up the project._
+
+**Latest (1.5.1, 2026-11-03) — the card plan box.** First of six UX items from the 2026-11-03 mockup (`.lavish/ux-improvements.html`, git-ignored; same page published as a private claude.ai artifact). Under every deck chart an "Auto book tonight" box says what the Auto book does with the card on the scan night, written by `autoPlan` in `lib/plan-line.ts` from `armBlocker` itself (arms · buy at open / waits · inside the box / not armed with the reason); the trigger line adds `takeRisk`: the stop a Take would get (`defaultTakeStop`), risk % and whole shares at tonight's tape size (`tapeMultiplier` on the home page, full size on `/s`). A symbol outside the deck draws no box (`autoBook={inDeck}`). `armBlocker` / `breakingOut` now take a `Pick<Candidate, …>` so the card can call them with loaded bars. Remaining mockup items, in Billy's order, one release each: 2 deck list grouped by the open, 3 "At the open" line (home, /paper, push), 4 stop-ladder chips beside Take, 5 open position drawn on the symbol chart, 6 research verdict line.
 
 ## What this is
 
@@ -17,7 +19,7 @@ README.md and `lib/config.ts` (thresholds are deliberately hardcoded — no sett
 
 | Area | Status |
 |---|---|
-| Engine + unit tests | ✅ 140/140 vitest (`npm test`) + 55/55 pytest (`.venv/bin/pytest tests/py`, needs the Python ≥ 3.11 `.venv` — system python on the Mac is 3.9) |
+| Engine + unit tests | ✅ 140/150 vitest (`npm test`) + 55/55 pytest (`.venv/bin/pytest tests/py`, needs the Python ≥ 3.11 `.venv` — system python on the Mac is 3.9) |
 | Production deploy | ✅ https://scanmana.vercel.app (Vercel project `scanmana`) |
 | Neon DB (Scanmana's own) | ✅ Neon via Vercel Marketplace, env `COIL_DATABASE_URL`, schema migrated (tables: bars, tickers, scan_results, analyses, watchlist, push_subscriptions, quotes, paper_*, scan_history, research_* — every `research_*` table is derived and safe to truncate; `npm run migrate` is idempotent; no `;` inside comments in `db/schema.sql`, the migrator splits on them) |
 | Cron | ✅ `/api/cron/scan` at `0 4 * * 2-6` UTC (midnight EDT / 11pm EST) + catch-up `30 5 * * 2-6` (1:30am EDT; skips if already scanned). Massive publishes the day's grouped bars after 9:30pm ET, so the first run must wait until at least midnight, auth via `CRON_SECRET`. The scan route chains the Python research job with `after()` (`lib/research.ts` `triggerResearch` → `POST /api/research_job`, same `CRON_SECRET`); jobs skip when already current for the latest scan date, so the 05:30 catch-up (scan "skipped") is where they normally get the full 280 s budget. Still only two crons (Hobby limit) |

@@ -5,7 +5,9 @@ import MarketBar from "@/components/MarketBar";
 import PushSetup from "@/components/PushSetup";
 import TopNav from "@/components/TopNav";
 import { getSql } from "@/lib/db";
-import { manualTakenTickers } from "@/lib/paper-db";
+import MorningLine from "@/components/MorningLine";
+import { morningBrief, type MorningBrief } from "@/lib/paper-engine";
+import { manualTakenTickers, morningBook } from "@/lib/paper-db";
 import { latestBreadth } from "@/lib/research";
 import { latestScanSlim } from "@/lib/scan";
 import { tapeMultiplier } from "@/lib/tape";
@@ -19,6 +21,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
   let savedTickers: string[] = [];
   let takenTickers: string[] = [];
   let breadth: Awaited<ReturnType<typeof latestBreadth>> = null;
+  let brief: MorningBrief | null = null;
   let dbError = false;
   try {
     payload = await latestScanSlim({ indices: [initialIndex - 1, initialIndex, initialIndex + 1] });
@@ -28,6 +31,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
     const { userId } = await auth();
     if (userId) takenTickers = await manualTakenTickers(userId).catch(() => []);
     breadth = await latestBreadth();
+    if (userId && payload) {
+      // Tomorrow morning's paper actions, from the book's rows (no bars). Its own catch: the deck must render without it.
+      const tape = tapeMultiplier(payload.market ? payload.market.verdict === "bullish" : null, breadth?.today.pctAbove20 ?? null);
+      brief = await morningBook(userId)
+        .then((mb) => morningBrief(mb.orders, mb.positions, tape.label))
+        .catch(() => null);
+    }
   } catch {
     dbError = true;
   }
@@ -48,6 +58,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
       ) : (
         <>
           <MarketBar market={payload.market} breadth={breadth} />
+          {brief && <MorningLine brief={brief} href="/paper" className="mb-3" />}
           <Deck
             candidates={payload.candidates}
             alerts={payload.watchlistAlerts}

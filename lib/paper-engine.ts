@@ -292,6 +292,105 @@ export function processSession(input: SessionInput): SessionResult {
   return { orders, positions, cash, events };
 }
 
+/** What `morningBrief` needs of an open position: the engine's row plus the last stored close. */
+export type BriefPosition = Pick<EnginePosition, "track" | "ticker" | "entryPrice" | "currentStop" | "pendingSellShares" | "sessionsHeld" | "trailMode" | "shares"> & {
+  lastClose: number | null;
+};
+
+export interface MorningBrief {
+  /** Market orders that fill at the open. */
+  buys: { ticker: string; track: Track }[];
+  /** Manual buy-stops still waiting on their trigger. */
+  buyStops: { ticker: string; trigger: number }[];
+  /** Auto positions sold half at the open (day 4, up on the entry). */
+  halfOff: string[];
+  /** Positions sold at the open: the 10-day exit or a requested manual sell. */
+  exits: { ticker: string; reason: "ma_exit" | "manual_sell"; partial: boolean }[];
+  /** Positions still held after the open. */
+  holds: number;
+  /** The held position whose stop sits closest under the last close (stop / close − 1). */
+  nearestStop: { ticker: string; pct: number } | null;
+  /** Tape size label for the buys ("half", "quarter"), null at full size. */
+  size: string | null;
+  /** True when nothing fills, sells or is held. */
+  empty: boolean;
+}
+
+/**
+ * Tomorrow morning in one read, from the book as the nightly run left it: the
+ * rows already carry the open's intent (a pending sell is the 10-day exit or
+ * a requested sale; a day-4 half-off follows from the sessions held and
+ * yesterday's close against the entry — the same tests `processSession`
+ * applies at the open). No bars. Pure.
+ */
+export type BriefOrder = Pick<EngineOrder, "ticker" | "track" | "kind" | "trigger"> & { status?: OrderStatus };
+
+export function morningBrief(orders: BriefOrder[], positions: BriefPosition[], sizeLabel: string | null): MorningBrief {
+  const armed = orders.filter((o) => o.status === undefined || o.status === "armed");
+  const buys = armed.filter((o) => o.kind === "market").map((o) => ({ ticker: o.ticker, track: o.track }));
+  const buyStops = armed.filter((o) => o.kind === "buy_stop").map((o) => ({ ticker: o.ticker, trigger: o.trigger }));
+  const halfOff: string[] = [];
+  const exits: MorningBrief["exits"] = [];
+  let holds = 0;
+  let nearestStop: MorningBrief["nearestStop"] = null;
+  for (const p of positions) {
+    if (p.shares <= 0) continue;
+    const pending = p.pendingSellShares ?? 0;
+    if (pending > 0) {
+      const partial = pending < p.shares;
+      exits.push({ ticker: p.ticker, reason: p.trailMode === "kullamagi" ? "ma_exit" : "manual_sell", partial });
+      if (!partial) continue;
+    } else if (
+      p.trailMode === "kullamagi" &&
+      p.sessionsHeld + 1 === K.PARTIAL_DAY &&
+      p.lastClose !== null &&
+      p.lastClose > p.entryPrice &&
+      Math.floor(p.shares * K.PARTIAL_FRACTION) > 0
+    ) {
+      halfOff.push(p.ticker);
+    }
+    holds++;
+    if (p.lastClose !== null && p.lastClose > 0) {
+      const pct = p.currentStop / p.lastClose - 1;
+      if (nearestStop === null || pct > nearestStop.pct) nearestStop = { ticker: p.ticker, pct };
+    }
+  }
+  const size = sizeLabel && sizeLabel !== "full" ? sizeLabel : null;
+  return { buys, buyStops, halfOff, exits, holds, nearestStop, size, empty: buys.length + buyStops.length + exits.length + holds === 0 };
+}
+
+const list = (t: string[]) => t.join(", ");
+const signed = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x * 100).toFixed(1)}%`;
+
+/** The brief as one sentence for the home strip and the paper page. */
+export function briefText(b: MorningBrief): string {
+  if (b.empty) return "Nothing to do: no orders armed, no positions open.";
+  const parts: string[] = [];
+  if (b.buys.length) parts.push(`Buys ${list(b.buys.map((o) => o.ticker))}${b.size ? ` at ${b.size} size` : ""}`);
+  if (b.buyStops.length) parts.push(`Buy-stops ${list(b.buyStops.map((o) => `${o.ticker} above ${o.trigger.toFixed(2)}`))}`);
+  if (b.halfOff.length) parts.push(`Half off ${list(b.halfOff)} (day ${K.PARTIAL_DAY}, up)`);
+  const ma = b.exits.filter((e) => e.reason === "ma_exit").map((e) => e.ticker);
+  const sells = b.exits.filter((e) => e.reason === "manual_sell").map((e) => (e.partial ? `some of ${e.ticker}` : e.ticker));
+  if (ma.length) parts.push(`Exit ${list(ma)} (closed under the ${K.MA}-day)`);
+  if (sells.length) parts.push(`Sell ${list(sells)} (requested)`);
+  parts.push(
+    b.holds === 0
+      ? "Holds nothing"
+      : `Holds ${b.holds}${b.nearestStop ? `, nearest stop ${b.nearestStop.ticker} ${signed(b.nearestStop.pct)}` : ""}`,
+  );
+  return parts.join(" · ");
+}
+
+/** The brief for the nightly push: the actions only, nothing when there are none. */
+export function briefPush(b: MorningBrief): string | null {
+  const parts: string[] = [];
+  if (b.buys.length) parts.push(`buy ${list(b.buys.map((o) => o.ticker))}${b.size ? ` (${b.size})` : ""}`);
+  if (b.halfOff.length) parts.push(`half off ${list(b.halfOff)}`);
+  const sold = b.exits.map((e) => e.ticker);
+  if (sold.length) parts.push(`${b.exits.every((e) => e.reason === "ma_exit") ? "exit" : "sell"} ${list(sold)}`);
+  return parts.length ? `At the open: ${parts.join(" · ")}` : null;
+}
+
 export interface ArmDecision {
   ticker: string;
   trigger: number;

@@ -59,6 +59,12 @@ overlays. A Python research layer scores the scanner's own history every night
   least 50%, $250 when one of the two holds, $125 when neither — the market
   strip, the paper page and the nightly push say which applies. Measured
   reason: the same setups averaged +0.11R when Bullish and −0.11R when not.
+  **At the open** (`morningBrief` in `lib/paper-engine.ts`): one line under
+  the market strip, atop the paper page and leading the nightly push that
+  says what the book does at tomorrow's open — which orders fill at what
+  size, which Auto positions sell half (day 4, up), which exit (10-day close
+  or a requested sale), how many are held and the nearest stop — read from
+  the book's rows, no bars.
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. `/help#market`

@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   armBlocker,
   armDecisions,
+  briefPush,
+  briefText,
   computeStats,
+  morningBrief,
   processSession,
   realized,
   sizeShares,
@@ -383,5 +386,68 @@ describe("computeStats", () => {
       { date: "2026-02-03", equity: 75 },
     ]);
     expect(computeStats([]).winRate).toBeNull();
+  });
+});
+
+describe("morningBrief — tomorrow morning from the book's rows", () => {
+  const withClose = (p: EnginePosition, lastClose: number | null) => ({ ...p, lastClose });
+
+  it("lists market buys, half-offs, 10-day exits and the nearest stop, and writes the sentence", () => {
+    const orders = [order({ ticker: "QLYS", kind: "market" }), order({ ticker: "LIND", kind: "market" }), order({ ticker: "ABC", track: "manual", kind: "buy_stop", trigger: 72.71 })];
+    const positions = [
+      withClose(autoPosition(3, { ticker: "NSIT" }), 52), // day 4 tomorrow, up on the entry
+      withClose(autoPosition(6, { ticker: "CORT", pendingSellShares: 10 }), 48), // closed under the 10-day
+      withClose(autoPosition(2, { ticker: "ZETA", currentStop: 49 }), 50), // −2.0% to the stop
+      withClose(position({ ticker: "MAN", currentStop: 40 }), 50), // manual hold, −20%
+    ];
+    const b = morningBrief(orders, positions, "half");
+    expect(b.buys.map((o) => o.ticker)).toEqual(["QLYS", "LIND"]);
+    expect(b.buyStops).toEqual([{ ticker: "ABC", trigger: 72.71 }]);
+    expect(b.halfOff).toEqual(["NSIT"]);
+    expect(b.exits).toEqual([{ ticker: "CORT", reason: "ma_exit", partial: false }]);
+    expect(b.holds).toBe(3);
+    expect(b.nearestStop).toEqual({ ticker: "ZETA", pct: 49 / 50 - 1 });
+    expect(b.empty).toBe(false);
+    expect(briefText(b)).toBe(
+      "Buys QLYS, LIND at half size · Buy-stops ABC above 72.71 · Half off NSIT (day 4, up) · Exit CORT (closed under the 10-day) · Holds 3, nearest stop ZETA −2.0%",
+    );
+    expect(briefPush(b)).toBe("At the open: buy QLYS, LIND (half) · half off NSIT · exit CORT");
+  });
+
+  it("does not halve a position that is down on the entry, a one-share position, or one leaving entirely", () => {
+    const positions = [
+      withClose(autoPosition(3, { ticker: "DOWN" }), 49),
+      withClose(autoPosition(3, { ticker: "ONE", shares: 1 }), 55),
+      withClose(autoPosition(3, { ticker: "OUT", pendingSellShares: 10 }), 55),
+    ];
+    const b = morningBrief([], positions, "full");
+    expect(b.halfOff).toEqual([]);
+    expect(b.exits.map((e) => e.ticker)).toEqual(["OUT"]);
+    expect(b.holds).toBe(2);
+    expect(b.size).toBeNull();
+  });
+
+  it("reads a requested manual sale, partial or whole, as a sell", () => {
+    const positions = [withClose(position({ ticker: "PART", pendingSellShares: 4 }), 50), withClose(position({ ticker: "ALL", pendingSellShares: 10 }), 50)];
+    const b = morningBrief([], positions, null);
+    expect(b.exits).toEqual([
+      { ticker: "PART", reason: "manual_sell", partial: true },
+      { ticker: "ALL", reason: "manual_sell", partial: false },
+    ]);
+    expect(b.holds).toBe(1);
+    expect(briefText(b)).toBe("Sell some of PART, ALL (requested) · Holds 1, nearest stop PART −10.0%");
+    expect(briefPush(b)).toBe("At the open: sell PART, ALL");
+  });
+
+  it("says so when there is nothing to do, and the push carries no line", () => {
+    const b = morningBrief([order({ status: "cancelled" })], [], "half");
+    expect(b.empty).toBe(true);
+    expect(briefText(b)).toBe("Nothing to do: no orders armed, no positions open.");
+    expect(briefPush(b)).toBeNull();
+  });
+
+  it("treats a book order with no status field as armed", () => {
+    const b = morningBrief([{ ticker: "Q", track: "auto", kind: "market", trigger: 10 }], [], null);
+    expect(b.buys).toEqual([{ ticker: "Q", track: "auto" }]);
   });
 });

@@ -335,6 +335,13 @@ export default async function Help() {
         manual Take would risk: the stop it would be given, the risk from entry to that stop in percent, and the whole shares the $500
         notional buys at tonight&apos;s tape size. A symbol outside tonight&apos;s deck shows no box: the Auto book never sees it.
       </Term>
+      <Term name="At the open">
+        One line under the market strip (and at the top of this page) that says what the paper book does at tomorrow&apos;s open, read
+        from the book&apos;s own rows: which market orders fill (with the tape size), which buy-stops are waiting on their trigger, which
+        Auto positions sell half (day 4, up on the entry), which exit (a close under the 10-day, or a sale you requested), how many are
+        held and which held stop sits closest under the last close. The nightly push leads with the same actions. &ldquo;Nothing to do&rdquo;
+        means no order is armed and nothing is open.
+      </Term>
       <Term name="Auto ledger">
         No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
         trigger first. From the fill on it runs Kullamägi&apos;s exits, nothing else: the stop sits at the breakout day&apos;s low; on

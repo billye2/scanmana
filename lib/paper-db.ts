@@ -7,13 +7,16 @@ import { getSql } from "./db";
 import {
   armDecisions,
   computeStats,
+  morningBrief,
   processSession,
   realized,
   sizeShares,
+  type BriefPosition,
   type EngineEvent,
   type EngineExit,
   type EngineOrder,
   type EnginePosition,
+  type MorningBrief,
   type OrderKind,
   type Track,
   type TrackStats,
@@ -189,6 +192,28 @@ export interface PaperNight {
   sold: number;
   armed: number;
   cancelled: number;
+  /** Tomorrow morning's actions for the push (single-user app: the last account processed). */
+  brief?: MorningBrief | null;
+}
+
+/**
+ * The rows `morningBrief` reads for a user: live orders and open positions with
+ * their last stored close. One small query per table, no bars — the home page
+ * reads this on every open, so it must stay light.
+ */
+export async function morningBook(userId: string): Promise<{ orders: EngineOrder[]; positions: BriefPosition[] }> {
+  const sql = getSql();
+  const orders = await liveOrders(userId);
+  const open = await loadPositions(userId, "open");
+  const last = new Map<string, number>();
+  const tickers = [...new Set(open.map((p) => p.ticker))];
+  if (tickers.length > 0) {
+    const rows = (await sql`
+      SELECT DISTINCT ON (ticker) ticker, c FROM bars WHERE ticker = ANY(${tickers}) ORDER BY ticker, date DESC
+    `) as { ticker: string; c: number }[];
+    for (const r of rows) last.set(r.ticker, Number(r.c));
+  }
+  return { orders, positions: open.map((p) => ({ ...p, lastClose: last.get(p.ticker) ?? null })) };
 }
 
 /**
@@ -226,7 +251,11 @@ export async function runPaperNight(date: string): Promise<PaperNight> {
       totals.cancelled += t.cancelled;
     }
   }
-  if (users.length > 0) totals.tape = await tapeFor(date);
+  if (users.length > 0) {
+    totals.tape = await tapeFor(date);
+    const mb = await morningBook(users[users.length - 1].user_id);
+    totals.brief = morningBrief(mb.orders, mb.positions, totals.tape?.label ?? null);
+  }
   return totals;
 }
 

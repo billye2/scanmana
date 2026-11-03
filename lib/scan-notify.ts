@@ -1,3 +1,4 @@
+import { briefPush } from "@/lib/paper-engine";
 import { runPaperNight } from "@/lib/paper-db";
 import { broadcast } from "@/lib/push";
 import { runScan, type ScanResult } from "@/lib/scan";
@@ -20,8 +21,12 @@ export function scanAndNotify(opts: { force?: boolean } = {}): Promise<ScanResul
         }
         // Paper book: fills/stops for the sessions since the last run, then tonight's
         // auto orders. Its own try/catch — a paper bug must never block the alert.
+        // The push leads with tomorrow morning's actions ("At the open: buy …"), then
+        // the counts of what the sessions just processed did.
         try {
           const paper = await runPaperNight(result.date);
+          const morning = paper.brief ? briefPush(paper.brief) : null;
+          if (morning) parts.unshift(morning);
           if (paper.filled || paper.stopped || paper.sold || paper.armed) {
             parts.push(
               `Paper: ${paper.filled} filled, ${paper.stopped} stopped${paper.sold ? `, ${paper.sold} sold` : ""}, ${paper.armed} armed${paper.tape && paper.tape.label !== "full" ? ` · ${paper.tape.label} size` : ""}`,

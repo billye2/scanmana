@@ -6,7 +6,8 @@ import { useState } from "react";
 import { CONFIG } from "@/lib/config";
 import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
-import { stopProgress, type ExitReason, type Track, type TrailMode } from "@/lib/paper-engine";
+import MorningLine from "@/components/MorningLine";
+import { stopProgress, type ExitReason, type MorningBrief, type Track, type TrailMode } from "@/lib/paper-engine";
 import type { ReplayRow } from "@/lib/research";
 import type { Tape } from "@/lib/tape";
 
@@ -27,7 +28,7 @@ async function post(path: string, body: unknown, method = "POST"): Promise<strin
   return j.error ?? `${res.status}`;
 }
 
-export default function PaperBook({ book, replay = [], tape = null }: { book: Book; replay?: ReplayRow[]; tape?: Tape | null }) {
+export default function PaperBook({ book, replay = [], tape = null, brief = null }: { book: Book; replay?: ReplayRow[]; tape?: Tape | null; brief?: MorningBrief | null }) {
   const router = useRouter();
   const [track, setTrack] = useState<Track>("manual");
   const [orderMsg, setOrderMsg] = useState<string | null>(null);
@@ -41,6 +42,7 @@ export default function PaperBook({ book, replay = [], tape = null }: { book: Bo
   }
   return (
     <div className="flex flex-col gap-5">
+      {brief && <MorningLine brief={brief} />}
       <div className="flex items-center gap-2">
         {(["manual", "auto"] as Track[]).map((k) => (
           <button

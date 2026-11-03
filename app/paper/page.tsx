@@ -1,6 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import PaperBook from "@/components/PaperBook";
 import TopNav from "@/components/TopNav";
+import { morningBrief, type MorningBrief } from "@/lib/paper-engine";
 import { ensureAccounts, getBook, type Book } from "@/lib/paper-db";
 import { getReplay, type ReplayRow } from "@/lib/research";
 import { latestTape, type Tape } from "@/lib/tape";
@@ -25,11 +26,19 @@ export default async function PaperPage() {
       error = err instanceof Error ? err.message : String(err);
     }
   }
+  // Tomorrow morning in one line, from the book already loaded (orders + open positions carry their last close).
+  const brief: MorningBrief | null = book
+    ? morningBrief(
+        [...book.manual.orders.map((o) => ({ ...o, track: "manual" as const })), ...book.auto.orders.map((o) => ({ ...o, track: "auto" as const }))],
+        [...book.manual.open, ...book.auto.open],
+        tape?.label ?? null,
+      )
+    : null;
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
       <TopNav current="/paper" subtitle="Paper trading" />
       {book ? (
-        <PaperBook book={book} replay={replay} tape={tape} />
+        <PaperBook book={book} replay={replay} tape={tape} brief={brief} />
       ) : (
         <p className="mt-16 text-center text-sm text-neutral-500">
           {error ? `Paper book unavailable — ${error} (run npm run migrate?)` : "Sign in to see your paper book."}

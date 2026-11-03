@@ -294,12 +294,16 @@ export async function latestScan(): Promise<ScanPayload | null> {
  * are 96% of it, so a page that lists tickers or reads the market strip was
  * shipping the whole deck's charts out of Neon on every open (mistakes.md
  * 2026-10-27). The deck fetches the other cards' bars per card from
- * `GET /api/scan/bars` as before. Null before the first scan.
+ * `GET /api/scan/bars` as before. `tail` keeps the last N bars on every other
+ * card (the deck list needs the last two closes to run `armBlocker`; two bars
+ * a card is ~2 KB for the whole deck) — a tail is not a chart, so never hand a
+ * tailed card to `Deck`. Null before the first scan.
  */
-export async function latestScanSlim(keep: { indices?: number[]; tickers?: string[] } = {}): Promise<SlimScanPayload | null> {
+export async function latestScanSlim(keep: { indices?: number[]; tickers?: string[]; tail?: number } = {}): Promise<SlimScanPayload | null> {
   const sql = getSql();
   const indices = keep.indices ?? [];
   const tickers = keep.tickers ?? [];
+  const tail = Math.max(0, Math.floor(keep.tail ?? 0));
   const rows = (await sql`
     SELECT jsonb_set(
       s.payload, '{candidates}',
@@ -308,7 +312,13 @@ export async function latestScanSlim(keep: { indices?: number[]; tickers?: strin
           CASE WHEN (t.ord - 1)::int = ANY(
                  SELECT ((i % n.cnt) + n.cnt) % n.cnt FROM unnest(${indices}::int[]) AS i
                ) OR (t.c->>'ticker') = ANY(${tickers}::text[])
-               THEN t.c ELSE t.c - 'bars' END
+               THEN t.c
+               WHEN ${tail}::int > 0 THEN jsonb_set(t.c, '{bars}', coalesce((
+                 SELECT jsonb_agg(b.v ORDER BY b.ord)
+                 FROM jsonb_array_elements(t.c->'bars') WITH ORDINALITY AS b(v, ord)
+                 WHERE b.ord > jsonb_array_length(t.c->'bars') - ${tail}::int
+               ), '[]'::jsonb))
+               ELSE t.c - 'bars' END
           ORDER BY t.ord
         )
         FROM jsonb_array_elements(s.payload->'candidates') WITH ORDINALITY AS t(c, ord),
@@ -350,13 +360,16 @@ export async function latestLiveCards(): Promise<{ date: string; cards: LiveCard
 
 /**
  * Strip bars from every card except the indices in `keep` (wrapped into range),
- * so a page embeds only the charts it will show first. See `DeckCard`.
+ * so a page embeds only the charts it will show first. See `DeckCard`. `tail`
+ * keeps the last N bars on the stripped cards instead (the spec `latestScanSlim`
+ * mirrors in SQL).
  */
-export function slimDeck(candidates: Candidate[], keep: Iterable<number>): DeckCard[] {
+export function slimDeck(candidates: Candidate[], keep: Iterable<number>, tail = 0): DeckCard[] {
   const n = candidates.length;
   const keepSet = new Set([...keep].map((i) => ((i % n) + n) % n));
   return candidates.map((c, i) => {
     if (keepSet.has(i)) return c;
+    if (tail > 0) return { ...c, bars: c.bars.slice(-tail) };
     const { bars: _bars, ...rest } = c;
     void _bars;
     return rest;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { autoPlan, takeRisk } from "../lib/plan-line";
+import { autoPlan, openGroup, openHint, takeRisk } from "../lib/plan-line";
 import type { DarvasBox } from "../lib/types";
 import { bar, flatBars, resetDays } from "./fixtures";
 
@@ -55,6 +55,43 @@ describe("autoPlan — the Auto book's decision in words", () => {
   it("has nothing to arm without a box", () => {
     const p = autoPlan({ box: null, verdict: "wait" }, flatBars(20, 95))!;
     expect(p.chip).toContain("no box");
+  });
+});
+
+describe("openGroup / openHint — the deck list's sections, from the arming test", () => {
+  beforeEach(resetDays);
+  const tail = (bars: ReturnType<typeof flatBars>) => bars.slice(-2);
+
+  it("groups a first close above the box as arms, with the Take numbers as the hint", () => {
+    const bars = tail([...flatBars(20, 95), bar(100, 103, 98, 101)]);
+    const g = openGroup({ box, verdict: "wait" }, bars);
+    expect(g).toBe("arms");
+    expect(openHint({ box, pivot: null, price: 101 }, g, bars, 0.5)).toBe("stop 98.00 · risk 3.0% · 2 sh");
+  });
+
+  it("keeps a Wait card inside its box in the inside group, hinting the distance to the trigger", () => {
+    const bars = tail(flatBars(20, 95));
+    const g = openGroup({ box, verdict: "wait" }, bars);
+    expect(g).toBe("inside");
+    expect(openHint({ box, pivot: null, price: 95 }, g, bars)).toBe("+5.3% to trigger");
+  });
+
+  it("puts a Wait card it cannot arm in the watch group with no hint", () => {
+    const earlier = tail([...flatBars(18, 95), bar(100, 103, 98, 101), bar(101, 104, 100, 103)]);
+    expect(openGroup({ box, verdict: "wait" }, earlier)).toBe("watch");
+    expect(openGroup({ box, verdict: "wait" }, tail([...flatBars(20, 95), bar(93, 94, 89, 90)]))).toBe("watch");
+    expect(openGroup({ box: null, verdict: "wait" }, tail(flatBars(20, 95)))).toBe("watch");
+    expect(openHint({ box: null, pivot: 100, price: 95 }, "watch", null)).toBeNull();
+  });
+
+  it("every Pass card is pass, whatever the bars say", () => {
+    expect(openGroup({ box, verdict: "pass" }, tail([...flatBars(20, 95), bar(100, 103, 98, 101)]))).toBe("pass");
+    expect(openGroup({ box, verdict: undefined }, null)).toBe("pass");
+  });
+
+  it("without bars a boxed Wait card reads as inside and an unboxed one as watch", () => {
+    expect(openGroup({ box, verdict: "wait" }, undefined)).toBe("inside");
+    expect(openGroup({ box: null, verdict: "wait" }, undefined)).toBe("watch");
   });
 });
 

@@ -248,8 +248,11 @@ export default async function Help() {
           further — see Research). There is no &ldquo;Take&rdquo;: end-of-day data can only tell you what to watch tomorrow, never to buy now.
         </li>
         <li>
-          Tap the <span className="text-neutral-100">list</span> icon <ListIcon size={13} className="inline -mt-0.5" /> in the header (or <span className="text-neutral-100">Deck</span> in the bottom bar) for the whole deck on one page
-          with each card&apos;s Wait / Pass, so you can skip straight to the ones worth a look. Tap a row to open that card.
+          Tap the <span className="text-neutral-100">list</span> icon <ListIcon size={13} className="inline -mt-0.5" /> in the header (or <span className="text-neutral-100">Deck</span> in the bottom bar) for the whole deck on one page,
+          grouped by what happens at the open: <span className="text-neutral-100">Arms tonight</span> (the names the Auto book buys at the open, each with
+          its stop, risk and share count), <span className="text-neutral-100">Inside the box</span> (Wait cards still under their box top, closest to the
+          trigger first), Wait cards the book cannot arm, and Pass folded away at the bottom. The groups come from the same arming test the Auto
+          book runs, so the list never disagrees with the ledger. Tap a Wait / Pass / ★ chip to filter, tap it again to clear. Tap a row to open that card.
         </li>
         <li>
           Curious about a name that isn&apos;t in the deck? Tap the <span className="text-neutral-100">search</span> icon <SearchIcon size={13} className="inline -mt-0.5" /> and type it.
@@ -267,7 +270,7 @@ export default async function Help() {
           its lookup page if it isn&apos;t in tonight&apos;s deck. During the day its <span className="text-neutral-100">Live</span>{" "}
           section shows each starred name against its trigger in real time — ⚡ breaking out is the moment his playbook
           says to act. The deck gets the same read: each card shows its live chip and price, and the deck page&apos;s{" "}
-          <span className="text-neutral-100">Live</span> toggle groups tonight&apos;s names by what price is doing. Quotes
+          <span className="text-neutral-100">Live</span> toggle orders each group by what price is doing and shows the live read in place of the verdict chip. Quotes
           refresh within a minute or two (a free-tier budget, oldest first); off-hours the chips show the close.
         </li>
         <li>

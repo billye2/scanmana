@@ -71,6 +71,44 @@ export function autoPlan(card: Pick<Candidate, "box" | "verdict">, bars: Bar[] |
   }
 }
 
+/** Where a card sits on the deck list: what happens to it at the open. */
+export type OpenGroup = "arms" | "inside" | "watch" | "pass";
+
+/** The list's sections in reading order, with the sub-line each heading carries. */
+export const OPEN_GROUPS: { key: OpenGroup; title: string; sub: string }[] = [
+  { key: "arms", title: "Arms tonight", sub: "buy at open" },
+  { key: "inside", title: "Inside the box", sub: "waiting for a close above" },
+  { key: "watch", title: "Wait · not armed", sub: "no box, broke out earlier or under the box" },
+  { key: "pass", title: "Pass", sub: "folded" },
+];
+
+/**
+ * The card's list group, from the same `armBlocker` the Auto book arms with.
+ * Needs only the last two bars. Without bars a Wait card inside a box reads as
+ * "inside", since a box that has not been closed above is the common case.
+ */
+export function openGroup(card: Pick<Candidate, "box" | "verdict">, bars: Bar[] | null | undefined): OpenGroup {
+  if (card.verdict !== "wait") return "pass";
+  if (!bars || bars.length === 0) return card.box ? "inside" : "watch";
+  const why = armBlocker({ box: card.box, verdict: card.verdict, bars });
+  if (why === null) return "arms";
+  return why === "waiting for a close above the box" ? "inside" : "watch";
+}
+
+/**
+ * The row's one-line hint under the ticker: the Take numbers for a name that
+ * arms (stop · risk · shares), the distance to the trigger inside the box,
+ * nothing otherwise.
+ */
+export function openHint(card: Pick<Candidate, "box" | "pivot" | "price">, group: OpenGroup, bars: Bar[] | null | undefined, tapeMult = 1): string | null {
+  if (group === "arms") {
+    const r = takeRisk(card, bars ?? null, tapeMult);
+    return r ? `stop ${fmt(r.stop)} · risk ${(r.riskPct * 100).toFixed(1)}% · ${r.shares} sh` : null;
+  }
+  if (group === "inside" && card.box) return `${signedPct(card.box.top / card.price - 1)} to trigger`;
+  return null;
+}
+
 export interface TakeRisk {
   entry: number;
   stop: number;

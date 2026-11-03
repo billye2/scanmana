@@ -128,8 +128,13 @@ overlays. A Python research layer scores the scanner's own history every night
   card in tonight's deck — a chip beside the badges, the live price with the
   stored close under it, and the trigger distance from the live price. The
   `/deck` page (list icon in the header, **Deck** in the bottom bar) lists
-  the whole deck with a **Live** toggle that groups it breaking / failed /
-  stopped / approaching / quiet with a tally; tap a row to open that card. Finnhub's free tier is
+  the whole deck grouped by what happens at the open — Arms tonight (with
+  stop, risk and shares), Inside the box (closest to the trigger first), Wait
+  not armed, Pass folded — from the Auto book's own arming test run on the
+  last two bars of each card (`lib/plan-line.ts` `openGroup`); the Wait /
+  Pass / ★ chips filter, and the **Live** toggle orders each group breaking /
+  failed / stopped / approaching / quiet with the live read on the row; tap a
+  row to open that card. Finnhub's free tier is
   60 calls/min, so each poll refetches at most a budget of stale symbols,
   oldest first (`CONFIG.LIVE`: deck 30, watchlist 25), and serves the rest
   from the cache with their age; a 60-name deck is fully fresh every two

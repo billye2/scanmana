@@ -25,6 +25,18 @@ describe("slimDeck", () => {
     expect(out.map((c) => Boolean(c.bars))).toEqual([true, true, false, true]);
   });
 
+  it("keeps a tail of the last bars on the stripped cards when asked", () => {
+    const three = card("T");
+    three.bars = [
+      { date: "2026-09-08", o: 10, h: 11, l: 9, c: 10, v: 1000 },
+      { date: "2026-09-09", o: 10, h: 11, l: 9, c: 10, v: 1000 },
+      { date: "2026-09-10", o: 10, h: 11, l: 9, c: 10, v: 1000 },
+    ];
+    const out = slimDeck([three, deck[1]], [1], 2);
+    expect(out[0].bars!.map((b) => b.date)).toEqual(["2026-09-09", "2026-09-10"]);
+    expect(out[1].bars).toBe(deck[1].bars);
+  });
+
   it("strips everything when nothing is kept, and leaves the other fields intact", () => {
     const out = slimDeck(deck, []);
     expect(out.every((c) => !("bars" in c))).toBe(true);

@@ -316,6 +316,35 @@ export async function getBreadth(days = 120): Promise<{ rows: BreadthRow[]; buck
   }
 }
 /** The last two breadth rows (today and the session before), for the market strip. */
+export interface TapeVerdictRow {
+  bullish: boolean | null;
+  n: number;
+  hitRate: number | null;
+  /** Avg R of the Auto book's plan (k_r) on the boxed Wait rows scanned under that verdict. */
+  avgKR: number | null;
+  kN: number;
+}
+
+/**
+ * The deck by the index verdict on scan night (/tape, 1.7.0): how many deck
+ * rows each verdict produced, their 10-session breakout rate, and the Auto
+ * plan's avg R on the boxed Wait rows among them. Empty on any error.
+ */
+export async function getTapeStudy(): Promise<TapeVerdictRow[]> {
+  try {
+    const rows = (await getSql()`
+      SELECT h.market_bullish AS bullish, count(o.broke_10d)::int AS n, avg(o.broke_10d::int) AS hit,
+             avg(o.k_r) AS avg_k_r, count(o.k_r)::int AS k_n
+      FROM scan_history h JOIN research_outcomes o USING (date, ticker)
+      WHERE h.rank IS NOT NULL
+      GROUP BY 1 ORDER BY 1 DESC NULLS LAST
+    `) as { bullish: boolean | null; n: number; hit: number | null; avg_k_r: number | null; k_n: number }[];
+    return rows.map((r) => ({ bullish: r.bullish, n: r.n, hitRate: r.hit === null ? null : Number(r.hit), avgKR: r.avg_k_r === null ? null : Number(r.avg_k_r), kN: r.k_n }));
+  } catch {
+    return [];
+  }
+}
+
 export async function latestBreadth(): Promise<{ today: BreadthRow; prev: BreadthRow | null } | null> {
   const { rows } = await getBreadth(2);
   if (rows.length === 0) return null;

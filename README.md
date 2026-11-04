@@ -97,6 +97,12 @@ but nothing is traded from it until it holds out of sample.
   and the scan-night facts, plus one line on what the shown setups had in
   common; a "5-star only" switch keeps just the boxed Wait cards resting under
   their box top (`isFiveStar`). Linked from `/research` and Help; on the bar by default.
+- **Tape** (`/tape`, `lib/tape-read.ts`, `components/TapeCharts.tsx`): the
+  index verdict and market breadth over 60 / 120 / 250 sessions — how long the
+  verdict has held, breadth against ten sessions ago, three breadth lines on
+  Bullish bands, new highs against new lows, the sizing table with tonight's
+  row lit, and the deck's breakout rate and Auto-plan R under each verdict. A
+  section you can put on the bar from the gear.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.

@@ -1,6 +1,6 @@
 import { CONFIG } from "./config";
 import { lowestLow } from "./indicators";
-import { armBlocker, sizeShares, type EnginePosition } from "./paper-engine";
+import { armBlocker, sizeShares, stopWidthAdr, WIDE_STOP, type EnginePosition } from "./paper-engine";
 import { defaultTakeStop } from "./stop-plan";
 import type { Bar, Candidate } from "./types";
 
@@ -31,10 +31,10 @@ const signedPct = (x: number) => `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1)}%`;
 const RULE = "Arms only a boxed Wait card on its first close above the box: a buy at the next open, stop at that day's low.";
 
 /** What the Auto book does with this card tonight. Null until the card's bars are loaded. */
-export function autoPlan(card: Pick<Candidate, "box" | "verdict">, bars: Bar[] | null): AutoPlan | null {
+export function autoPlan(card: Pick<Candidate, "box" | "verdict" | "adrPct">, bars: Bar[] | null): AutoPlan | null {
   if (!bars || bars.length === 0) return null;
   const last = bars[bars.length - 1];
-  const why = armBlocker({ box: card.box, verdict: card.verdict, bars });
+  const why = armBlocker({ box: card.box, verdict: card.verdict, adrPct: card.adrPct, bars });
   if (why === null) {
     return {
       arms: true,
@@ -62,6 +62,15 @@ export function autoPlan(card: Pick<Candidate, "box" | "verdict">, bars: Bar[] |
         tone: "neutral",
         detail: "The first close above the box came before this session, and the Auto book buys only that one. A manual Take at open is still priced below.",
       };
+    case WIDE_STOP: {
+      const width = stopWidthAdr(card, last) ?? 0;
+      return {
+        arms: false,
+        chip: `not armed · ${WIDE_STOP}`,
+        tone: "red",
+        detail: `Closed above the box, but the day's low ${fmt(last.l)} is ${signedPct(last.l / last.c - 1)} from the close, ${width.toFixed(1)}× the ${card.adrPct.toFixed(1)}% ADR: a stop wider than one average day is a trade Kullamägi does not take (wide stops scored −0.19R against +0.06R on history). A manual Take at open is still priced below.`,
+      };
+    }
     default:
       return {
         arms: false,
@@ -79,7 +88,7 @@ export type OpenGroup = "arms" | "inside" | "watch" | "pass";
 export const OPEN_GROUPS: { key: OpenGroup; title: string; sub: string }[] = [
   { key: "arms", title: "Arms tonight", sub: "buy at open" },
   { key: "inside", title: "Inside the box", sub: "waiting for a close above" },
-  { key: "watch", title: "Wait · not armed", sub: "no box, broke out earlier or under the box" },
+  { key: "watch", title: "Wait · not armed", sub: "no box, broke out earlier, under the box or a stop wider than one ADR" },
   { key: "pass", title: "Pass", sub: "folded" },
 ];
 
@@ -88,10 +97,10 @@ export const OPEN_GROUPS: { key: OpenGroup; title: string; sub: string }[] = [
  * Needs only the last two bars. Without bars a Wait card inside a box reads as
  * "inside", since a box that has not been closed above is the common case.
  */
-export function openGroup(card: Pick<Candidate, "box" | "verdict">, bars: Bar[] | null | undefined): OpenGroup {
+export function openGroup(card: Pick<Candidate, "box" | "verdict" | "adrPct">, bars: Bar[] | null | undefined): OpenGroup {
   if (card.verdict !== "wait") return "pass";
   if (!bars || bars.length === 0) return card.box ? "inside" : "watch";
-  const why = armBlocker({ box: card.box, verdict: card.verdict, bars });
+  const why = armBlocker({ box: card.box, verdict: card.verdict, adrPct: card.adrPct, bars });
   if (why === null) return "arms";
   return why === "waiting for a close above the box" ? "inside" : "watch";
 }

@@ -60,7 +60,10 @@ RULES: dict[str, str] = {
     "actual": "What actually happened",
 }
 # The rule each track trades live, so the paper page can say "vs the current rule".
-CURRENT_RULE: dict[str, str] = {"auto": "kullamagi", "manual": "trail_10"}
+# auto = kullamagi_adr since 1.6.3 (2026-11-03): the book declines a break whose stop is
+# wider than one ADR (lib/paper-engine.ts armBlocker, measured against the close; this
+# variant measures against the actual entry, so it is a touch looser on gap-up opens).
+CURRENT_RULE: dict[str, str] = {"auto": "kullamagi_adr", "manual": "trail_10"}
 
 
 def _combine(

@@ -49,11 +49,15 @@ but nothing is traded from it until it holds out of sample.
   strip's reason line is folded to one line with a chevron; tap to read it all.
 - **Paper trading** (`/paper`, `lib/paper-engine.ts` + `lib/paper-db.ts`): two
   ledgers priced on the same end-of-day bars, run right after each nightly scan.
-  *Auto* arms a buy-stop at the box top of every boxed Wait card (stop at the box
-  bottom, no cash cap) and trails the stop up to the lowest low of the
-  last 10 sessions — hands off, it measures the scanner. *Manual* is a $10k
+  *Auto* trades Kullamägi's playbook on every boxed Wait card (since 1.3.7): a
+  market buy at the next open after the first close above the box, stop at that
+  day's low, half off at the day-4 open if day 3 closed above entry, then
+  breakeven, out at the next open after a close under the 10-day average; no
+  cash cap. Since 1.6.3 it declines a break whose stop would be wider than one
+  ADR (measured: ≤1 ADR +0.06R on 483 rows, wider −0.19R on 268) and lists it
+  under Skipped — hands off, it measures the scanner. *Manual* is a $10k
   account, cash binds: **Take** on a card or watchlist row arms
-  the same buy-stop; raise the stop, pick a percent or N-session-low trail, or
+  a buy-stop at the box top; raise the stop, pick a percent or N-session-low trail, or
   queue a partial sell at the next open. Price already above the trigger (the
   breakout-day cards, or a late Take) means a market buy at the next open with
   the same stop — a buy-stop under the market is not an order a broker takes.
@@ -122,8 +126,8 @@ but nothing is traded from it until it holds out of sample.
   history vs since the last change; the R tile is the Auto book's own plan scored on
   every boxed Wait card — `k_r` from `research/outcomes.py`), **Kullamägi's plan on
   every boxed Wait card** (that plan by stop width in ADR units and by the card's ADR,
-  and against a resting buy-stop with a one-ADR stop — the tables that decide whether
-  the book skips wide stops and which entry it keeps), a **scorecard** (four numbers, all
+  and against a resting buy-stop with a one-ADR stop — the width table decided the
+  book's one-ADR skip in 1.6.3, the entry table decides which entry it keeps), a **scorecard** (four numbers, all
   history vs since the last change), the **rule changes** (`RULE_CHANGES` in
   `lib/research-story.ts`, one entry per shipped change with the number it is
   scored on, grey until 30 rows), then the rates, the sweep (headline knob

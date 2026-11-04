@@ -157,7 +157,7 @@ export default async function ResearchPage() {
       <p className="mt-3 text-[13px] leading-relaxed text-neutral-200">{story.sentence}</p>
 
       {/* ---------- 1b. Kullamägi's plan on history ---------- */}
-      <H id="plan" sub={`Every boxed Wait card that closed under its box top on scan night (${n(plan.rows)} rows), traded two ways on the stored bars and sold by the Auto book's routine: the book's own entry — the open after the first close above the box within ten sessions, stop at that day's low — and a resting buy-stop at the box top with the stop one ADR under the fill. Grey under ${MIN_AFTER_N}. The stop-width table decides whether the book should skip wide stops; the entry table which entry it keeps.`}>
+      <H id="plan" sub={`Every boxed Wait card that closed under its box top on scan night (${n(plan.rows)} rows), traded two ways on the stored bars and sold by the Auto book's routine: the book's own entry — the open after the first close above the box within ten sessions, stop at that day's low — and a resting buy-stop at the box top with the stop one ADR under the fill. Grey under ${MIN_AFTER_N}. The stop-width table decided the book's one-ADR skip (1.6.3, 2026-11-03: ≤1 ADR +0.06R on 483, wider −0.19R on 268 — the rule-change row scores it from here); the entry table decides which entry it keeps.`}>
         Kullamägi&apos;s plan on every boxed Wait card
       </H>
       <div className="grid gap-3 md:grid-cols-3">

@@ -32,6 +32,9 @@ export const RULE_CHANGES: RuleChange[] = [
   // 1.6.1 set the floor to 5 from the sweep; 1.6.2 the same afternoon, before any scan ran under it,
   // set 3 and removed the 15% ceiling (Billy's call) — one change as far as the scans are concerned.
   { effective: "2026-11-03", version: "1.6.2", label: "ADR floor 3.5% → 3%, ADR ceiling off (was 15%)", lens: "deck_hit" },
+  // R3 of the hit-rate plan, gated on the width table of "Kullamägi's plan on every boxed Wait card":
+  // ≤ 1 ADR +0.06R (n=483) vs > 1 ADR −0.19R (n=268) on 2026-11-03.
+  { effective: "2026-11-03", version: "1.6.3", label: "Auto skips a breakout whose stop is wider than one ADR", lens: "paper_avg_r" },
 ];
 
 /** Labelled rows (or closed trades) the "after" side needs before its number is shown in colour. */

@@ -4,17 +4,21 @@ import type { DarvasBox } from "../lib/types";
 import { bar, flatBars, resetDays } from "./fixtures";
 
 const box = { top: 100, bottom: 92 } as DarvasBox;
+// A 5% ADR: the 98-low / 101-close breakout bar used below is 3% wide (0.6×), inside the one-ADR rule.
+const wait = { box, verdict: "wait" as const, adrPct: 5 };
+const pass = { box, verdict: "pass" as const, adrPct: 5 };
+const noBox = { box: null, verdict: "wait" as const, adrPct: 5 };
 
 describe("autoPlan — the Auto book's decision in words", () => {
   beforeEach(resetDays);
 
   it("is null until the bars are loaded", () => {
-    expect(autoPlan({ box, verdict: "wait" }, null)).toBeNull();
+    expect(autoPlan(wait, null)).toBeNull();
   });
 
   it("arms on the first close above the box, with the stop at that day's low", () => {
     const bars = [...flatBars(20, 95), bar(100, 103, 98, 101)];
-    const p = autoPlan({ box, verdict: "wait" }, bars)!;
+    const p = autoPlan(wait, bars)!;
     expect(p.arms).toBe(true);
     expect(p.chip).toBe("arms · buy at open");
     expect(p.detail).toContain("98.00");
@@ -23,7 +27,7 @@ describe("autoPlan — the Auto book's decision in words", () => {
 
   it("waits inside the box and says how far the close is from the top", () => {
     const bars = flatBars(20, 95);
-    const p = autoPlan({ box, verdict: "wait" }, bars)!;
+    const p = autoPlan(wait, bars)!;
     expect(p.arms).toBe(false);
     expect(p.chip).toBe("waits · inside the box");
     expect(p.detail).toContain("100.00");
@@ -32,7 +36,7 @@ describe("autoPlan — the Auto book's decision in words", () => {
 
   it("never arms a Pass card", () => {
     const bars = [...flatBars(20, 95), bar(100, 103, 98, 101)];
-    const p = autoPlan({ box, verdict: "pass" }, bars)!;
+    const p = autoPlan(pass, bars)!;
     expect(p.arms).toBe(false);
     expect(p.tone).toBe("red");
     expect(p.chip).toContain("verdict Pass");
@@ -40,21 +44,35 @@ describe("autoPlan — the Auto book's decision in words", () => {
 
   it("skips a name that broke out before this session", () => {
     const bars = [...flatBars(18, 95), bar(100, 103, 98, 101), bar(101, 104, 100, 103)];
-    const p = autoPlan({ box, verdict: "wait" }, bars)!;
+    const p = autoPlan(wait, bars)!;
     expect(p.arms).toBe(false);
     expect(p.chip).toContain("broke out earlier");
   });
 
   it("reads a close under the box bottom as a failed box", () => {
     const bars = [...flatBars(20, 95), bar(93, 94, 89, 90)];
-    const p = autoPlan({ box, verdict: "wait" }, bars)!;
+    const p = autoPlan(wait, bars)!;
     expect(p.chip).toContain("under the box");
     expect(p.detail).toContain("92.00");
   });
 
   it("has nothing to arm without a box", () => {
-    const p = autoPlan({ box: null, verdict: "wait" }, flatBars(20, 95))!;
+    const p = autoPlan(noBox, flatBars(20, 95))!;
     expect(p.chip).toContain("no box");
+  });
+
+  it("declines a confirmed break whose stop is wider than one ADR, with both numbers (1.6.3)", () => {
+    // Low 92 under a 101 close: 8.9% wide, 1.8× the 5% ADR.
+    const bars = [...flatBars(20, 95), bar(100, 103, 92, 101)];
+    const p = autoPlan(wait, bars)!;
+    expect(p.arms).toBe(false);
+    expect(p.tone).toBe("red");
+    expect(p.chip).toBe("not armed · stop wider than one ADR");
+    expect(p.detail).toContain("92.00");
+    expect(p.detail).toContain("-8.9%");
+    expect(p.detail).toContain("1.8× the 5.0% ADR");
+    // The same bar on a name with a 10% ADR is inside the rule and arms.
+    expect(autoPlan({ ...wait, adrPct: 10 }, bars)!.arms).toBe(true);
   });
 });
 
@@ -64,34 +82,36 @@ describe("openGroup / openHint — the deck list's sections, from the arming tes
 
   it("groups a first close above the box as arms, with the Take numbers as the hint", () => {
     const bars = tail([...flatBars(20, 95), bar(100, 103, 98, 101)]);
-    const g = openGroup({ box, verdict: "wait" }, bars);
+    const g = openGroup(wait, bars);
     expect(g).toBe("arms");
     expect(openHint({ box, pivot: null, price: 101 }, g, bars, 0.5)).toBe("stop 98.00 · risk 3.0% · 2 sh");
   });
 
   it("keeps a Wait card inside its box in the inside group, hinting the distance to the trigger", () => {
     const bars = tail(flatBars(20, 95));
-    const g = openGroup({ box, verdict: "wait" }, bars);
+    const g = openGroup(wait, bars);
     expect(g).toBe("inside");
     expect(openHint({ box, pivot: null, price: 95 }, g, bars)).toBe("+5.3% to trigger");
   });
 
   it("puts a Wait card it cannot arm in the watch group with no hint", () => {
     const earlier = tail([...flatBars(18, 95), bar(100, 103, 98, 101), bar(101, 104, 100, 103)]);
-    expect(openGroup({ box, verdict: "wait" }, earlier)).toBe("watch");
-    expect(openGroup({ box, verdict: "wait" }, tail([...flatBars(20, 95), bar(93, 94, 89, 90)]))).toBe("watch");
-    expect(openGroup({ box: null, verdict: "wait" }, tail(flatBars(20, 95)))).toBe("watch");
+    expect(openGroup(wait, earlier)).toBe("watch");
+    expect(openGroup(wait, tail([...flatBars(20, 95), bar(93, 94, 89, 90)]))).toBe("watch");
+    expect(openGroup(noBox, tail(flatBars(20, 95)))).toBe("watch");
+    // A confirmed break declined for its stop width files under watch too (1.6.3).
+    expect(openGroup(wait, tail([...flatBars(20, 95), bar(100, 103, 92, 101)]))).toBe("watch");
     expect(openHint({ box: null, pivot: 100, price: 95 }, "watch", null)).toBeNull();
   });
 
   it("every Pass card is pass, whatever the bars say", () => {
-    expect(openGroup({ box, verdict: "pass" }, tail([...flatBars(20, 95), bar(100, 103, 98, 101)]))).toBe("pass");
-    expect(openGroup({ box, verdict: undefined }, null)).toBe("pass");
+    expect(openGroup(pass, tail([...flatBars(20, 95), bar(100, 103, 98, 101)]))).toBe("pass");
+    expect(openGroup({ box, verdict: undefined, adrPct: 5 }, null)).toBe("pass");
   });
 
   it("without bars a boxed Wait card reads as inside and an unboxed one as watch", () => {
-    expect(openGroup({ box, verdict: "wait" }, undefined)).toBe("inside");
-    expect(openGroup({ box: null, verdict: "wait" }, undefined)).toBe("watch");
+    expect(openGroup(wait, undefined)).toBe("inside");
+    expect(openGroup(noBox, undefined)).toBe("watch");
   });
 });
 

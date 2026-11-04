@@ -121,7 +121,15 @@ export const CONFIG = {
     //   this playbook −0.03R / 42% win / 5-session hold, breakeven at +1R +0.02R,
     //   half off at +2R +0.01R. Billy adopted the playbook knowing the trail scored higher:
     //   the Auto book is there to measure the rules he would actually trade.
-    KULLAMAGI: { PARTIAL_DAY: 4, PARTIAL_FRACTION: 0.5, MA: 10 },
+    // MAX_STOP_ADR (since 1.6.3, 2026-11-03, R3 of the hit-rate plan): the book does not buy
+    // a breakout whose day's low sits more than this many ADRs under the close — his "stop
+    // wider than one average day's range is not a trade" rule. Measured 2026-11-03 on 751
+    // completed boxed Wait deck rows under this plan (research/outcomes.py k_r / k_stop_adr):
+    //   stop ≤ 1 ADR +0.06R / 41% win (n=483) vs > 1 ADR −0.19R / 44% (n=268);
+    //   by bucket ≤½ −0.40R (130), ½–1 +0.23R (353), 1–1½ −0.22R (169), >1½ −0.13R (99).
+    //   Tight beat wide in 5 of the 8 months with rows. The ≤½ bucket is the worst cell on the
+    //   page (shaken out), but no floor is set: one change at a time, let /research score it.
+    KULLAMAGI: { PARTIAL_DAY: 4, PARTIAL_FRACTION: 0.5, MA: 10, MAX_STOP_ADR: 1 },
   },
 
   // Data requirements

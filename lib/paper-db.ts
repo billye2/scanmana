@@ -340,8 +340,13 @@ async function armTonight(userId: string, date: string): Promise<{ armed: number
   if (!payload) return { armed: 0, cancelled: 0 };
   const live = (await liveOrders(userId)).filter((o) => o.track === "auto");
   const open = new Set((await loadPositions(userId, "open")).filter((p) => p.track === "auto").map((p) => p.ticker));
-  const { arm, cancel } = armDecisions(payload.candidates, live, open);
+  const { arm, cancel, skip } = armDecisions(payload.candidates, live, open);
   const liveByTicker = new Map(live.map((o) => [o.ticker, o]));
+  // A confirmed break declined for its stop width (1.6.3) is the one blocker that is a trade
+  // not taken rather than a card not ready, so it goes on the ledger's Skipped list.
+  for (const s of skip) {
+    await sql`INSERT INTO paper_skips (user_id, track, ticker, date, reason) VALUES (${userId}, 'auto', ${s.ticker}, ${date}, ${s.reason})`;
+  }
   for (const a of arm) {
     const existing = liveByTicker.get(a.ticker);
     if (existing) {

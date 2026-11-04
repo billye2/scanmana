@@ -324,9 +324,11 @@ describe("armDecisions", () => {
       cand({ ticker: "PASS", verdict: "pass" }),
       cand({ ticker: "PIV", box: null, pivot: 50 }),
       cand({ ticker: "OPEN" }),
-      cand({ ticker: "TODAY", bars: brokeToday }),
+      cand({ ticker: "TODAY", bars: brokeToday, adrPct: 8 }), // 7.8% wide on an 8% ADR: inside the one-ADR rule
       cand({ ticker: "EARLIER", bars: brokeEarlier }),
       cand({ ticker: "UNDER", bars: [...bars.slice(0, 11), { ...bars[11], c: 44 }] }),
+      // Closed above the box too, but the day's low is 8.5% under the close against a 4% ADR.
+      cand({ ticker: "WIDE", bars: [...bars.slice(0, 11), { ...bars[11], l: 47, c: 51.37 }] }),
     ];
     const live = [
       order({ ticker: "OK" }),
@@ -343,12 +345,27 @@ describe("armDecisions", () => {
       { ticker: "PASS", reason: "verdict pass" },
       { ticker: "GONE", reason: "dropped from the scan" },
     ]);
+    // The wide break is the one blocker that is a trade declined, so it is reported as a skip with both numbers.
+    expect(d.skip).toEqual([{ ticker: "WIDE", reason: "stop wider than one ADR: stop 8.5% under the close at 47.00, ADR 4.0%" }]);
   });
 
   it("a close exactly at the box top is not a break", () => {
     const bars = flatBars(12, 48, 0.04);
     expect(armBlocker(cand({ ticker: "ATTOP", bars: [...bars.slice(0, 11), { ...bars[11], c: 50 }] }))).toBe("waiting for a close above the box");
-    expect(armBlocker(cand({ ticker: "ABOVE", bars: [...bars.slice(0, 11), { ...bars[11], c: 50.01 }] }))).toBeNull();
+    expect(armBlocker(cand({ ticker: "ABOVE", adrPct: 8, bars: [...bars.slice(0, 11), { ...bars[11], c: 50.01 }] }))).toBeNull();
+  });
+
+  it("declines a confirmed break whose stop is wider than one ADR (1.6.3)", () => {
+    const bars = flatBars(12, 48, 0.04);
+    // Close 52 above the $50 box top, low 50: 3.8% wide on a 4% ADR — inside the rule, taken.
+    expect(armBlocker(cand({ adrPct: 4, bars: [...bars.slice(0, 11), { ...bars[11], l: 50, c: 52 }] }))).toBeNull();
+    // Low 49.8: 4.2% wide — wider than one ADR, declined.
+    expect(armBlocker(cand({ adrPct: 4, bars: [...bars.slice(0, 11), { ...bars[11], l: 49.8, c: 52 }] }))).toBe("stop wider than one ADR");
+    // A wider ADR makes the same bar acceptable; no ADR at all never blocks.
+    expect(armBlocker(cand({ adrPct: 6, bars: [...bars.slice(0, 11), { ...bars[11], l: 49.8, c: 52 }] }))).toBeNull();
+    expect(armBlocker(cand({ adrPct: 0, bars: [...bars.slice(0, 11), { ...bars[11], l: 40, c: 52 }] }))).toBeNull();
+    // The width test comes after the breakout tests: a name inside its box is "waiting", however wide its day was.
+    expect(armBlocker(cand({ bars: [...bars.slice(0, 11), { ...bars[11], l: 40, c: 49 }] }))).toBe("waiting for a close above the box");
   });
 });
 

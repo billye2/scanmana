@@ -398,14 +398,31 @@ export interface ArmDecision {
   kind: OrderKind;
 }
 
+export const WIDE_STOP = "stop wider than one ADR";
+
+/**
+ * The breakout day's stop width as a multiple of the card's ADR: (close − low) / close
+ * over the scan-night ADR. The close stands in for tomorrow's open, which is unknown
+ * at arming; the replay's `kullamagi_adr` measures the same rule against the actual
+ * entry, so the live rule is a touch stricter on a gap-up open. Null without an ADR.
+ */
+export function stopWidthAdr(c: Pick<Candidate, "adrPct">, last: Pick<Bar, "c" | "l">): number | null {
+  if (!(c.adrPct > 0) || !(last.c > 0)) return null;
+  return (last.c - last.l) / last.c / (c.adrPct / 100);
+}
+
 /** Why a deck candidate is not an auto order tonight, or null when it is. */
-export function armBlocker(c: Pick<Candidate, "box" | "verdict" | "bars">): string | null {
+export function armBlocker(c: Pick<Candidate, "box" | "verdict" | "bars" | "adrPct">): string | null {
   if (!c.box) return "no box";
   if (c.verdict !== "wait") return "verdict pass";
   const last = c.bars[c.bars.length - 1];
   if (last && last.c < c.box.bottom) return "closed below the box bottom";
   if (last && last.c > c.box.top && !breakingOut(c)) return "broke out earlier";
   if (!breakingOut(c)) return "waiting for a close above the box";
+  // Kullamägi's width rule (1.6.3): a confirmed break is still not bought when the day's
+  // low is more than MAX_STOP_ADR average ranges under the close. Measured in config.ts.
+  const width = stopWidthAdr(c, last);
+  if (width !== null && width > CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR) return WIDE_STOP;
   return null;
 }
 
@@ -417,13 +434,16 @@ export function armBlocker(c: Pick<Candidate, "box" | "verdict" | "bars">): stri
  * that broke out earlier and tickers with an open auto position are skipped.
  * Every live auto order whose ticker is not in that set is cancelled with the
  * reason — including, on the night this rule shipped, the old buy-stops.
+ * A confirmed break the book declines for its stop width is returned in `skip`
+ * with both numbers, so the ledger's Skipped list can show the trade not taken.
  */
 export function armDecisions(
   candidates: Candidate[],
   liveOrders: EngineOrder[],
   openTickers: Set<string>,
-): { arm: ArmDecision[]; cancel: { ticker: string; reason: string }[] } {
+): { arm: ArmDecision[]; cancel: { ticker: string; reason: string }[]; skip: { ticker: string; reason: string }[] } {
   const arm: ArmDecision[] = [];
+  const skip: { ticker: string; reason: string }[] = [];
   const blocked = new Map<string, string>();
   for (const c of candidates) {
     if (openTickers.has(c.ticker)) {
@@ -431,6 +451,11 @@ export function armDecisions(
       continue;
     }
     const why = armBlocker(c);
+    if (why === WIDE_STOP) {
+      const last = c.bars[c.bars.length - 1];
+      const widePct = ((last.c - last.l) / last.c) * 100;
+      skip.push({ ticker: c.ticker, reason: `${WIDE_STOP}: stop ${widePct.toFixed(1)}% under the close at ${last.l.toFixed(2)}, ADR ${c.adrPct.toFixed(1)}%` });
+    }
     if (why) blocked.set(c.ticker, why);
     else {
       // Stop at the breakout day's low — the same rule `defaultTakeStop` (lib/stop-plan.ts)
@@ -445,7 +470,7 @@ export function armDecisions(
     if (o.track !== "auto" || armed.has(o.ticker)) continue;
     cancel.push({ ticker: o.ticker, reason: blocked.get(o.ticker) ?? "dropped from the scan" });
   }
-  return { arm, cancel };
+  return { arm, cancel, skip };
 }
 
 export interface ClosedTrade {

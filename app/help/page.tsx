@@ -197,9 +197,10 @@ export default async function Help() {
         routine. Three tables: by how wide that stop was in units of the card&apos;s ADR (a stop wider than one average day is
         the one his rule would not take), by the card&apos;s ADR, and the same cards bought instead with a resting buy-stop at
         the box top and the stop one ADR under the fill — the entry a person can leave with a broker without watching the
-        open. &ldquo;Filled&rdquo; is the share of cards each entry actually bought. The width table decides whether the ledger
-        should skip wide stops; the entry table which entry it keeps. The paper replay carries the matching rule,
-        &ldquo;stop one ADR under the entry&rdquo;, on the ledger&apos;s real trades.
+        open. &ldquo;Filled&rdquo; is the share of cards each entry actually bought. The width table decided the one-ADR rule the
+        ledger has run since 1.6.3 (2026-11-03: stops within one ADR +0.06R on 483 rows, wider −0.19R on 268); the entry table
+        decides which entry it keeps (the next open led the buy-stop, −0.03R to −0.17R, on that date). The paper replay carries the
+        matching rule, &ldquo;stop one ADR under the entry&rdquo;, on the ledger&apos;s real trades.
       </Term>
       <Term name="Rule changes">
         One row per shipped change, scored on the number it was meant to move — all labelled history before it against
@@ -355,7 +356,9 @@ export default async function Help() {
         The box under every deck chart says what the Auto book does with that card on the scan night, written from the same function
         that arms the orders: <em>arms · buy at open</em> on the first close above the box (with the stop at that day&apos;s low and the
         day-4 and 10-day rules spelled out), <em>waits · inside the box</em> with the distance to the top, or <em>not armed</em> with the
-        reason — a Pass verdict, a close under the box bottom, a breakout before this session, no box. The trigger line below it adds what a
+        reason — a Pass verdict, a close under the box bottom, a breakout before this session, a breakout day whose low sits more than
+        one ADR under the close (the stop would be wider than one average day, so the Auto book declines it and lists it under Skipped
+        on the paper page), no box. The trigger line below it adds what a
         manual Take would risk: the stop it would be given, the risk from entry to that stop in percent, and the whole shares the $500
         notional buys at tonight&apos;s tape size. A symbol outside tonight&apos;s deck shows no box: the Auto book never sees it.
       </Term>
@@ -374,7 +377,10 @@ export default async function Help() {
       </Term>
       <Term name="Auto ledger">
         No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
-        trigger first. From the fill on it runs Kullamägi&apos;s exits, nothing else: the stop sits at the breakout day&apos;s low; on
+        trigger first. One signal it declines (since 1.6.3, 2026-11-03): a breakout day whose low is more than one ADR under the close,
+        because the stop would be wider than one average day&apos;s range — measured on the scanner&apos;s history, stops within one ADR
+        made +0.06R a trade (483 rows) and wider ones −0.19R (268). Those names are listed under Skipped with both numbers. From the
+        fill on it runs Kullamägi&apos;s exits, nothing else: the stop sits at the breakout day&apos;s low; on
         day 4 (the entry day is day 1), if the previous close is above entry, half the shares are sold at the open and the stop moves to
         breakeven; after any close under the 10-day average the rest is sold at the next open. No lowest-low trail. The numbers behind
         the choice, measured 2026-10-25 on the scanner&apos;s history with this entry: the old box-bottom stop with a 10-session-low trail

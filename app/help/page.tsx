@@ -180,10 +180,17 @@ export default async function Help() {
       <Term name="Research page" who="flask icon">
         Every night, after the scan, a separate Python job replays the scanner&apos;s own history and writes a
         handful of tables the app reads. Nothing here changes the scan, the verdicts or the paper book; it measures
-        them. The page answers one question — is the scanner working, and did the last rule change help — in this
-        order: a scorecard, the rule changes, the breakout rates, the episodic-pivot study, the threshold sweep, breadth, tonight&apos;s themes.
-        Splits, the paper replay and the job log sit under <em>Maintenance</em> at the bottom. The deck, the market
-        strip and the paper page each show one line from it.
+        them. The page answers one question — is the scanner working, and did the last rule change help — and since 1.7.5 keeps
+        to it: this week&apos;s read, the scorecard, the rule changes. Splits, the paper replay and the job log sit under{" "}
+        <em>Maintenance</em> at the bottom. The deck, the market strip and the paper page each show one line from it.
+      </Term>
+      <Term name="Studies page" who="open-book icon">
+        <span id="studies" />
+        <Link href="/studies" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/studies</Link> holds
+        the deeper reads that used to sit between the scorecard and Maintenance: Kullamägi&apos;s plan on every boxed Wait card, the breakout
+        rates, the episodic-pivot study, the threshold sweep, market breadth, tonight&apos;s themes and the themes scored. Every one is a study —
+        it reads the nightly tables and changes nothing. A rule changes only when a study says so, and then the Research page scores it. New
+        studies from the Python jobs land here. On the bar when you tick it under the gear.
       </Term>
       <Term name="This week's read">
         The page opens with its verdict, written by rules from the numbers below it, the way a card&apos;s analysis is. The headline follows

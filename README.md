@@ -97,6 +97,11 @@ but nothing is traded from it until it holds out of sample.
   and the scan-night facts, plus one line on what the shown setups had in
   common; a "5-star only" switch keeps just the boxed Wait cards resting under
   their box top (`isFiveStar`). Linked from `/research` and Help; on the bar by default.
+- **Studies** (`/studies`, since 1.7.5): the research layer's deeper reads,
+  moved off `/research` so that page keeps to this week's read, the scorecard
+  and the rule changes — the plan on every boxed Wait card, breakout rates, the
+  EP study, the threshold sweep, breadth, tonight's themes and themes scored.
+  Shared table and heading primitives in `components/ResearchPrimitives.tsx`.
 - **Tape** (`/tape`, `lib/tape-read.ts`, `components/TapeCharts.tsx`): the
   index verdict and market breadth over 60 / 120 / 250 sessions — how long the
   verdict has held, breadth against ten sessions ago, three breadth lines on

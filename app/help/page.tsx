@@ -342,6 +342,12 @@ export default async function Help() {
         held and which held stop sits closest under the last close. The nightly push leads with the same actions. &ldquo;Nothing to do&rdquo;
         means no order is armed and nothing is open.
       </Term>
+      <Term name="Position on the chart">
+        Open a name you hold in either ledger (tap its ticker on the paper page) and its chart carries the position: the entry in blue, the
+        stop as it stands in green, and — once a trail or your hand has raised it — the first stop in red, dashed, so a moved stop is a
+        visible gap rather than a sentence. An Auto position also gets a dot under its day-4 bar, the session the half-off rule looks at;
+        before that bar exists the line under the lookup says how many sessions away it is.
+      </Term>
       <Term name="Auto ledger">
         No cash cap — every armed signal gets its notional, because a cap would make the record depend on which names happened to
         trigger first. From the fill on it runs Kullamägi&apos;s exits, nothing else: the stop sits at the breakout day&apos;s low; on

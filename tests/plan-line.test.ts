@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { autoPlan, openGroup, openHint, takeLadder, takeRisk } from "../lib/plan-line";
+import { autoPlan, openGroup, openHint, positionLines, takeLadder, takeRisk } from "../lib/plan-line";
 import type { DarvasBox } from "../lib/types";
 import { bar, flatBars, resetDays } from "./fixtures";
 
@@ -134,6 +134,37 @@ describe("takeLadder — the stop levels a Take can pick", () => {
   it("is null without a trigger or without bars", () => {
     expect(takeLadder({ box: null, pivot: null, price: 95, adrPct: 4 }, flatBars(20, 95))).toBeNull();
     expect(takeLadder({ box, pivot: null, price: 95, adrPct: 4 }, null)).toBeNull();
+  });
+});
+
+describe("positionLines — an open position drawn on its chart", () => {
+  beforeEach(resetDays);
+  const auto = { track: "auto" as const, entryPrice: 100, initialStop: 95, currentStop: 95, trailMode: "kullamagi" as const };
+
+  it("draws entry and stop, and marks the day-4 bar when it is on the chart", () => {
+    const bars = flatBars(10, 100); // 2026-01-01 … 2026-01-10
+    const d = positionLines({ ...auto, entryDate: "2026-01-03" }, bars);
+    expect(d.lines.map((l) => [l.title, l.price])).toEqual([["entry", 100], ["stop", 95]]);
+    expect(d.markers).toEqual([{ date: "2026-01-06", text: "day 4" }]);
+    expect(d.day4).toEqual({ date: "2026-01-06" });
+    expect(d.note).toBe("Auto book position · entry 100.00 on 2026-01-03 · stop 95.00 (-5.0% from entry) · day 4 was 2026-01-06");
+  });
+
+  it("adds the first stop in red when the stop has moved, and counts the sessions to day 4", () => {
+    const bars = flatBars(10, 100);
+    const d = positionLines({ ...auto, entryDate: "2026-01-09", currentStop: 100 }, bars);
+    expect(d.lines.map((l) => [l.title, l.style])).toEqual([["entry", "solid"], ["stop now", "solid"], ["first stop", "dashed"]]);
+    expect(d.markers).toEqual([]);
+    expect(d.day4).toEqual({ away: 2 });
+    expect(d.note).toContain("stop 100.00, raised from 95.00 (+0.0% from entry) · day 4 in 2 sessions");
+  });
+
+  it("gives a manual position no day-4 marker, and an entry off the chart none either", () => {
+    const bars = flatBars(10, 100);
+    const manual = positionLines({ ...auto, track: "manual", trailMode: "none", entryDate: "2026-01-03" }, bars);
+    expect(manual.day4).toBeNull();
+    expect(manual.note.startsWith("Manual position")).toBe(true);
+    expect(positionLines({ ...auto, entryDate: "2026-02-01" }, bars).day4).toBeNull();
   });
 });
 

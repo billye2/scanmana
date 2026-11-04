@@ -1,6 +1,10 @@
+import { auth } from "@clerk/nextjs/server";
 import TopNav from "@/components/TopNav";
 import Link from "next/link";
+import type { ChartLine, ChartMarker } from "@/components/Chart";
 import Deck from "@/components/Deck";
+import { openPositionsFor } from "@/lib/paper-db";
+import { positionLines } from "@/lib/plan-line";
 import { getSql } from "@/lib/db";
 import { latestScanSlim, loadBars } from "@/lib/scan";
 import { analyzeCandidate } from "@/lib/analysis";
@@ -31,6 +35,10 @@ export default async function SymbolPage({
   let freshAnalysis: Analysis | null = null; // computed now for non-deck symbols; nothing stored to fetch
   let liveNote: string | null = null;
   let liveMarket: Awaited<ReturnType<typeof liveBundle>>["market"];
+  // An open paper position on this name: its entry and stops go on the chart, its words under the lookup.
+  const chartLines: ChartLine[] = [];
+  const chartMarkers: ChartMarker[] = [];
+  const positionNotes: string[] = [];
 
   try {
     const sql = getSql();
@@ -56,6 +64,15 @@ export default async function SymbolPage({
     if (b.length === 0) {
       const bars = await loadBars([ticker]);
       b = bars.get(ticker) ?? [];
+    }
+    const { userId } = await auth();
+    if (userId && b.length > 0) {
+      for (const p of await openPositionsFor(userId, ticker).catch(() => [])) {
+        const d = positionLines(p, b);
+        chartLines.push(...d.lines);
+        chartMarkers.push(...d.markers);
+        positionNotes.push(d.note);
+      }
     }
     if (fromDeck) {
       candidate = fromDeck;
@@ -96,9 +113,23 @@ export default async function SymbolPage({
         <SymbolLookup placeholder="Look up another symbol…" />
       </div>
       {liveNote && <p className="mb-2 text-[11px] text-sky-300/80">{liveNote}</p>}
+      {positionNotes.map((n) => (
+        <p key={n} className="mb-2 text-[11px] text-emerald-300/90">
+          {n} · <Link href="/paper" className="underline underline-offset-4">paper book</Link>
+        </p>
+      ))}
       {live && liveMarket && <MarketBar market={liveMarket} />}
       {candidate ? (
-        <Deck candidates={[candidate]} alerts={[]} savedTickers={savedTickers} date={scanDate} analysisOverride={freshAnalysis ?? undefined} autoBook={inDeck} />
+        <Deck
+          candidates={[candidate]}
+          alerts={[]}
+          savedTickers={savedTickers}
+          date={scanDate}
+          analysisOverride={freshAnalysis ?? undefined}
+          autoBook={inDeck}
+          chartLines={chartLines.length > 0 ? chartLines : undefined}
+          chartMarkers={chartMarkers.length > 0 ? chartMarkers : undefined}
+        />
       ) : (
         <p className="mt-16 text-center text-sm text-neutral-500">{error}</p>
       )}

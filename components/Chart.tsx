@@ -4,6 +4,7 @@ import {
   CandlestickSeries,
   ColorType,
   createChart,
+  createSeriesMarkers,
   LineSeries,
   LineStyle,
   type IChartApi,
@@ -43,6 +44,12 @@ export interface ChartLine {
 }
 const LINE_STYLE = { solid: LineStyle.Solid, dashed: LineStyle.Dashed, dotted: LineStyle.Dotted } as const;
 
+/** A labelled dot under one bar (an open position's day-4 session). `date` must be a bar on the chart. */
+export interface ChartMarker {
+  date: string;
+  text: string;
+}
+
 // Module-level so the default is the SAME array on every render. An inline
 // `smas = [10, 20]` default made a fresh array each time the deck re-rendered,
 // which the build effect below reads as a changed dependency: the whole chart
@@ -58,6 +65,7 @@ export default function Chart({
   pivot,
   smas = DEFAULT_SMAS,
   lines,
+  markers,
   zoomed: zoomedProp,
   onZoomChange,
 }: {
@@ -65,8 +73,10 @@ export default function Chart({
   box: DarvasBox | null;
   pivot: number | null;
   smas?: readonly number[];
-  /** Extra horizontal levels (the simulator's entry and stop). Pass a stable array: it is an effect dependency. */
+  /** Extra horizontal levels (the simulator's entry and stop, an open position's lines). Pass a stable array: it is an effect dependency. */
   lines?: readonly ChartLine[];
+  /** Labelled dots under bars. Stable array, same reason. */
+  markers?: readonly ChartMarker[];
   zoomed?: boolean;
   onZoomChange?: (zoomed: boolean) => void;
 }) {
@@ -170,6 +180,15 @@ export default function Chart({
     for (const l of lines ?? []) {
       candles.createPriceLine({ price: l.price, color: l.color, lineWidth: 1, lineStyle: LINE_STYLE[l.style ?? "solid"], title: l.title });
     }
+    if (markers && markers.length > 0) {
+      const dates = new Set(bars.map((b) => b.date));
+      createSeriesMarkers(
+        candles,
+        markers
+          .filter((m) => dates.has(m.date))
+          .map((m) => ({ time: m.date, position: "belowBar" as const, shape: "circle" as const, color: "#a3a3a3", text: m.text, size: 0.6 })),
+      );
+    }
 
     chartRef.current = chart;
     applyViewRef.current(chart);
@@ -182,7 +201,7 @@ export default function Chart({
       chartRef.current = null;
       chart.remove();
     };
-  }, [bars, box, pivot, smas, lines]);
+  }, [bars, box, pivot, smas, lines, markers]);
 
   useEffect(() => {
     if (chartRef.current) applyView(chartRef.current);

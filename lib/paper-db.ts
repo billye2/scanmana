@@ -196,6 +196,11 @@ export interface PaperNight {
   brief?: MorningBrief | null;
 }
 
+/** The user's open paper positions on one ticker (either track), for the symbol page's chart. */
+export async function openPositionsFor(userId: string, ticker: string): Promise<EnginePosition[]> {
+  return (await loadPositions(userId, "open")).filter((p) => p.ticker === ticker);
+}
+
 /**
  * The rows `morningBrief` reads for a user: live orders and open positions with
  * their last stored close. One small query per table, no bars — the home page

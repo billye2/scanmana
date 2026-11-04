@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AnalysisModal from "@/components/AnalysisModal";
-import Chart from "@/components/Chart";
+import Chart, { type ChartLine, type ChartMarker } from "@/components/Chart";
 import LiveChip from "@/components/LiveChip";
 import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
@@ -52,6 +52,8 @@ export default function Deck({
   initialIndex = 0,
   tape,
   autoBook = true,
+  chartLines,
+  chartMarkers,
 }: {
   candidates: DeckCard[];
   alerts: WatchlistAlert[];
@@ -69,6 +71,9 @@ export default function Deck({
   tape?: { mult: number; label: string };
   /** False on a symbol page for a name outside tonight's deck: the Auto book never sees it, so the plan box is not drawn. */
   autoBook?: boolean;
+  /** Symbol page: an open paper position's entry and stops drawn on the chart (`positionLines` in lib/plan-line.ts). Stable arrays. */
+  chartLines?: readonly ChartLine[];
+  chartMarkers?: readonly ChartMarker[];
 }) {
   const [idx, setIdx] = useState(() => Math.min(Math.max(0, initialIndex), Math.max(0, candidates.length - 1)));
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -370,7 +375,7 @@ export default function Deck({
 
       <div className="relative mt-3 min-h-[300px] flex-1 lg:min-h-[480px]">
         {bars ? (
-          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} zoomed={zoomed} onZoomChange={setZoomed} />
+          <Chart key={c.ticker} bars={bars} box={c.box} pivot={c.pivot} zoomed={zoomed} onZoomChange={setZoomed} lines={chartLines} markers={chartMarkers} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-xs text-neutral-600">
             {barsErrors[c.ticker] ? `Chart unavailable — ${barsErrors[c.ticker]}` : "Loading chart…"}

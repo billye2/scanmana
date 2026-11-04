@@ -1,6 +1,6 @@
 import { CONFIG } from "./config";
 import { lowestLow } from "./indicators";
-import { armBlocker, sizeShares } from "./paper-engine";
+import { armBlocker, sizeShares, type EnginePosition } from "./paper-engine";
 import { defaultTakeStop } from "./stop-plan";
 import type { Bar, Candidate } from "./types";
 
@@ -118,6 +118,59 @@ export interface TakeRisk {
   /** Whole shares at the notional × tape multiplier (0 = one share costs more). */
   shares: number;
   atOpen: boolean;
+}
+
+export interface PositionDrawing {
+  /** Horizontal price lines for the chart: entry, the stop now, the first stop when it has moved. */
+  lines: { price: number; color: string; title: string; style: "solid" | "dashed" }[];
+  /** Bar markers: the day-4 session of an Auto position, when it is on the chart. */
+  markers: { date: string; text: string }[];
+  /** Day 4 relative to the bars: its session date, how many sessions away, or null (manual positions, entry not on the chart). */
+  day4: { date: string } | { away: number } | null;
+  /** One line of words for the symbol page. */
+  note: string;
+}
+
+/**
+ * An open paper position drawn on its own chart: the entry, the stop as it
+ * stands (green), the first stop (red, dashed) when a trail or a hand has
+ * moved it, and for an Auto position the day-4 session — a marker on that bar
+ * when it exists, else "in N sessions". Pure; the words come from the same
+ * numbers as the lines.
+ */
+export function positionLines(
+  p: Pick<EnginePosition, "track" | "entryDate" | "entryPrice" | "initialStop" | "currentStop" | "trailMode">,
+  bars: Bar[],
+): PositionDrawing {
+  const moved = p.currentStop > p.initialStop;
+  const lines: PositionDrawing["lines"] = [
+    { price: p.entryPrice, color: "#38bdf8", title: "entry", style: "solid" },
+    { price: p.currentStop, color: "#34d399", title: moved ? "stop now" : "stop", style: "solid" },
+  ];
+  if (moved) lines.push({ price: p.initialStop, color: "#f87171", title: "first stop", style: "dashed" });
+
+  let day4: PositionDrawing["day4"] = null;
+  const markers: PositionDrawing["markers"] = [];
+  if (p.trailMode === "kullamagi") {
+    const idx = bars.findIndex((b) => b.date >= p.entryDate);
+    if (idx >= 0) {
+      const d4 = idx + K.PARTIAL_DAY - 1;
+      if (d4 < bars.length) {
+        day4 = { date: bars[d4].date };
+        markers.push({ date: bars[d4].date, text: `day ${K.PARTIAL_DAY}` });
+      } else {
+        day4 = { away: d4 - (bars.length - 1) };
+      }
+    }
+  }
+
+  const stopWords = moved
+    ? `stop ${fmt(p.currentStop)}, raised from ${fmt(p.initialStop)} (${signedPct(p.currentStop / p.entryPrice - 1)} from entry)`
+    : `stop ${fmt(p.currentStop)} (${signedPct(p.currentStop / p.entryPrice - 1)} from entry)`;
+  const day4Words =
+    day4 === null ? "" : "date" in day4 ? ` · day ${K.PARTIAL_DAY} was ${day4.date}` : ` · day ${K.PARTIAL_DAY} in ${day4.away} session${day4.away === 1 ? "" : "s"}`;
+  const note = `${p.track === "auto" ? "Auto book" : "Manual"} position · entry ${fmt(p.entryPrice)} on ${p.entryDate} · ${stopWords}${day4Words}`;
+  return { lines, markers, day4, note };
 }
 
 export interface LadderRung {

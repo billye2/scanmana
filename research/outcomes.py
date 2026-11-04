@@ -23,6 +23,11 @@ no exit applied, so the exit routine can be judged against it. path_days on the
 outcome row counts the days written; a row whose path is short of PATH_DAYS is
 re-labelled nightly until the bars reach that far, past its own 20-session
 window if need be.
+
+Exit sweep (1.7.9, R4): on the same rows, once the path is full, exit_grid
+holds the R of every cell of research/replay.py EXIT_GRID (partial day × exit
+MA × breakeven) on the twenty sessions from the entry — the same entry and
+stop as k_r, one list in the grid's order. research/sweep.py aggregates it.
 """
 from __future__ import annotations
 
@@ -34,7 +39,7 @@ import pandas as pd
 import psycopg
 
 from .db import load_bars, pyval, read_df, write_rows
-from .replay import KULLAMAGI_MA, _replay_kullamagi
+from .replay import EXIT_GRID, KULLAMAGI_MA, _replay_kullamagi, exit_grid_r
 from .util import JobContext
 
 HORIZON = 20
@@ -55,8 +60,10 @@ COLUMNS = [
     "date", "ticker", "level", "broke_10d", "broke_day",
     "mfe_5", "mfe_10", "mfe_20", "mae_5", "mae_10", "mae_20",
     "r_at_exit", "filled", "sessions_after", "complete",
-    *PLAN_COLUMNS, "plan_v", "path_days",
+    *PLAN_COLUMNS, "plan_v", "path_days", "exit_grid",
 ]
+EXIT_CELLS = len(EXIT_GRID)
+EXIT_MA_MAX = max(ma for _, ma, _ in EXIT_GRID)  # closes of history the longest average needs
 COMPLETE_COL = COLUMNS.index("complete")
 PATH_DAYS_COL = COLUMNS.index("path_days")
 
@@ -163,7 +170,7 @@ def label_one(
         "level": level, "broke_10d": None, "broke_day": None,
         "mfe_5": None, "mfe_10": None, "mfe_20": None, "mae_5": None, "mae_10": None, "mae_20": None,
         "r_at_exit": None, "filled": None, "sessions_after": int(n), "complete": bool(n >= HORIZON),
-        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION, "path_days": 0,
+        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION, "path_days": 0, "exit_grid": None,
     }
     if n == 0:
         return out
@@ -221,7 +228,7 @@ def _pending_rows(conn: psycopg.Connection, force: bool) -> pd.DataFrame:
     # path reaches PATH_DAYS, which can be up to ten sessions after its outcome window.
     short_path = (
         "(h.rank IS NOT NULL AND h.boxed AND h.verdict = 'wait' AND h.close <= h.box_top"
-        f" AND o.k_entry_day IS NOT NULL AND COALESCE(o.path_days, 0) < {PATH_DAYS})"
+        f" AND o.k_entry_day IS NOT NULL AND (COALESCE(o.path_days, 0) < {PATH_DAYS} OR o.exit_grid IS NULL))"
     )
     where = "" if force else f"WHERE o.date IS NULL OR NOT o.complete OR o.plan_v IS DISTINCT FROM {PLAN_VERSION} OR {short_path}"
     return read_df(
@@ -278,9 +285,17 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> tuple[list[list[Any]]
             entry_day = lab["k_entry_day"]
             if entry_day is not None and in_path_study(getattr(r, "rank", None), boxed, getattr(r, "verdict", None), float(r.close), _f(r.box_top)):
                 start = i + entry_day  # after[0] is tb[i + 1], so entry day d (1-based in after) is tb[i + d]
-                path = follow_path(tb.iloc[start : start + PATH_DAYS], float(tb["o"].iloc[start]))
+                entry = float(tb["o"].iloc[start])
+                path = follow_path(tb.iloc[start : start + PATH_DAYS], entry)
                 lab["path_days"] = len(path)
                 paths.extend([pyval(r.date), ticker, day, gain, low] for day, gain, low in path)
+                if len(path) == PATH_DAYS:
+                    stop = float(tb["l"].iloc[start - 1])  # the breakout day's low, as the plan sets it
+                    if float(tb["l"].iloc[start]) <= stop:
+                        lab["exit_grid"] = [-1.0] * EXIT_CELLS  # same-day stop-out, as the engine books it
+                    else:
+                        closes = tb["c"].iloc[max(0, start - EXIT_MA_MAX + 1) : start + 1].astype(float).tolist()
+                        lab["exit_grid"] = exit_grid_r(tb.iloc[start + 1 : start + PATH_DAYS], entry, stop, closes)
             out.append([pyval(r.date), ticker] + [pyval(lab[k]) for k in COLUMNS[2:]])
     return out, paths
 

@@ -7,6 +7,7 @@ import ThemeSpark from "@/components/ThemeSpark";
 import { Card, H, NUM, SUMMARY, TD, TH, n, pc, rr } from "@/components/ResearchPrimitives";
 import { meanInterval, wilson } from "@/lib/stats";
 import { pathSentence, pathSummary } from "@/lib/paths-read";
+import { EXIT_BREAKEVENS, EXIT_MAS, EXIT_PARTIAL_DAYS, exitCells, exitLabel, exitRead } from "@/lib/exit-read";
 import { CONFIG } from "@/lib/config";
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
@@ -43,8 +44,10 @@ const SWEEP_LABEL: Record<string, { title: string; sub: string; fmt: (v: number)
  * that page keeps to the verdict, the scorecard and the rule changes (Billy's
  * call, 2026-11-03). Everything here is a study: it reads the research tables
  * and changes nothing. In order: the plan on history, the follow-through paths
- * (1.7.7, split by ?split=), breakout rates, the EP study, the threshold sweep,
- * breadth, tonight's themes, themes scored.
+ * (1.7.7, split by ?split=), the exit sweep (1.7.9), breakout rates, the EP
+ * study, the threshold sweep, breadth, tonight's themes, themes scored. One
+ * column throughout: Billy would rather scroll than read three narrow tables
+ * side by side (2026-11-03).
  */
 export default async function StudiesPage({ searchParams }: { searchParams: Promise<{ split?: string }> }) {
   const sp = await searchParams;
@@ -69,7 +72,9 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const markDays = [CONFIG.PAPER.KULLAMAGI.PARTIAL_DAY, CONFIG.PAPER.KULLAMAGI.MA, PATH_DAYS];
   const gainAt = (g: (typeof pathGroups)[number], day: number) => g.days.find((d) => d.day === day) ?? null;
   const sweepParams = Object.keys(SWEEP_LABEL).filter((p) => sweep.some((s) => s.param === p));
-  const headline = sweepHeadline(sweep);
+  const headline = sweepHeadline(sweep.filter((s) => s.param in SWEEP_LABEL));
+  const cells = exitCells(sweep);
+  const exit = exitRead(cells, pathSummary(paths.all[0]?.days ?? [], []).peakDay);
   const themes = clusters.filter((c) => c.inDeck.length >= 2).sort((a, b) => b.inDeck.length - a.inDeck.length || b.ret63d - a.ret63d).slice(0, 8);
   const epGroups = [ep.overall, ...ep.byNeglect, ...ep.byVolume, ...ep.byHeld, ...ep.byBoth];
   const epReady = ep.overall.n >= MIN_AFTER_N;
@@ -89,7 +94,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
       <H id="plan" sub={`Every boxed Wait card that closed under its box top on scan night (${n(plan.rows)} rows), traded two ways on the stored bars and sold by the Auto book's routine: the book's own entry — the open after the first close above the box within ten sessions, stop at that day's low — and a resting buy-stop at the box top with the stop one ADR under the fill. The stop-width table decided the book's one-ADR skip (1.6.3, 2026-11-03: ≤1 ADR +0.06R on 483, wider −0.19R on 268 — the rule-change row scores it from here); the entry table decides which entry it keeps.`}>
         Kullamägi&apos;s plan on every boxed Wait card
       </H>
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3">
         {(
           [
             ["By stop width · next-open entry", plan.byWidth, "Width"],
@@ -181,11 +186,46 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </div>
       </Card>
 
-      {/* ---------- 3. Breakout rates ---------- */}
+      {/* ---------- 3. Exit sweep (1.7.9) ---------- */}
+      <H id="exit" sub={`The Auto book's exit routine moved one knob at a time on the same cards and the same twenty sessions as the paths above: the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the stop goes to breakeven after the partial. Twelve cells, average R with its range; today's routine is boxed. With the paths this decides whether the routine changes — and only then, as one scored rule-change row.`}>
+        Exit routine, swept
+      </H>
+      <Card className="overflow-x-auto p-0">
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className={TH}>Half off</th>
+              {EXIT_MAS.flatMap((ma) => EXIT_BREAKEVENS.map((be) => <th key={`${ma}-${be}`} className={`${TH} text-right`}>{ma}-day · breakeven {be ? "on" : "off"}</th>))}
+            </tr>
+          </thead>
+          <tbody>
+            {EXIT_PARTIAL_DAYS.map((pd) => (
+              <tr key={pd} className="border-t border-neutral-800">
+                <td className={`${TD} text-neutral-100`}>day {pd}</td>
+                {EXIT_MAS.flatMap((ma) => EXIT_BREAKEVENS.map((be) => {
+                  const c = cells.find((x) => x.partialDay === pd && x.ma === ma && x.breakeven === be)!;
+                  const ready = c.n >= MIN_AFTER_N;
+                  return (
+                    <td key={`${ma}-${be}`} className={`${NUM} ${c.isCurrent ? "bg-neutral-800/60 ring-1 ring-inset ring-amber-500/60" : ""}`} title={exitLabel(c)}>
+                      <div className={ready && c.avgR !== null ? (c.avgR >= 0 ? "text-emerald-300" : "text-red-300") : "text-neutral-500"}>
+                        <Band text={rr(c.avgR)} value={c.avgR} interval={c.interval} kind="r" tone="" />
+                      </div>
+                      <div className="text-[10px] text-neutral-600">{c.n === 0 ? "—" : `${pc(c.winRate)} win · ${n(c.n)}`}</div>
+                    </td>
+                  );
+                }))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="px-2 py-2 text-[12px] leading-relaxed text-neutral-400">{exit.sentence}</p>
+      </Card>
+
+      {/* ---------- 4. Breakout rates ---------- */}
       <H id="outcomes" sub={`Deck names only (the capped nightly deck), ${n(summary.labelled)} of ${n(summary.deckRows)} labelled so far. "Broke out" = a close within ten sessions of the scan above the box top, else above the pivot while it is still overhead, else above the 20-session high.`}>
         Breakout rate within 10 sessions
       </H>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid gap-3">
         <Card>
           <RateBars rows={[...summary.byVerdict, ...summary.byBadge].map((g) => ({ label: g.label, rate: g.hitRate, n: g.n }))} />
         </Card>
@@ -209,14 +249,14 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </Card>
       </div>
 
-      {/* ---------- 4. Episodic pivots ---------- */}
+      {/* ---------- 5. Episodic pivots ---------- */}
       <H id="ep" sub={`Kullamägi's main setup, which the deck cannot show: a gap of 10%+ on 3× volume in the whole market (price ≥ $10, ≥ $20M/day), bought at the next open with the stop at the gap day's low and sold by the Auto book's routine. ${n(ep.candidates)} gap days${ep.firstDate ? ` since ${ep.firstDate}` : ""}, ${n(ep.taken)} tradeable, ${n(ep.labelled)} with a result. A study only — nothing is armed from it.`}>
         Episodic pivots, had the book traded them
       </H>
       {ep.candidates === 0 ? (
         <Card className="text-xs text-neutral-500">No gap days scored yet — the ep job fills this after the next research run.</Card>
       ) : (
-        <div className="grid gap-3 md:grid-cols-[1fr_300px]">
+        <div className="grid gap-3">
           <Card className="overflow-x-auto p-0">
             <table className="w-full">
               <thead><tr><th className={TH}>Group</th><th className={`${TH} text-right`}>Trades</th><th className={`${TH} text-right`}>Win</th><th className={`${TH} text-right`}>Avg R</th><th className={`${TH} text-right`}>Best close in 20</th></tr></thead>
@@ -258,7 +298,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </div>
       )}
 
-      {/* ---------- 5. Sweep ---------- */}
+      {/* ---------- 6. Sweep ---------- */}
       <H id="sweep" sub="One screen floor moved at a time, the other three held at today's values, the deck cap re-applied. A report for retuning lib/config.ts, nothing on the deck reads it. The ADR floor is 3.5% for good (1.6.5), whatever its curve says.">
         Threshold sweep
       </H>
@@ -278,7 +318,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
           </p>
           <details className="mt-2">
             <summary className={SUMMARY}>The four curves</summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid gap-3">
               {sweepParams.map((p) => (
                 <div key={p} className="min-w-0 rounded-lg bg-neutral-950/60 p-2">
                   <div className="text-[12px] font-semibold text-neutral-200">{SWEEP_LABEL[p].title}</div>
@@ -291,11 +331,11 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </Card>
       )}
 
-      {/* ---------- 6. Breadth ---------- */}
+      {/* ---------- 7. Breadth ---------- */}
       <H id="breadth" sub="Share of the universe (price ≥ $5, ≥ $5M/day) above its 20-day average. Green bands: sessions the index verdict called Bullish. Right: the deck's 10-session hit rate by the breadth on scan night. The tape page has the full read.">
         Market breadth
       </H>
-      <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+      <div className="grid gap-3">
         <Card><BreadthLine rows={breadth.rows} /></Card>
         <Card>
           <div className="mb-1 text-[11px] font-semibold text-neutral-400">Hit rate by breadth</div>
@@ -303,7 +343,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </Card>
       </div>
 
-      {/* ---------- 7. Themes ---------- */}
+      {/* ---------- 8. Themes ---------- */}
       <H id="themes" sub="Groups that moved together over the last 63 sessions, from price alone, with two or more names in tonight's deck. Amber tickers are on the deck. Membership is saved nightly; the card below scores it.">
         Themes on tonight&apos;s deck
       </H>
@@ -334,7 +374,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </Card>
       )}
 
-      {/* ---------- 8. Themes, scored (1.7.4) ---------- */}
+      {/* ---------- 9. Themes, scored (1.7.4) ---------- */}
       <H
         id="themes-scored"
         sub={
@@ -346,7 +386,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         Themes, scored
       </H>
       {themeStudy.since && (
-        <div className="grid gap-3 lg:grid-cols-[1fr_1.4fr]">
+        <div className="grid gap-3">
           <Card className="overflow-x-auto p-0">
             <table className="w-full">
               <thead>

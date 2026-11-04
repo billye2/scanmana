@@ -4,7 +4,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from research.sweep import CURRENT, GRIDS, cap_deck, sweep
+from research.replay import EXIT_CURRENT, EXIT_GRID
+from research.sweep import CURRENT, GRIDS, cap_deck, exit_current, sweep
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -76,3 +77,21 @@ def test_sweep_current_row_is_flagged_and_monotone_deck_size():
 
 def test_sweep_empty_frame():
     assert sweep(pd.DataFrame()) == []
+
+
+# ---------- exit sweep (1.7.9, R4 of the Python-studies plan) ----------
+
+
+def test_exit_grid_order_is_fixed_and_the_current_cell_is_the_live_routine():
+    assert EXIT_GRID == [
+        (3, 10, True), (3, 10, False), (3, 20, True), (3, 20, False),
+        (4, 10, True), (4, 10, False), (4, 20, True), (4, 20, False),
+        (5, 10, True), (5, 10, False), (5, 20, True), (5, 20, False),
+    ]
+    config = (ROOT / "lib" / "config.ts").read_text()
+    live = config[config.index("KULLAMAGI: {") :]
+    pd_now, ma_now, be_now = EXIT_GRID[EXIT_CURRENT]
+    assert pd_now == _ts_number(live, "PARTIAL_DAY") and ma_now == _ts_number(live, "MA") and be_now is True
+    assert exit_current("EXIT_GRID", EXIT_CURRENT + 1) and not exit_current("EXIT_GRID", EXIT_CURRENT)
+    assert exit_current("EXIT_PARTIAL_DAY", 4) and exit_current("EXIT_MA", 10) and exit_current("EXIT_BREAKEVEN", 1)
+    assert not exit_current("EXIT_BREAKEVEN", 0)

@@ -190,15 +190,18 @@ export interface SweepPoint {
   deckSize: number;
   hitRate: number | null;
   avgR: number | null;
+  /** Spread behind avgR (1.7.9), for the exit grid's bands; null on the threshold curves. */
+  sdR: number | null;
   n: number;
   isCurrent: boolean;
 }
+/** Every sweep row: the four threshold curves and, since 1.7.9, the EXIT_* params of the exit grid (lib/exit-read.ts reads those). */
 export async function getSweep(): Promise<SweepPoint[]> {
   try {
-    const rows = (await getSql()`SELECT param, value, deck_size, hit_rate, avg_r, n, is_current FROM research_sweep ORDER BY param, value`) as {
-      param: string; value: number; deck_size: number; hit_rate: number | null; avg_r: number | null; n: number; is_current: boolean;
+    const rows = (await getSql()`SELECT param, value, deck_size, hit_rate, avg_r, sd_r, n, is_current FROM research_sweep ORDER BY param, value`) as {
+      param: string; value: number; deck_size: number; hit_rate: number | null; avg_r: number | null; sd_r: number | null; n: number; is_current: boolean;
     }[];
-    return rows.map((r) => ({ param: r.param, value: Number(r.value), deckSize: Number(r.deck_size), hitRate: r.hit_rate === null ? null : Number(r.hit_rate), avgR: r.avg_r === null ? null : Number(r.avg_r), n: r.n, isCurrent: r.is_current }));
+    return rows.map((r) => ({ param: r.param, value: Number(r.value), deckSize: Number(r.deck_size), hitRate: r.hit_rate === null ? null : Number(r.hit_rate), avgR: r.avg_r === null ? null : Number(r.avg_r), sdR: r.sd_r === null ? null : Number(r.sd_r), n: r.n, isCurrent: r.is_current }));
   } catch {
     return [];
   }

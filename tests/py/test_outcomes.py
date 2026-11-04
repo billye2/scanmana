@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import pandas as pd
 
-from research.outcomes import HORIZON, breakout_level, label_frame, label_one
+from research.outcomes import COLUMNS, HORIZON, breakout_level, label_frame, label_one
 
 
 def _after(closes, highs=None, lows=None, opens=None):
@@ -261,3 +261,24 @@ def test_label_frame_path_is_short_while_the_bars_run_out_and_absent_off_the_dec
     assert out[0][PATH_DAYS_COL] == 0 and paths == []
     out, paths = label_frame(_path_row(dates, verdict="pass"), bars)
     assert out[0][PATH_DAYS_COL] == 0 and paths == []
+
+
+# ---------- the exit grid on the outcome row (1.7.9, R4) ----------
+from research.outcomes import EXIT_CELLS  # noqa: E402
+from research.replay import EXIT_CURRENT, _replay_kullamagi  # noqa: E402
+
+
+def test_label_frame_writes_the_exit_grid_once_the_path_is_full():
+    dates, bars = _path_bars(32)
+    out, _ = label_frame(_path_row(dates), bars)
+    grid = out[0][COLUMNS.index("exit_grid")]
+    assert isinstance(grid, list) and len(grid) == EXIT_CELLS
+    # The current cell is the live routine run on the 19 sessions after the entry (session 4 opens 108, stop = session 3's low).
+    entry, stop = 108.0, 106 * 0.99
+    rest = bars.iloc[5:24]
+    expected = _replay_kullamagi(rest, entry, stop, 100, bars["c"].iloc[0:5].astype(float).tolist())
+    assert grid[EXIT_CURRENT] == pytest.approx(expected["r"])
+    # Short path: no grid yet.
+    dates, bars = _path_bars(21)
+    out, _ = label_frame(_path_row(dates), bars)
+    assert out[0][COLUMNS.index("exit_grid")] is None

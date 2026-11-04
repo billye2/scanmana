@@ -355,3 +355,31 @@ def test_kullamagi_adrstop_puts_the_stop_one_adr_under_the_entry():
     assert out["r"] == pytest.approx(-1.0)
     # Without an ADR the rule keeps the position's own stop.
     assert replay_position(bars, 100, 90, 10, "kullamagi_adrstop") == replay_position(bars, 100, 90, 10, "kullamagi")
+
+
+# ---------- the exit grid (1.7.9, R4) ----------
+from research.replay import EXIT_CURRENT, EXIT_GRID, _replay_kullamagi, exit_grid_r  # noqa: E402
+
+
+def test_kullamagi_partial_day_and_breakeven_are_knobs():
+    bars = _bars(
+        [
+            {"date": _d(1), "o": 101, "h": 103, "l": 99, "c": 102},
+            {"date": _d(2), "o": 102, "h": 105, "l": 101, "c": 104},
+            {"date": _d(3), "o": 105, "h": 106, "l": 103, "c": 105},
+            {"date": _d(4), "o": 104, "h": 104, "l": 99, "c": 100},
+        ]
+    )
+    # Partial on day 3 instead: half sells at day 3's open (102) since day 2 closed over the entry.
+    early = _replay_kullamagi(bars, 100, 90, 10, [100] * 10, partial_day=3)
+    assert early["pnl"] == pytest.approx((102 - 100) * 5 + (100 - 100) * 5)
+    # Breakeven off: the stop stays at 90, so day 5's 99 low does not stop the rest out; it marks to the last close.
+    loose = _replay_kullamagi(bars, 100, 90, 10, [100] * 10, breakeven=False)
+    assert loose["mtm"] is True and loose["pnl"] == pytest.approx((105 - 100) * 5 + (100 - 100) * 5)
+
+
+def test_exit_grid_r_has_one_r_per_cell_and_the_current_cell_is_the_default_routine():
+    bars = _bars([{"date": _d(i), "o": 100 + i, "h": 102 + i, "l": 98 + i, "c": 101 + i} for i in range(1, 20)])
+    rs = exit_grid_r(bars, 100, 95, [100] * 20)
+    assert len(rs) == len(EXIT_GRID)
+    assert rs[EXIT_CURRENT] == pytest.approx(_replay_kullamagi(bars, 100, 95, 100, [100] * 20)["r"])

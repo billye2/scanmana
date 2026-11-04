@@ -45,6 +45,12 @@ MANUAL_START_CASH = 10_000
 KULLAMAGI_PARTIAL_DAY = 4  # entry day = 1
 KULLAMAGI_PARTIAL_FRACTION = 0.5
 KULLAMAGI_MA = 10
+# The exit sweep's grid (1.7.9, R4 of the Python-studies plan): (partial day, exit MA,
+# breakeven after the partial), in this fixed order — research_outcomes.exit_grid stores
+# one R per cell in it, lib/exit-read.ts mirrors it by hand, tests/py/test_sweep.py pins
+# the current cell to lib/config.ts.
+EXIT_GRID: list[tuple[int, int, bool]] = [(pd, ma, be) for pd in (3, 4, 5) for ma in (10, 20) for be in (True, False)]
+EXIT_CURRENT = EXIT_GRID.index((KULLAMAGI_PARTIAL_DAY, KULLAMAGI_MA, True))
 
 RULES: dict[str, str] = {
     "kullamagi": "Kullamägi: half off day 4, breakeven, 10-day exit",
@@ -173,14 +179,23 @@ def _replay_half_2r(
 
 
 def _replay_kullamagi(
-    bars: pd.DataFrame, entry_price: float, initial_stop: float, shares: int, pre_closes: list[float], ma: int = KULLAMAGI_MA
+    bars: pd.DataFrame,
+    entry_price: float,
+    initial_stop: float,
+    shares: int,
+    pre_closes: list[float],
+    ma: int = KULLAMAGI_MA,
+    partial_day: int = KULLAMAGI_PARTIAL_DAY,
+    breakeven: bool = True,
 ) -> dict:
     """The Auto book's live exit (lib/paper-engine.ts processSession, kullamagi
-    branch): stop at `initial_stop`; on day KULLAMAGI_PARTIAL_DAY (entry day = 1),
-    if the previous close is above entry, sell the partial fraction at the open
-    and raise the stop to breakeven; after any close under the `ma`-session
-    average (KULLAMAGI_MA live; 20 for the kullamagi_20 rule — Kullamägi trails
-    the more extended names on the 20-day), sell what is left at the next open.
+    branch): stop at `initial_stop`; on day `partial_day` (entry day = 1), if the
+    previous close is above entry, sell the partial fraction at the open and,
+    with `breakeven`, raise the stop to the entry; after any close under the
+    `ma`-session average (KULLAMAGI_MA live; 20 for the kullamagi_20 rule —
+    Kullamägi trails the more extended names on the 20-day), sell what is left
+    at the next open. The defaults are the live routine; the exit sweep moves
+    the three knobs over EXIT_GRID.
     `pre_closes` are the closes up to and including the entry day (oldest first)
     so the average has history from the first post-entry session; without them
     it is taken over what exists.
@@ -196,12 +211,13 @@ def _replay_kullamagi(
         if pending:
             legs.append((row.o, row.date, held, i + 1))
             return _combine(entry_price, initial_stop, legs, False)
-        if day == KULLAMAGI_PARTIAL_DAY and held == shares and prev_close > entry_price:
+        if day == partial_day and held == shares and prev_close > entry_price:
             sell = int(held * KULLAMAGI_PARTIAL_FRACTION)
             if sell > 0:
                 legs.append((row.o, row.date, sell, i + 1))
                 held -= sell
-            stop = max(stop, entry_price)
+            if breakeven:
+                stop = max(stop, entry_price)
         if row.l <= stop:
             legs.append((min(row.o, stop), row.date, held, i + 1))
             return _combine(entry_price, initial_stop, legs, False)
@@ -213,6 +229,16 @@ def _replay_kullamagi(
     last = bars.iloc[-1]
     legs.append((last.c, last.date, held, len(bars)))
     return _combine(entry_price, initial_stop, legs, True)
+
+
+def exit_grid_r(bars: pd.DataFrame, entry_price: float, initial_stop: float, pre_closes: list[float], shares: int = 100) -> list[float]:
+    """R of every EXIT_GRID cell on one trade: `bars` are the sessions strictly
+    after the entry day (a fixed window, so a trade still open at the end is
+    marked to the last close in every cell alike). Pure."""
+    return [
+        float(_replay_kullamagi(bars, entry_price, initial_stop, shares, pre_closes, ma=ma, partial_day=pd, breakeven=be)["r"])
+        for pd, ma, be in EXIT_GRID
+    ]
 
 
 def _skipped(initial_stop: float, first_date: Any) -> dict:

@@ -229,6 +229,14 @@ export default async function Help() {
         peaks and the day the mean low bottoms. Together with the exit sweep this decides whether the ledger&apos;s routine changes — and
         only then, as a scored rule change.
       </Term>
+      <Term name="Exit routine, swept">
+        The grid on Studies (1.7.9): the Auto ledger&apos;s exit routine run twelve ways on the same cards and the same twenty sessions as
+        the follow-through card — the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the
+        stop moves to breakeven after the partial. Each cell is the average R with its range; today&apos;s routine is boxed. The sentence under
+        it applies the gate agreed for the plan: a change is on the table only when the best cell beats today&apos;s with both at thirty rows and
+        the two ranges apart, and the follow-through paths do not argue — if the best cell moves the partial day, the day the mean gain
+        peaks has to sit on the same side. Even then nothing changes by itself: the routine changes as one scored rule-change row on Research.
+      </Term>
       <Term name="The bar under a number">
         Since 1.7.6 every rate and average R on the Research, Studies and Tape pages carries its 95% range, drawn as a thin bar under the
         number with a dot at the value (hover for the figures). A rate&apos;s range comes from its sample size alone (Wilson); an average

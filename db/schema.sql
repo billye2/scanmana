@@ -238,6 +238,10 @@ ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS path_days smallint;
 -- 1.7.7: the follow-through of every boxed Wait deck card the next-open plan entered, day 1..20
 -- from the entry session (day 1 = the entry day, as the replay counts it), with no exit applied.
 -- gain = close / entry - 1 on that day, low = the lowest low so far / entry - 1.
+-- 1.7.9 (R4): exit_grid = the R of every cell of research/replay.py EXIT_GRID on the twenty
+-- sessions from the entry, in the grid's order, once the path is full. research/sweep.py reads it.
+ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS exit_grid double precision[];
+
 CREATE TABLE IF NOT EXISTS research_paths (
   date date NOT NULL,
   ticker text NOT NULL,
@@ -258,6 +262,8 @@ CREATE TABLE IF NOT EXISTS research_sweep (
   as_of date NOT NULL,
   PRIMARY KEY (param, value)
 );
+-- 1.7.9: the spread behind avg_r, so the exit grid's cells can carry their 95% range.
+ALTER TABLE research_sweep ADD COLUMN IF NOT EXISTS sd_r double precision;
 
 CREATE TABLE IF NOT EXISTS research_clusters (
   cluster_id integer NOT NULL,

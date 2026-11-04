@@ -441,6 +441,22 @@ export default async function Help() {
       </Term>
 
       <H>
+        <span id="gallery">Best setups</span>
+      </H>
+      <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
+        <Link href="/gallery" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/gallery</Link> is
+        Kullamägi&apos;s monthly review of the charts that worked, done on the scanner&apos;s own picks: the deck cards whose best close in
+        the twenty sessions after their scan night was highest, one per name, over the last 60 or 180 days of scan nights or all history
+        (a night is scored only twenty sessions later, so the shortest view is about a month of scored nights). Each card draws
+        the move into the box, the scan night and the Auto book&apos;s buy (the open after the first close above the box) marked under the
+        bars, and the follow-through; the line under it says how far price went, which day it broke, and what the Auto plan made with
+        how wide its stop was; the grey line is the scan-night facts (ADR, tightness, distance from the high, the three returns, the tape).
+        The box at the top says what the shown setups had in common that night — the question the review exists to answer. A card
+        appears only once twenty sessions have passed and the nightly outcomes job has scored it. Reads history, writes nothing; linked
+        from the research page, no nav icon.
+      </p>
+
+      <H>
         <span id="sim">Stop simulator</span>
       </H>
       <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">

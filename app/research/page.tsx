@@ -122,7 +122,8 @@ export default async function ResearchPage() {
       <p className="text-[13px] leading-relaxed text-neutral-300">
         Is the scanner working, and did the last rule change help? A Python job labels every past deck name with what happened
         next; this page reads those tables and changes nothing. Terms in{" "}
-        <Link href="/help#research" className="text-neutral-100 underline underline-offset-4">Help</Link>.
+        <Link href="/help#research" className="text-neutral-100 underline underline-offset-4">Help</Link>. The charts that worked, as his
+        monthly review would show them: <Link href="/gallery" className="text-neutral-100 underline underline-offset-4">Best setups</Link>.
       </p>
       {!ran && (
         <Card className="mt-4 text-[12px] leading-relaxed text-neutral-400">

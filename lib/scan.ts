@@ -267,6 +267,39 @@ export async function loadBars(tickers: string[]): Promise<Map<string, Bar[]>> {
   return map;
 }
 
+/**
+ * Bars for several (ticker, date range) windows in one query, split-adjusted like
+ * `loadBars`. For the best-setups gallery (1.6.4): a dozen windows of ~120 rows each
+ * instead of a dozen full histories. Keyed by ticker; callers pass one window per ticker
+ * (two overlapping windows on one ticker would repeat the overlap's bars).
+ */
+export async function loadBarWindows(windows: { ticker: string; since: string; until: string }[]): Promise<Map<string, Bar[]>> {
+  const map = new Map<string, Bar[]>();
+  if (windows.length === 0) return map;
+  const tickers = windows.map((w) => w.ticker);
+  const factors = await splitFactors([...new Set(tickers)]);
+  const rows = (await getSql()`
+    SELECT b.ticker, b.date::text AS date, b.o, b.h, b.l, b.c, b.v::double precision AS v
+    FROM bars b
+    JOIN unnest(${tickers}::text[], ${windows.map((w) => w.since)}::date[], ${windows.map((w) => w.until)}::date[]) AS w(ticker, since, until)
+      ON b.ticker = w.ticker AND b.date BETWEEN w.since AND w.until
+    ORDER BY b.ticker, b.date
+  `) as (Bar & { ticker: string })[];
+  for (const row of rows) {
+    let arr = map.get(row.ticker);
+    if (!arr) {
+      arr = [];
+      map.set(row.ticker, arr);
+    }
+    arr.push({ date: row.date, o: row.o, h: row.h, l: row.l, c: row.c, v: row.v });
+  }
+  for (const [ticker, splits] of factors) {
+    const arr = map.get(ticker);
+    if (arr) map.set(ticker, adjustForSplits(arr, splits));
+  }
+  return map;
+}
+
 export async function upsertAnalyses(date: string, analyses: Analysis[]): Promise<void> {
   const sql = getSql();
   // A rescan can drop tickers from the day's deck; don't leave their old reads behind.

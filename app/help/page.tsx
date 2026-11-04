@@ -356,8 +356,11 @@ export default async function Help() {
 
       <Term name="Manual ledger">
         $10,000 to start, the same tape-sized notional per position, and cash binds — a take that does not fit is refused with the reason. Tap{" "}
-        <span className="text-neutral-100">Take</span> on a deck card or a watchlist row to arm the same trigger and stop the card
-        shows; a pivot-only name has no stop line, so it asks you to type one. When price is already above the trigger the button reads{" "}
+        <span className="text-neutral-100">Take</span> on a deck card or a watchlist row to arm the same trigger the card
+        shows with the stop in the box beside the button. The box starts at the rule&apos;s stop, and the chips under it are the levels you
+        can pick instead — today&apos;s low, the box bottom, the 10-session low — each with its distance from the entry, the rule&apos;s
+        level marked <em>his rule</em> and anything farther than one average day&apos;s range marked <em>wide</em>; tap a chip or type a
+        price. A pivot-only name has no rule stop, so one must be picked or typed. When price is already above the trigger the button reads{" "}
         <span className="text-neutral-100">Take at open</span>: a market buy at the next open with the stop at that session&apos;s low — the
         Auto ledger&apos;s rule, so both books price a breakout-day entry the same way (since 1.4.2; before that it kept the box bottom). If the Auto
         ledger already filled that name before you took it, your fill is at the next open and the trade is marked{" "}

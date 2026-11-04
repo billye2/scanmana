@@ -28,7 +28,7 @@ overlays. A Python research layer scores the scanner's own history every night
   embeds bars only for the card on screen and its neighbours — ~12 KB gzipped
   instead of ~75 KB — and fetches the rest per card from `GET /api/scan/bars`
   as you page, neighbours prefetched), paged from a
-  fixed bottom bar of line icons (prev · watch · paper book · deck list · "n of N" counter in a bordered pill (tap = next)); under each chart an **Auto book tonight** box says whether the Auto book arms the card and why, and the trigger line shows the stop, risk % and shares a Take would use
+  fixed bottom bar of line icons (prev · watch · paper book · deck list · "n of N" counter in a bordered pill (tap = next)); under each chart an **Auto book tonight** box says whether the Auto book arms the card and why, and the trigger line shows the stop, risk % and shares a Take would use; the Take button carries a stop input prefilled with the rule's stop and a row of chips under it (today's low, box bottom, 10-session low with their distance, the rule marked, wide-than-one-ADR flagged) that fill it (`takeLadder` in `lib/plan-line.ts`)
   (wraps around: past the last card comes the first, and vice versa)
   (lightweight-charts), a watchlist with "broke its box" alerts, and a `/help`
   page that carries the **↻ Run scan for previous day** button

@@ -11,7 +11,7 @@ import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
 import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ListIcon, StarIcon } from "@/components/Icons";
 import { money, pct, price } from "@/lib/format";
-import { autoPlan, takeRisk, type PlanTone } from "@/lib/plan-line";
+import { autoPlan, takeLadder, takeRisk, type PlanTone } from "@/lib/plan-line";
 import type { LiveDeckBundle } from "@/lib/livewatch";
 import type { CardResearch } from "@/lib/research";
 import type { Analysis, Bar, DeckCard, WatchlistAlert } from "@/lib/types";
@@ -75,7 +75,7 @@ export default function Deck({
   const [zoomed, setZoomed] = useState(false); // chart window: last 30 sessions or all bars; shared across cards
   const [saved, setSaved] = useState<Set<string>>(new Set(savedTickers));
   const [taken, setTaken] = useState<Set<string>>(new Set(takenTickers));
-  const [takeStop, setTakeStop] = useState<string | null>(null); // pivot-only card: the typed stop, while the input is open
+  const [takeStops, setTakeStops] = useState<Record<string, string>>({}); // per ticker: the stop typed or picked from the ladder; absent = the rule's default
   const [takeError, setTakeError] = useState<string | null>(null);
   // Bars per card. The page embeds bars for the first card(s) only; the rest arrive
   // from /api/scan/bars as you page, the neighbours fetched ahead so › never waits.
@@ -196,42 +196,6 @@ export default function Deck({
     }
   }
 
-  /**
-   * Take the card into the manual paper book: the same trigger as ☆ Watch (box
-   * top, else the bare pivot). Under the trigger it is a buy-stop with the box
-   * bottom as the stop; already above it ("Take at open") the server stops at the
-   * last session's low, the Auto book's rule, so no stop is sent. A pivot-only
-   * card has no stop line, so the first tap opens an input for one.
-   */
-  async function take() {
-    const trigger = c.box?.top ?? c.pivot ?? null;
-    if (trigger === null) return;
-    let stop: number | null = c.box && c.price <= trigger ? c.box.bottom : null;
-    if (stop === null && !c.box) {
-      if (takeStop === null) {
-        setTakeStop("");
-        return;
-      }
-      stop = Number(takeStop);
-      if (!(stop > 0 && stop < trigger)) {
-        setTakeError("stop must be a price below the trigger");
-        return;
-      }
-    }
-    setTakeError(null);
-    const res = await fetch("/api/paper/take", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(stop === null ? { ticker: c.ticker } : { ticker: c.ticker, stop }),
-    });
-    if (res.ok) {
-      setTaken((cur) => new Set(cur).add(c.ticker));
-      setTakeStop(null);
-    } else {
-      const j = (await res.json().catch(() => ({}))) as { error?: string };
-      setTakeError(j.error ?? `take failed (${res.status})`);
-    }
-  }
   const isTaken = taken.has(c.ticker);
   const takeTrigger = c.box?.top ?? c.pivot ?? null;
   const canTake = takeTrigger !== null;
@@ -241,6 +205,45 @@ export default function Deck({
   // both from the functions the books run on (lib/plan-line.ts). Null until the bars load.
   const auto = autoBook ? autoPlan(c, bars) : null;
   const risk = takeRisk(c, bars, tape?.mult ?? 1);
+  // The stop ladder (1.5.4): the levels a Take can choose from, as chips that fill the
+  // stop input. The input starts at the rule's stop (`risk.stop` = `defaultTakeStop`).
+  const ladder = takeLadder(c, bars);
+  const defaultStop = risk ? risk.stop.toFixed(2) : "";
+  const takeStop = takeStops[c.ticker] ?? defaultStop;
+  const setTakeStop = (v: string) => setTakeStops((cur) => ({ ...cur, [c.ticker]: v }));
+
+  /**
+   * Take the card into the manual paper book: the same trigger as ☆ Watch (box
+   * top, else the bare pivot) and the stop in the input — the rule's default
+   * (box bottom for a buy-stop, today's low for a take at the open) unless a
+   * ladder chip or a typed price replaced it. The server checks the stop by
+   * order kind. A pivot-only card under its trigger has no default, so a stop
+   * must be typed or picked.
+   */
+  async function take() {
+    if (takeTrigger === null) return;
+    const stop = Number(takeStop);
+    if (!(stop > 0)) {
+      setTakeError("type a stop price, or tap a level below");
+      return;
+    }
+    if (!takeAtOpen && stop >= takeTrigger) {
+      setTakeError("stop must be a price below the trigger");
+      return;
+    }
+    setTakeError(null);
+    const res = await fetch("/api/paper/take", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticker: c.ticker, stop }),
+    });
+    if (res.ok) {
+      setTaken((cur) => new Set(cur).add(c.ticker));
+    } else {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      setTakeError(j.error ?? `take failed (${res.status})`);
+    }
+  }
 
   // Distance to the trigger from the live price when we have one, else from the stored close.
   const toTrigger = c.box ? (c.box.top / (liveRow?.price ?? c.price) - 1) : null;
@@ -409,7 +412,7 @@ export default function Deck({
         <span className="flex shrink-0 items-center gap-2">
           {canTake && (
             <>
-              {takeStop !== null && !isTaken && (
+              {!isTaken && (
                 <input
                   type="number"
                   step="0.01"
@@ -440,6 +443,30 @@ export default function Deck({
           )}
         </span>
       </div>
+      {canTake && !isTaken && ladder && ladder.rungs.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]" aria-label="Stop levels">
+          {ladder.rungs.map((r) => {
+            const picked = Number(takeStop) === Number(r.price.toFixed(2));
+            return (
+              <button
+                key={r.key}
+                onClick={() => setTakeStop(r.price.toFixed(2))}
+                aria-pressed={picked}
+                className={`rounded-full border px-2 py-0.5 tabular-nums ${
+                  r.rule
+                    ? picked ? "border-emerald-500 bg-emerald-800/60 text-emerald-100" : "border-emerald-600 bg-emerald-900/30 text-emerald-200 active:bg-emerald-900/60"
+                    : picked ? "border-neutral-400 bg-neutral-700 text-neutral-100" : "border-neutral-700 text-neutral-300 active:bg-neutral-800"
+                }`}
+              >
+                {r.label} {price(r.price)} · −{(r.riskPct * 100).toFixed(1)}%{r.rule ? " · his rule" : ""}{r.wide ? " · wide" : ""}
+              </button>
+            );
+          })}
+          {ladder.adr !== null && (
+            <span className="rounded-full border border-neutral-800 px-2 py-0.5 text-neutral-500">one ADR {(ladder.adr * 100).toFixed(1)}% · wider is marked</span>
+          )}
+        </div>
+      )}
       {takeError && <p className="mt-1 text-xs text-red-300">{takeError}</p>}
 
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).

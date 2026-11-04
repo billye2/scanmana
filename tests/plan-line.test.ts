@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { autoPlan, openGroup, openHint, takeRisk } from "../lib/plan-line";
+import { autoPlan, openGroup, openHint, takeLadder, takeRisk } from "../lib/plan-line";
 import type { DarvasBox } from "../lib/types";
 import { bar, flatBars, resetDays } from "./fixtures";
 
@@ -92,6 +92,48 @@ describe("openGroup / openHint — the deck list's sections, from the arming tes
   it("without bars a boxed Wait card reads as inside and an unboxed one as watch", () => {
     expect(openGroup({ box, verdict: "wait" }, undefined)).toBe("inside");
     expect(openGroup({ box: null, verdict: "wait" }, undefined)).toBe("watch");
+  });
+});
+
+describe("takeLadder — the stop levels a Take can pick", () => {
+  beforeEach(resetDays);
+
+  it("at the open: today's low is the rule, then the box bottom and the 10-session low, tightest first", () => {
+    const bars = [...flatBars(20, 95), bar(100, 103, 98, 101)];
+    const l = takeLadder({ box, pivot: null, price: 101, adrPct: 4 }, bars)!;
+    expect(l.atOpen).toBe(true);
+    expect(l.entry).toBe(101);
+    expect(l.rungs.map((r) => [r.key, r.price, r.rule])).toEqual([
+      ["entry_low", 98, true],
+      ["low10", 95 * 0.98, false], // flatBars' low
+      ["box_bottom", 92, false],
+    ]);
+    expect(l.rungs[0].riskPct).toBeCloseTo(1 - 98 / 101, 6);
+    expect(l.rungs[0].wide).toBe(false);
+    expect(l.rungs[2].wide).toBe(true); // 8.9% is wider than one 4% ADR
+    expect(l.adr).toBe(0.04);
+  });
+
+  it("under the trigger: the box bottom is the rule and there is no entry-day low yet", () => {
+    const l = takeLadder({ box, pivot: null, price: 95, adrPct: 4 }, flatBars(20, 95))!;
+    expect(l.atOpen).toBe(false);
+    expect(l.entry).toBe(100);
+    expect(l.rungs.map((r) => r.key)).toEqual(["box_bottom", "low10"]);
+    expect(l.rungs[0].rule).toBe(true);
+  });
+
+  it("a pivot-only card offers only the 10-session low, and a level above the entry is left out", () => {
+    const l = takeLadder({ box: null, pivot: 100, price: 95, adrPct: 0 }, flatBars(20, 95))!;
+    expect(l.rungs.map((r) => r.key)).toEqual(["low10"]);
+    expect(l.rungs[0].rule).toBe(false);
+    expect(l.adr).toBeNull();
+    const above = takeLadder({ box: { top: 100, bottom: 100 } as DarvasBox, pivot: null, price: 95, adrPct: 4 }, flatBars(20, 95))!;
+    expect(above.rungs.map((r) => r.key)).toEqual(["low10"]);
+  });
+
+  it("is null without a trigger or without bars", () => {
+    expect(takeLadder({ box: null, pivot: null, price: 95, adrPct: 4 }, flatBars(20, 95))).toBeNull();
+    expect(takeLadder({ box, pivot: null, price: 95, adrPct: 4 }, null)).toBeNull();
   });
 });
 

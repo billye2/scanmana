@@ -1,4 +1,5 @@
 import { CONFIG } from "./config";
+import { lowestLow } from "./indicators";
 import { armBlocker, sizeShares } from "./paper-engine";
 import { defaultTakeStop } from "./stop-plan";
 import type { Bar, Candidate } from "./types";
@@ -117,6 +118,59 @@ export interface TakeRisk {
   /** Whole shares at the notional × tape multiplier (0 = one share costs more). */
   shares: number;
   atOpen: boolean;
+}
+
+export interface LadderRung {
+  key: "entry_low" | "box_bottom" | "low10";
+  /** Chip text before the price, e.g. "today's low". */
+  label: string;
+  price: number;
+  /** (entry − price) / entry */
+  riskPct: number;
+  /** The stop the Take gets by default — Kullamägi's rule for this order kind. */
+  rule: boolean;
+  /** Farther than one ADR from the entry. */
+  wide: boolean;
+}
+
+export interface TakeLadder {
+  entry: number;
+  atOpen: boolean;
+  rungs: LadderRung[];
+  /** One average day's range as a fraction of price (from the card), null when unknown. */
+  adr: number | null;
+}
+
+/**
+ * The stop levels a Take can choose from, as chips beside the input: today's
+ * low (the rule for a take at the open), the box bottom (the rule for a
+ * buy-stop), the 10-session low. Levels at or above the entry are left out.
+ * `rule` marks `defaultTakeStop`'s answer, so the chip and the default never
+ * disagree. Not `planStop` (lib/stop-plan.ts): that ladder assumes an entry
+ * that has happened, and a buy-stop has no entry day yet; the box here is the
+ * card's own. Null without bars or a trigger.
+ */
+export function takeLadder(card: Pick<Candidate, "box" | "pivot" | "price" | "adrPct">, bars: Bar[] | null): TakeLadder | null {
+  const trigger = card.box?.top ?? card.pivot ?? null;
+  if (trigger === null || !bars || bars.length === 0) return null;
+  const atOpen = card.price > trigger;
+  const entry = atOpen ? card.price : trigger;
+  const adr = card.adrPct > 0 ? card.adrPct / 100 : null;
+  const last = bars[bars.length - 1];
+  const raw: { key: LadderRung["key"]; label: string; price: number; rule: boolean }[] = [];
+  if (atOpen) raw.push({ key: "entry_low", label: "today's low", price: last.l, rule: true });
+  if (card.box) raw.push({ key: "box_bottom", label: "box bottom", price: card.box.bottom, rule: !atOpen });
+  raw.push({ key: "low10", label: "10-session low", price: lowestLow(bars, 10), rule: false });
+  const rungs: LadderRung[] = [];
+  for (const r of raw) {
+    if (!(r.price < entry)) continue;
+    const riskPct = 1 - r.price / entry;
+    rungs.push({ ...r, riskPct, wide: adr !== null && riskPct > adr });
+  }
+  // Rule first, then tightest to widest; one chip per price.
+  rungs.sort((a, b) => Number(b.rule) - Number(a.rule) || a.riskPct - b.riskPct);
+  const seen = new Set<number>();
+  return { entry, atOpen, adr, rungs: rungs.filter((r) => (seen.has(r.price) ? false : (seen.add(r.price), true))) };
 }
 
 /**

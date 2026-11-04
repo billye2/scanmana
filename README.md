@@ -215,7 +215,7 @@ but nothing is traded from it until it holds out of sample.
 
 Hard filters: price > $10 on every close of the last 21 sessions · 20d avg
 dollar volume > $20M · US common stock/ADR · momentum (1M ≥ +25% OR 3M ≥ +50%
-OR 6M ≥ +100%) · ADR ≥ 3% with no ceiling (3 and uncapped since 1.6.2, Billy's call; the sweep had 3% at a 69.2% breakout rate and 5% at 72.4%, so the rule-change row scores it) · 1M return ≤ +300% · close above
+OR 6M ≥ +100%) · ADR ≥ 3.5% with no ceiling (the 3.5 floor is permanent by Billy's standing instruction, 1.6.5; the ceiling came off in 1.6.2 and the rule-change row scores that) · 1M return ≤ +300% · close above
 rising 10/20 SMA · within 5% of 6-month high. The return cap and the
 21-session price floor are the parabolic guard: a sub-dollar shell that
 spiked to $18 passes every floor on today's numbers alone. Ranked with boxed

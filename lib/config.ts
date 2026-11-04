@@ -25,12 +25,14 @@ export const CONFIG = {
   LOOKBACK: { M1: 21, M3: 63, M6: 126 }, // trading days
 
   // Volatility / trend / structure
-  // 3 since 1.6.2 (2026-11-03), Billy's call, replacing the 5 set an hour earlier in 1.6.1 before any
-  // scan ran under it (so the two are one RULE_CHANGES row). For the record, the 2026-11-02 sweep: the
-  // deck's 10-session breakout rate was 69.2% at 3% (47 names a night, n=7,647), 69.5% at the
-  // inherited 3.5% (44, n=7,279), 72.4% at 5% (29, n=4,880), 72.5% at 5.5% (22); avg R under the old
-  // plan flat at −0.08 throughout. The rule-change row scores the choice from the 2026-11-03 scan on.
-  MIN_ADR_PCT: 3,
+  // 3.5, PERMANENT — Billy's standing instruction (2026-11-03, 1.6.5): "make this permanent, push back
+  // if I try to adjust the 3.5% ADR again". The day's history: 1.6.1 set 5 from the sweep, 1.6.2 set 3
+  // an hour later, 1.6.5 set 3.5 the same night, before more than one scan had run under 3. Do not
+  // change this value on a sweep reading; the ceiling stays off (MAX_ADR_PCT Infinity, see PARABOLIC).
+  // For the record, the 2026-11-02 sweep: the deck's 10-session breakout rate was 69.2% at 3% (47
+  // names a night, n=7,647), 69.5% at 3.5% (44, n=7,279), 72.4% at 5% (29, n=4,880), 72.5% at 5.5%
+  // (22); avg R under the old plan flat at −0.08 throughout.
+  MIN_ADR_PCT: 3.5,
   ...PARABOLIC,
   ADR_WINDOW: 20,
   SMA_FAST: 10,

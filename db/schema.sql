@@ -220,14 +220,16 @@ CREATE TABLE IF NOT EXISTS research_outcomes (
 );
 -- 1.5.9: the plan the Auto book trades (k_*: next open after the first close above the box,
 -- stop at that day's low) and the resting buy-stop (bs_*: stop one ADR under the fill),
--- both with Kullamägi's exits; k_stop_adr = the next-open stop's width in ADR units.
+-- both with Kullamägi's exits. k_stop_adr = the next-open stop's width in ADR units.
+-- (No semicolons in comments: scripts/migrate.ts splits this file on them.)
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS k_entry_day smallint;
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS k_stop_adr double precision;
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS k_r double precision;
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS bs_entry_day smallint;
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS bs_stop_adr double precision;
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS bs_r double precision;
-ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS plan_v smallint; -- research/outcomes.py PLAN_VERSION; null = not yet labelled with the plans
+-- plan_v: research/outcomes.py PLAN_VERSION. Null = not yet labelled with the plans.
+ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS plan_v smallint;
 
 CREATE TABLE IF NOT EXISTS research_sweep (
   param text NOT NULL,

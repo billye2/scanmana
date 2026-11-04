@@ -112,7 +112,7 @@ export default function DeckLiveList({ candidates, saved, plan }: { candidates: 
             <span className="shrink-0 text-sm tabular-nums text-neutral-300">{price(c.price)}</span>
           )}
           {r && live ? (
-            <LiveChip status={r.status} muted={!live.live} className="w-[4.5rem] shrink-0 justify-center" />
+            <LiveChip status={r.status} muted={!live.live} className="shrink-0 whitespace-nowrap" />
           ) : (
             <span className={`w-12 shrink-0 rounded-full py-0.5 text-center text-[11px] font-semibold ${verdictChip(c.verdict)}`}>
               {verdictLabel(c.verdict) ?? "—"}

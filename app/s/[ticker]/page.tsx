@@ -3,7 +3,7 @@ import TopNav from "@/components/TopNav";
 import Link from "next/link";
 import type { ChartLine, ChartMarker } from "@/components/Chart";
 import Deck from "@/components/Deck";
-import { openPositionsFor } from "@/lib/paper-db";
+import { manualTakenTickers, openPositionsFor } from "@/lib/paper-db";
 import { positionLines } from "@/lib/plan-line";
 import { getSql } from "@/lib/db";
 import { latestScanSlim, loadBars } from "@/lib/scan";
@@ -39,6 +39,7 @@ export default async function SymbolPage({
   const chartLines: ChartLine[] = [];
   const chartMarkers: ChartMarker[] = [];
   const positionNotes: string[] = [];
+  let takenTickers: string[] = [];
 
   try {
     const sql = getSql();
@@ -66,11 +67,14 @@ export default async function SymbolPage({
       b = bars.get(ticker) ?? [];
     }
     const { userId } = await auth();
+    if (userId) takenTickers = await manualTakenTickers(userId).catch(() => []);
     if (userId && b.length > 0) {
+      // A name held in both books at the same numbers would label every line twice: one line per level.
+      const seen = new Set<string>();
       for (const p of await openPositionsFor(userId, ticker).catch(() => [])) {
         const d = positionLines(p, b);
-        chartLines.push(...d.lines);
-        chartMarkers.push(...d.markers);
+        for (const l of d.lines) if (!seen.has(`${l.title}@${l.price}`)) { seen.add(`${l.title}@${l.price}`); chartLines.push(l); }
+        for (const m of d.markers) if (!seen.has(`m@${m.date}`)) { seen.add(`m@${m.date}`); chartMarkers.push(m); }
         positionNotes.push(d.note);
       }
     }
@@ -124,6 +128,7 @@ export default async function SymbolPage({
           candidates={[candidate]}
           alerts={[]}
           savedTickers={savedTickers}
+          takenTickers={takenTickers}
           date={scanDate}
           analysisOverride={freshAnalysis ?? undefined}
           autoBook={inDeck}

@@ -296,8 +296,17 @@ export default function Deck({
 
       <div className="flex items-start justify-between">
         <div className="min-w-0">
-          <div className="flex items-baseline gap-2 overflow-hidden">
+          <div className="flex items-center gap-2 overflow-hidden">
             <h2 className="text-2xl font-bold tracking-tight">{c.ticker}</h2>
+            {/* The card's watch toggle, beside the ticker since 1.6.9 (it left the bottom bar at Billy's request). */}
+            <button
+              onClick={toggleWatch}
+              aria-pressed={isSaved}
+              aria-label={isSaved ? "Watching — tap to remove from the watchlist" : "Watch — add to the watchlist"}
+              className={`flex shrink-0 p-1 active:opacity-70 ${isSaved ? "text-amber-400" : "text-neutral-500"}`}
+            >
+              <StarIcon size={20} fill={isSaved ? "currentColor" : "none"} />
+            </button>
             <span className="truncate text-xs text-neutral-500">{c.name}</span>
           </div>
           <div className="mt-1 flex items-center gap-1.5">
@@ -484,9 +493,9 @@ export default function Deck({
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).
           Same line icons as the top nav, icon-only in equal columns, because the old text
           buttons (‹ › ☆ ★ ↗) rendered in mismatched fallback fonts on iPhone. Since 1.6.8 the
-          section links between the watch star and the counter are the reader's first picks
-          (`barLinks`, from the same cookie as the top bar); without them (the symbol page) it
-          is paper, plus the deck list when live. The Google button left 2026-10-26 (1.4.0,
+          section links between prev and the counter are the reader's first picks (`barLinks`,
+          from the same cookie as the top bar); without them (the symbol page) it is paper,
+          plus the deck list when live. The watch star moved up beside the ticker in 1.6.9. The Google button left 2026-10-26 (1.4.0,
           rarely tapped; the chip beside Analysis and the space key remain) and its column
           shows the card counter instead; tapping the counter pages forward, which made ›
           redundant (gone in 1.4.5; the keyboard's → / j still work). */}
@@ -494,17 +503,9 @@ export default function Deck({
         aria-label="Deck navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
       >
-        <div className="mx-auto grid w-full max-w-xl" style={{ gridTemplateColumns: `repeat(${3 + bar.length}, minmax(0, 1fr))` }}>
+        <div className="mx-auto grid w-full max-w-xl" style={{ gridTemplateColumns: `repeat(${2 + bar.length}, minmax(0, 1fr))` }}>
           <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
             <ChevronLeftIcon size={25} />
-          </button>
-          <button
-            onClick={toggleWatch}
-            aria-pressed={isSaved}
-            aria-label={isSaved ? "Watching — tap to remove from the watchlist" : "Watch — add to the watchlist"}
-            className={`${BAR_ITEM} ${isSaved ? "text-amber-400" : ""}`}
-          >
-            <StarIcon size={25} fill={isSaved ? "currentColor" : "none"} />
           </button>
           {bar.map((s) => {
             const Icon = NAV_ICONS[s.key];

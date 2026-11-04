@@ -20,7 +20,7 @@ export default async function SectionsPage() {
       <p className="text-[13px] leading-relaxed text-neutral-300">
         Every section, ranked by how often Kullamägi&apos;s routine has you open it. Tick the {MAX_NAV} the top bar should carry — the bar
         draws them in this order, so the first thing you need each evening is the first icon — and tap a row to open it. The gear is always
-        there, so nothing you untick is ever more than two taps away. Saved on this device; the home deck&apos;s bottom bar carries your first three picks too.
+        there, so nothing you untick is ever more than two taps away. Saved on this device; the home deck&apos;s bottom bar carries your first four picks too.
         Terms in <Link href="/help#sections" className="text-neutral-100 underline underline-offset-4">Help</Link>.
       </p>
       <div className="mt-4">

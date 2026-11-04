@@ -451,8 +451,8 @@ export default async function Help() {
         Tick up to six and the bar carries them in that order, first thing needed first; once six are ticked the rest grey out until one is
         unticked. Each row also opens its section, so whatever you leave off the bar stays two taps away. The choice is kept on this device
         for a year (a cookie), so the phone and the desktop can carry different bars. The suggested six are the deck list, paper, best setups,
-        research, watchlist and lookup. The home deck&apos;s bottom bar follows: previous card · the card&apos;s watch star · your first three
-        picks (the watchlist pick is skipped there, since the star beside it already is the watchlist) · the card counter.
+        research, watchlist and lookup. The home deck&apos;s bottom bar follows: previous card · your first four picks · the card counter. The card&apos;s
+        watch star sits beside the ticker.
       </p>
 
       <H>

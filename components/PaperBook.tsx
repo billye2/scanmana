@@ -30,7 +30,8 @@ async function post(path: string, body: unknown, method = "POST"): Promise<strin
 
 export default function PaperBook({ book, replay = [], tape = null, brief = null }: { book: Book; replay?: ReplayRow[]; tape?: Tape | null; brief?: MorningBrief | null }) {
   const router = useRouter();
-  const [track, setTrack] = useState<Track>("manual");
+  // Auto opens first since 1.7.1 (Billy: "i rarely look over the manual trades").
+  const [track, setTrack] = useState<Track>("auto");
   const [orderMsg, setOrderMsg] = useState<string | null>(null);
   const t = book[track];
 
@@ -44,7 +45,7 @@ export default function PaperBook({ book, replay = [], tape = null, brief = null
     <div className="flex flex-col gap-5">
       {brief && <MorningLine brief={brief} />}
       <div className="flex items-center gap-2">
-        {(["manual", "auto"] as Track[]).map((k) => (
+        {(["auto", "manual"] as Track[]).map((k) => (
           <button
             key={k}
             onClick={() => setTrack(k)}

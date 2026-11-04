@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
+import { cookies } from "next/headers";
 import Link from "next/link";
+import { NAV_COOKIE, bottomBarLinks, parseNav } from "@/lib/nav";
 import Deck from "@/components/Deck";
 import MarketBar from "@/components/MarketBar";
 import PushSetup from "@/components/PushSetup";
@@ -68,6 +70,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ i
             live
             initialIndex={initialIndex}
             tape={tapeMultiplier(payload.market ? payload.market.verdict === "bullish" : null, breadth?.today.pctAbove20 ?? null)}
+            barLinks={bottomBarLinks(parseNav((await cookies()).get(NAV_COOKIE)?.value))}
           />
         </>
       )}

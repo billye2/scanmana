@@ -9,7 +9,9 @@ import ScreenFit from "@/components/ScreenFit";
 import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
-import { BellIcon, BriefcaseIcon, ChevronLeftIcon, ListIcon, StarIcon } from "@/components/Icons";
+import { BellIcon, ChevronLeftIcon, StarIcon } from "@/components/Icons";
+import { NAV_ICONS } from "@/components/NavIcons";
+import { NAV_SECTIONS, type NavSection } from "@/lib/nav";
 import { money, pct, price } from "@/lib/format";
 import { autoPlan, takeLadder, takeRisk, type PlanTone } from "@/lib/plan-line";
 import type { LiveDeckBundle } from "@/lib/livewatch";
@@ -54,8 +56,11 @@ export default function Deck({
   autoBook = true,
   chartLines,
   chartMarkers,
+  barLinks,
 }: {
   candidates: DeckCard[];
+  /** Home deck: the bottom bar's section links, the reader's first picks (`bottomBarLinks` in lib/nav.ts). Absent → paper (+ deck list when live). */
+  barLinks?: NavSection[];
   alerts: WatchlistAlert[];
   savedTickers: string[];
   /** Tickers with a live manual paper order or open manual position (the Take control shows "Taken"). */
@@ -161,6 +166,8 @@ export default function Deck({
 
   const c = candidates[idx];
   const isSaved = saved.has(c.ticker);
+  // The bottom bar's section links: the reader's picks on the home deck, the old pair elsewhere.
+  const bar = barLinks ?? NAV_SECTIONS.filter((s) => s.key === "paper" || (live && s.key === "deck")).sort((a, b) => (a.key === "paper" ? -1 : b.key === "paper" ? 1 : 0));
   const liveRow = liveDeck?.rows.find((r) => r.ticker === c.ticker) ?? null;
   const bars = barsByTicker[c.ticker] ?? null;
   // Pure + cheap on the card's bars; deck names pass every screen rule
@@ -475,17 +482,19 @@ export default function Deck({
       {takeError && <p className="mt-1 text-xs text-red-300">{takeError}</p>}
 
       {/* Permanent bottom nav bar (fixed; pages pad their bottom so nothing hides under it).
-          Same line icons as the top nav in the top nav's order (paper before deck), icon-only
-          in equal columns, because the old text buttons (‹ › ☆ ★ ↗) rendered in mismatched
-          fallback fonts on iPhone. The Google button left 2026-10-26 (1.4.0, rarely tapped;
-          the chip beside Analysis and the space key remain) and its column shows the card
-          counter instead; tapping the counter pages forward, which made › redundant (gone
-          in 1.4.5; the keyboard's → / j still work). */}
+          Same line icons as the top nav, icon-only in equal columns, because the old text
+          buttons (‹ › ☆ ★ ↗) rendered in mismatched fallback fonts on iPhone. Since 1.6.8 the
+          section links between the watch star and the counter are the reader's first picks
+          (`barLinks`, from the same cookie as the top bar); without them (the symbol page) it
+          is paper, plus the deck list when live. The Google button left 2026-10-26 (1.4.0,
+          rarely tapped; the chip beside Analysis and the space key remain) and its column
+          shows the card counter instead; tapping the counter pages forward, which made ›
+          redundant (gone in 1.4.5; the keyboard's → / j still work). */}
       <nav
         aria-label="Deck navigation"
         className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
       >
-        <div className={`mx-auto grid w-full max-w-xl ${live ? "grid-cols-5" : "grid-cols-4"}`}>
+        <div className="mx-auto grid w-full max-w-xl" style={{ gridTemplateColumns: `repeat(${3 + bar.length}, minmax(0, 1fr))` }}>
           <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
             <ChevronLeftIcon size={25} />
           </button>
@@ -497,14 +506,14 @@ export default function Deck({
           >
             <StarIcon size={25} fill={isSaved ? "currentColor" : "none"} />
           </button>
-          <Link href="/paper" className={BAR_ITEM} aria-label="Paper trading book">
-            <BriefcaseIcon size={25} />
-          </Link>
-          {live && (
-            <Link href="/deck" className={BAR_ITEM} aria-label="Tonight's deck — the whole list, grouped live">
-              <ListIcon size={25} />
-            </Link>
-          )}
+          {bar.map((s) => {
+            const Icon = NAV_ICONS[s.key];
+            return (
+              <Link key={s.key} href={s.href} className={BAR_ITEM} aria-label={s.label}>
+                <Icon size={25} />
+              </Link>
+            );
+          })}
           {/* Bordered pill, inset from the column: the border shows where the tap lands, and
               the inset keeps "of N" clear of the iPhone's right screen edge, where iOS holds
               touches to test for a forward swipe (1.4.9, mistakes.md 2026-10-27). */}

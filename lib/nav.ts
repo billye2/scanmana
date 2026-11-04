@@ -115,3 +115,15 @@ export function navCookieValue(keys: readonly string[]): string {
 export function navSections(keys: readonly NavKey[]): NavSection[] {
   return keys.map((k) => NAV_SECTIONS.find((s) => s.key === k)!).filter(Boolean);
 }
+
+/** The home deck's bottom bar carries this many section links between the watch toggle and the counter. */
+export const BOTTOM_BAR_LINKS = 3;
+
+/**
+ * The home deck's bottom bar follows the top bar (1.6.8): the first picks, in
+ * order, skipping the watchlist — the star in that bar is the card's own watch
+ * toggle, and a second star beside it would read as the same thing. Pure.
+ */
+export function bottomBarLinks(keys: readonly NavKey[]): NavSection[] {
+  return navSections(keys.filter((k) => k !== "watchlist")).slice(0, BOTTOM_BAR_LINKS);
+}

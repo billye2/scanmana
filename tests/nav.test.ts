@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_NAV, MAX_NAV, NAV_SECTIONS, navCookieValue, navSections, parseNav } from "../lib/nav";
+import { DEFAULT_NAV, MAX_NAV, NAV_SECTIONS, bottomBarLinks, navCookieValue, navSections, parseNav } from "../lib/nav";
+
+describe("bottomBarLinks — the home deck's bottom bar follows the picks", () => {
+  it("takes the first three picks, skipping the watchlist (the bar's star is the card's watch toggle)", () => {
+    expect(bottomBarLinks(DEFAULT_NAV).map((s) => s.key)).toEqual(["deck", "paper", "gallery"]);
+    expect(bottomBarLinks(["watchlist", "help", "sim"]).map((s) => s.key)).toEqual(["help", "sim"]);
+    expect(bottomBarLinks([])).toEqual([]);
+  });
+});
 
 describe("parseNav — the bar's picks from the cookie", () => {
   it("falls back to the default six when nothing is stored", () => {

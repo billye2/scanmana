@@ -266,8 +266,12 @@ export default async function Help() {
           <span className="text-neutral-100">Themes, scored</span> (Research, since 1.7.4): membership has been saved every night since
           2026-09-21, so every deck row since then is scored by the theme it sat in that night — first by how many other deck names
           shared the theme (none · alone · 2–3 · 4+; his claim is that leaders move in groups, so the 4+ row should break out most
-          often), then per theme by its key. A key is the three leaders sorted, so when a leader changes the theme continues under a
-          new key; the nights column says how long a key held. Grey under 30 rows.
+          often), then one row per theme. Since 1.7.8 a theme has a stable id: each night&apos;s groups are matched to the themes of the
+          ten nights before by how many members they share (half or more keeps the id — a split keeps it on the larger half, a
+          merge takes the theme it overlaps most, and a theme unseen for ten nights ends), so a change of leaders no longer breaks a
+          theme into several rows. The row shows the nights the theme has been seen, its first and last night, and a small line of its
+          rank among the night&apos;s groups over that life (top of the box is strongest). A name you give a theme follows the id. Grey
+          under 30 rows.
         </span>
       </Term>
       <Term name="Breadth">

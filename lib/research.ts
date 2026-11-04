@@ -207,6 +207,8 @@ export async function getSweep(): Promise<SweepPoint[]> {
 export interface Cluster {
   clusterId: number;
   clusterKey: string;
+  /** Stable theme id (1.7.8); null until the clusters job has chained tonight. */
+  themeId: number | null;
   alias: string | null;
   leaders: string[];
   members: string[];
@@ -218,14 +220,18 @@ export interface Cluster {
 /** Every cluster, with the deck names it contains; strongest first. */
 export async function getClusters(deckTickers: string[]): Promise<Cluster[]> {
   try {
+    // The alias by theme id wins (it survives a change of leaders); the key-only alias is the pre-1.7.8 fallback.
     const rows = (await getSql()`
-      SELECT c.cluster_id, c.cluster_key, a.alias, c.leaders, c.members, c.member_count, c.ret_63d, c.as_of::text AS as_of
+      SELECT c.cluster_id, c.cluster_key, c.theme_id,
+             COALESCE((SELECT alias FROM research_cluster_alias t WHERE t.theme_id = c.theme_id ORDER BY t.updated_at DESC LIMIT 1), a.alias) AS alias,
+             c.leaders, c.members, c.member_count, c.ret_63d, c.as_of::text AS as_of
       FROM research_clusters c LEFT JOIN research_cluster_alias a USING (cluster_key) ORDER BY c.cluster_id
-    `) as { cluster_id: number; cluster_key: string; alias: string | null; leaders: string[]; members: string[]; member_count: number; ret_63d: number; as_of: string }[];
+    `) as { cluster_id: number; cluster_key: string; theme_id: number | null; alias: string | null; leaders: string[]; members: string[]; member_count: number; ret_63d: number; as_of: string }[];
     const deck = new Set(deckTickers);
     return rows.map((r) => ({
       clusterId: r.cluster_id,
       clusterKey: r.cluster_key,
+      themeId: r.theme_id === null ? null : Number(r.theme_id),
       alias: r.alias,
       leaders: r.leaders,
       members: r.members,
@@ -239,15 +245,16 @@ export async function getClusters(deckTickers: string[]): Promise<Cluster[]> {
   }
 }
 
-export async function setClusterAlias(clusterKey: string, alias: string): Promise<void> {
+/** Name a theme. The row is keyed by tonight's cluster key and carries the theme id (1.7.8), so readers find it by either. */
+export async function setClusterAlias(clusterKey: string, alias: string, themeId: number | null = null): Promise<void> {
   const sql = getSql();
   if (alias.trim() === "") {
-    await sql`DELETE FROM research_cluster_alias WHERE cluster_key = ${clusterKey}`;
+    await sql`DELETE FROM research_cluster_alias WHERE cluster_key = ${clusterKey} OR (${themeId}::int IS NOT NULL AND theme_id = ${themeId})`;
     return;
   }
   await sql`
-    INSERT INTO research_cluster_alias (cluster_key, alias) VALUES (${clusterKey}, ${alias.trim().slice(0, 40)})
-    ON CONFLICT (cluster_key) DO UPDATE SET alias = EXCLUDED.alias, updated_at = now()
+    INSERT INTO research_cluster_alias (cluster_key, alias, theme_id) VALUES (${clusterKey}, ${alias.trim().slice(0, 40)}, ${themeId})
+    ON CONFLICT (cluster_key) DO UPDATE SET alias = EXCLUDED.alias, theme_id = COALESCE(EXCLUDED.theme_id, research_cluster_alias.theme_id), updated_at = now()
   `;
 }
 
@@ -326,10 +333,16 @@ export interface ThemeBucket {
   kN: number;
 }
 export interface ThemeRow {
+  /** Stable theme id (1.7.8); the row is one theme across every key it held. */
+  themeId: number;
+  /** The theme's latest key (its leaders on the last night it was seen). */
   clusterKey: string;
   alias: string | null;
   leaders: string[];
+  /** Nights the theme was seen, first to last. */
   nights: number;
+  /** The theme's nightly rank as a share of the night's clusters (1 = strongest), oldest first. */
+  strength: number[];
   n: number;
   hitRate: number | null;
   avgKR: number | null;
@@ -337,7 +350,7 @@ export interface ThemeRow {
   kN: number;
   first: string;
   last: string;
-  /** The key is one of tonight's clusters (leaders unchanged since). */
+  /** The theme is on tonight's snapshot. */
   current: boolean;
 }
 export interface ThemeStudy {
@@ -362,9 +375,9 @@ const MATES_LABEL: Record<ThemeBucket["key"], string> = {
  * Themes, scored (1.7.4): every deck row since membership began saving nightly
  * (research_cluster_history, 2026-09-21), joined to the theme it sat in that
  * night. Two reads — by how many other deck names shared the theme (his
- * "leaders move in groups"), and per theme by its key (the sorted leaders; the
- * key changes when a leader changes, so a theme can appear under several keys,
- * which the "nights" column makes visible). Empty on any error.
+ * "leaders move in groups"), and per theme by its stable id (1.7.8: one row
+ * per theme across every key it held, with its lifespan and nightly rank;
+ * rows the job has not chained yet fall back to their key). Empty on any error.
  */
 export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
   const empty: ThemeStudy = { since: null, nights: 0, deckRows: 0, inTheme: 0, byMates: [], themes: [] };
@@ -389,20 +402,32 @@ export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
       GROUP BY 1
     `) as { key: ThemeBucket["key"]; rows: number; n: number; hit: number | null; avg_k_r: number | null; sd_k_r: number | null; k_n: number }[];
     const themes = (await sql`
-      SELECT ch.cluster_key, a.alias, count(DISTINCT h.date)::int AS nights, count(o.broke_10d)::int AS n,
-             avg(o.broke_10d::int) AS hit, avg(o.k_r) AS avg_k_r, stddev_samp(o.k_r) AS sd_k_r, count(o.k_r)::int AS k_n,
-             min(h.date)::text AS first, max(h.date)::text AS last,
-             EXISTS (SELECT 1 FROM research_clusters c WHERE c.cluster_key = ch.cluster_key) AS current
-      FROM scan_history h
-      JOIN research_cluster_history ch ON ch.as_of = h.date AND ch.ticker = h.ticker
-      LEFT JOIN research_outcomes o ON o.date = h.date AND o.ticker = h.ticker
-      LEFT JOIN research_cluster_alias a ON a.cluster_key = ch.cluster_key
-      WHERE h.rank IS NOT NULL
-      GROUP BY 1, 2
-      HAVING count(o.broke_10d) >= 8
+      WITH g AS (
+        SELECT COALESCE(ch.theme_id, -dense_rank() OVER (ORDER BY ch.cluster_key)::int) AS theme_id, ch.cluster_key, h.date, o.broke_10d, o.k_r
+        FROM scan_history h
+        JOIN research_cluster_history ch ON ch.as_of = h.date AND ch.ticker = h.ticker
+        LEFT JOIN research_outcomes o ON o.date = h.date AND o.ticker = h.ticker
+        WHERE h.rank IS NOT NULL
+      ),
+      d AS (SELECT DISTINCT theme_id, as_of, cluster_id FROM research_cluster_history WHERE theme_id IS NOT NULL),
+      rank AS (SELECT theme_id, as_of, (cluster_id - 1)::float / greatest(1, count(*) OVER (PARTITION BY as_of) - 1) AS pos FROM d),
+      s AS (SELECT theme_id, array_agg(pos ORDER BY as_of) AS strength FROM rank GROUP BY 1)
+      SELECT g.theme_id, COALESCE(t.current_key, max(g.cluster_key)) AS cluster_key,
+             COALESCE((SELECT alias FROM research_cluster_alias x WHERE x.theme_id = g.theme_id ORDER BY x.updated_at DESC LIMIT 1),
+                      (SELECT alias FROM research_cluster_alias x WHERE x.cluster_key = COALESCE(t.current_key, max(g.cluster_key)))) AS alias,
+             COALESCE(t.nights, count(DISTINCT g.date))::int AS nights, count(g.broke_10d)::int AS n,
+             avg(g.broke_10d::int) AS hit, avg(g.k_r) AS avg_k_r, stddev_samp(g.k_r) AS sd_k_r, count(g.k_r)::int AS k_n,
+             COALESCE(t.first_night, min(g.date))::text AS first, COALESCE(t.last_night, max(g.date))::text AS last,
+             EXISTS (SELECT 1 FROM research_clusters c WHERE c.theme_id = g.theme_id OR (g.theme_id < 0 AND c.cluster_key = max(g.cluster_key))) AS current,
+             COALESCE(s.strength, '{}') AS strength
+      FROM g
+      LEFT JOIN research_themes t ON t.theme_id = g.theme_id
+      LEFT JOIN s ON s.theme_id = g.theme_id
+      GROUP BY g.theme_id, t.theme_id, t.current_key, t.nights, t.first_night, t.last_night, s.strength
+      HAVING count(g.broke_10d) >= 8
       ORDER BY n DESC, nights DESC
       LIMIT ${limit}
-    `) as { cluster_key: string; alias: string | null; nights: number; n: number; hit: number | null; avg_k_r: number | null; sd_k_r: number | null; k_n: number; first: string; last: string; current: boolean }[];
+    `) as { theme_id: number; cluster_key: string; alias: string | null; nights: number; n: number; hit: number | null; avg_k_r: number | null; sd_k_r: number | null; k_n: number; first: string; last: string; current: boolean; strength: number[] }[];
     const by = new Map(mates.map((r) => [r.key, r]));
     const num = (x: number | null) => (x === null ? null : Number(x));
     return {
@@ -415,7 +440,8 @@ export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
         return { key, label: MATES_LABEL[key], n: r?.n ?? 0, hitRate: num(r?.hit ?? null), avgKR: num(r?.avg_k_r ?? null), sdKR: num(r?.sd_k_r ?? null), kN: r?.k_n ?? 0 };
       }),
       themes: themes.map((r) => ({
-        clusterKey: r.cluster_key, alias: r.alias, leaders: r.cluster_key.split("|"), nights: r.nights, n: r.n,
+        themeId: Number(r.theme_id), clusterKey: r.cluster_key, alias: r.alias, leaders: r.cluster_key.split("|"), nights: Number(r.nights), n: r.n,
+        strength: (r.strength ?? []).map(Number),
         hitRate: num(r.hit), avgKR: num(r.avg_k_r), sdKR: num(r.sd_k_r), kN: r.k_n, first: r.first, last: r.last, current: r.current,
       })),
     };
@@ -833,6 +859,7 @@ export interface LikeThis {
 }
 export interface CardTheme {
   clusterKey: string;
+  themeId: number | null;
   name: string; // alias, else the leaders joined
   memberCount: number;
   ret63d: number;
@@ -865,7 +892,7 @@ export async function deckResearch(cards: { ticker: string; boxed: boolean; ep: 
       out[card.ticker] = {
         likeThis: l && l.hit !== null && l.n >= 20 ? { hitRate: Number(l.hit), n: l.n, boxed: card.boxed, ep: card.ep, verdict: card.verdict } : null,
         theme: cl
-          ? { clusterKey: cl.clusterKey, name: cl.alias ?? cl.leaders.join(" · "), memberCount: cl.memberCount, ret63d: cl.ret63d, deckMates: cl.inDeck.filter((t) => t !== card.ticker) }
+          ? { clusterKey: cl.clusterKey, themeId: cl.themeId, name: cl.alias ?? cl.leaders.join(" · "), memberCount: cl.memberCount, ret63d: cl.ret63d, deckMates: cl.inDeck.filter((t) => t !== card.ticker) }
           : null,
       };
     }

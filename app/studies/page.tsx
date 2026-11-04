@@ -3,6 +3,7 @@ import { BreadthLine, BucketBars, RateBars, SweepPanel } from "@/components/Rese
 import { ClusterAlias } from "@/components/ResearchControls";
 import Band from "@/components/Band";
 import PathChart from "@/components/PathChart";
+import ThemeSpark from "@/components/ThemeSpark";
 import { Card, H, NUM, SUMMARY, TD, TH, n, pc, rr } from "@/components/ResearchPrimitives";
 import { meanInterval, wilson } from "@/lib/stats";
 import { pathSentence, pathSummary } from "@/lib/paths-read";
@@ -326,7 +327,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
                   <Link key={m} href={`/s/${m}`} className="rounded bg-neutral-800 px-1.5 py-px font-mono text-[10px] text-neutral-500">{m}</Link>
                 ))}
                 {c.memberCount > c.inDeck.length + 8 && <span className="px-1 text-[10px] text-neutral-600">+{c.memberCount - c.inDeck.length - 8}</span>}
-                <ClusterAlias clusterKey={c.clusterKey} alias={c.alias} />
+                <ClusterAlias clusterKey={c.clusterKey} themeId={c.themeId} alias={c.alias} />
               </div>
             </div>
           ))}
@@ -338,7 +339,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         id="themes-scored"
         sub={
           themeStudy.since
-            ? `Every deck row since membership began saving nightly (${themeStudy.since}, ${themeStudy.nights} nights; ${n(themeStudy.inTheme)} of ${n(themeStudy.deckRows)} deck rows sat in a theme), scored by the theme it sat in that night. Left: by how many other deck names shared the theme — Kullamägi's claim is that leaders move in groups, so the 4+ row should break out most often. Right: per theme by its key (the sorted leaders; a theme continues under a new key when a leader changes, and "nights" says how long a key held).`
+            ? `Every deck row since membership began saving nightly (${themeStudy.since}, ${themeStudy.nights} nights; ${n(themeStudy.inTheme)} of ${n(themeStudy.deckRows)} deck rows sat in a theme), scored by the theme it sat in that night. Left: by how many other deck names shared the theme — Kullamägi's claim is that leaders move in groups, so the 4+ row should break out most often. Right: one row per theme (since 1.7.8 a theme keeps its id from night to night while its members overlap by half or more, so a change of leaders no longer splits its rows), with the nights it has been seen, its first and last night, and its rank among the night's clusters over that life — top of the box is strongest.`
             : "The clusters job has not saved a night of membership yet."
         }
       >
@@ -371,16 +372,16 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
           <Card className="overflow-x-auto p-0">
             <table className="w-full">
               <thead>
-                <tr><th className={TH}>Theme</th><th className={`${TH} text-right`}>Nights</th><th className={`${TH} text-right`}>Rows</th><th className={`${TH} text-right`}>Broke out</th><th className={`${TH} text-right`}>Auto plan</th></tr>
+                <tr><th className={TH}>Theme</th><th className={`${TH} text-right`}>Nights</th><th className={TH}>Rank</th><th className={`${TH} text-right`}>Rows</th><th className={`${TH} text-right`}>Broke out</th><th className={`${TH} text-right`}>Auto plan</th></tr>
               </thead>
               <tbody>
                 {themeStudy.themes.length === 0 && (
-                  <tr><td colSpan={5} className={`${TD} text-neutral-500`}>No theme has eight scored deck rows yet.</td></tr>
+                  <tr><td colSpan={6} className={`${TD} text-neutral-500`}>No theme has eight scored deck rows yet.</td></tr>
                 )}
                 {themeStudy.themes.map((t) => {
                   const grey = t.n < MIN_AFTER_N;
                   return (
-                    <tr key={t.clusterKey} className="border-t border-neutral-800">
+                    <tr key={t.themeId} className="border-t border-neutral-800">
                       <td className={`${TD} whitespace-normal`}>
                         {t.alias && <span className="mr-1.5 font-semibold text-neutral-100">{t.alias}</span>}
                         <span className="inline-flex flex-wrap gap-1">
@@ -392,6 +393,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
                         <span className="ml-1.5 text-[10px] text-neutral-600">{t.first.slice(5)} → {t.last.slice(5)}</span>
                       </td>
                       <td className={NUM}>{t.nights}</td>
+                      <td className={TD}><ThemeSpark strength={t.strength} nights={t.nights} /></td>
                       <td className={NUM}>{t.n}</td>
                       <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}><Band text={pc(t.hitRate)} value={t.hitRate} interval={wilson(t.hitRate, t.n)} kind="rate" tone="" /></td>
                       <td className={`${NUM} ${t.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>

@@ -1,6 +1,6 @@
 # Python studies — five releases plus the page they live on
 
-**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migrated 2026-11-03) · **R3 next** · R4 · R5. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
+**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migrated 2026-11-03) · R3 ✅ 1.7.8 (migration pending: `npm run migrate`) · **R4 next** · R5. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
 
 **Approved by Billy in the Lavish explainer `.lavish/python-heavy-lifting.html` (git-ignored).** His picks, in build order: confidence bands → follow-through paths → stable theme ids → exit sweep → drawdown fan. Not picked: relative-strength deciles (and the deck keeps tightest-first regardless). Answers to the three questions: (1) **the exit routine may change** — if the paths and the exit sweep are clear at 30+ rows with ranges apart, change it as a scored `RULE_CHANGES` row; (2) **the research page keeps to the read, the scorecard and the rule changes; the studies live on `/studies`** in the gear's list; (3) relative strength is study only, not picked.
 
@@ -24,7 +24,9 @@ Reader `getPaths()` in `lib/research.ts` → per day 1..20: mean and median gain
 
 Card on `/studies` under the plan card: `components/PathChart.tsx` (server SVG like `TapeCharts`): mean gain line per split with the day-4 and 10-day markers (`CONFIG.PAPER.KULLAMAGI.PARTIAL_DAY`, `MA`), the mean-low line dashed below; splits as tabs via `?split=`. A fixed-template sentence from pure `lib/paths-read.ts` (tested): the day the mean gain peaks, gain at day 4 vs day 10 vs day 20, the day the mean low bottoms. Help term. Decides, with R4, whether the routine changes.
 
-## R3 — stable theme ids
+## R3 — stable theme ids ✅ 1.7.8
+
+Built as below, plus `theme_id` on `research_clusters` so the deck reads the alias by id. The strength line is the theme's nightly rank among that night's clusters (the history stores rank, not return). Back-fill of the saved history runs inside the nightly job's budget, oldest night first.
 
 **Migration first:** `theme_id` on `research_cluster_history`, new `research_themes`, `theme_id` on `research_cluster_alias`.
 

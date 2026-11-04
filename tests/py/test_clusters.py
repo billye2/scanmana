@@ -4,7 +4,7 @@ import pandas as pd
 
 from datetime import date
 
-from research.clusters import cluster_returns, history_rows, residual_returns
+from research.clusters import THEME_GAP_NIGHTS, chain_clusters, cluster_returns, history_rows, jaccard, live_themes, residual_returns
 
 
 def _prices_from_log_returns(log_returns: np.ndarray, start: float = 100.0) -> np.ndarray:
@@ -128,3 +128,61 @@ def test_history_rows_one_per_member_with_nightly_id_and_stable_key():
         (date(2026, 9, 21), "Y", "X|Y", 2),
     ]
     assert history_rows([], date(2026, 9, 21)) == []
+
+
+# ---------- stable theme ids (1.7.8, R3 of the Python-studies plan) ----------
+
+
+def _night(prev: dict[int, set[str]], clusters: list[set[str]], next_id: int) -> tuple[list[int], dict[int, set[str]], int]:
+    """One chained night as the job runs it: ids, the carried membership, the next free id."""
+    ids = chain_clusters(prev, clusters, next_id)
+    carried = dict(prev)
+    for tid, members in zip(ids, clusters):
+        carried[tid] = members
+    return ids, carried, max([next_id, *[i + 1 for i in ids]])
+
+
+def test_jaccard():
+    assert jaccard({"a", "b"}, {"b", "c"}) == 1 / 3
+    assert jaccard(set(), set()) == 0.0
+    assert jaccard({"a"}, {"a"}) == 1.0
+
+
+def test_chain_keeps_the_id_through_a_split_a_merge_and_a_gap():
+    a = {f"a{i}" for i in range(6)}
+    b = {f"b{i}" for i in range(5)}
+    # Night 1: two themes are born.
+    ids1, prev, nxt = _night({}, [a, b], 1)
+    assert ids1 == [1, 2] and nxt == 3
+    # Night 2: A splits — the larger half keeps id 1, the rest is a new theme 3; B is not seen.
+    a_big = {"a0", "a1", "a2", "a3", "x"}  # 4 of 7 with A = 0.57
+    a_small = {"a4", "a5", "y", "z", "w"}  # 2 of 9 with A = 0.22
+    ids2, prev, nxt = _night(prev, [a_small, a_big], nxt)
+    assert ids2 == [3, 1] and nxt == 4
+    # Night 3: the halves merge back — the result overlaps theme 1 more (5 of 8) than theme 3 (3 of 10), so it is theme 1.
+    merged = {"a0", "a1", "a2", "a3", "a4", "a5", "x", "y"}
+    ids3, prev, nxt = _night(prev, [merged], nxt)
+    assert ids3 == [1]
+    # Night 4: B returns after two nights away with one new name — still theme 2 while the gap is under the limit.
+    ids4, prev, nxt = _night(prev, [b | {"b9"}], nxt)
+    assert ids4 == [2] and nxt == 4
+    # A look-alike under the threshold is a new theme.
+    ids5, _, nxt = _night(prev, [{"a0", "a1", "q", "r", "s", "t", "u"}], nxt)
+    assert ids5 == [4]
+
+
+def test_chain_matches_each_side_once_and_breaks_ties_toward_the_older_theme():
+    prev = {1: {"a", "b", "c", "d"}, 2: {"a", "b", "c", "d"}}  # identical twins (cannot happen live, but pins the tie rule)
+    assert chain_clusters(prev, [{"a", "b", "c", "d"}], 3) == [1]
+    # Two clusters claim the same theme: the stronger overlap keeps it, the other starts fresh.
+    prev = {1: {"a", "b", "c", "d", "e", "f"}}
+    assert chain_clusters(prev, [{"a", "b", "c", "x"}, {"a", "b", "c", "d", "e", "y"}], 2) == [2, 1]
+    assert chain_clusters({}, [], 7) == []
+
+
+def test_live_themes_end_after_the_gap():
+    nights = [date(2026, 10, d) for d in range(1, 15)]
+    themes = {1: {"last_night": nights[0]}, 2: {"last_night": nights[5]}, 3: {"last_night": nights[13]}}
+    recent = nights[-THEME_GAP_NIGHTS:]
+    assert live_themes(themes, recent) == {2, 3}
+    assert live_themes(themes, []) == set()

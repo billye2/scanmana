@@ -292,6 +292,22 @@ CREATE TABLE IF NOT EXISTS research_cluster_alias (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- 1.7.8 (R3 of the Python-studies plan): stable theme ids. research/clusters.py chains each
+-- night's clusters to the themes of the ten nights before by member overlap and writes the id
+-- on the history, on tonight's snapshot and on research_themes (one row per theme). An alias
+-- attaches to the id as well as the key, so a name survives a change of leaders.
+ALTER TABLE research_cluster_history ADD COLUMN IF NOT EXISTS theme_id integer;
+ALTER TABLE research_clusters ADD COLUMN IF NOT EXISTS theme_id integer;
+ALTER TABLE research_cluster_alias ADD COLUMN IF NOT EXISTS theme_id integer;
+CREATE TABLE IF NOT EXISTS research_themes (
+  theme_id integer PRIMARY KEY,
+  first_night date NOT NULL,
+  last_night date NOT NULL,
+  current_key text NOT NULL,
+  nights integer NOT NULL
+);
+CREATE INDEX IF NOT EXISTS research_cluster_history_theme_idx ON research_cluster_history (theme_id, as_of);
+
 CREATE TABLE IF NOT EXISTS research_splits (
   ticker text NOT NULL,
   date date NOT NULL,

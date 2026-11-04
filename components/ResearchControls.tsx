@@ -47,14 +47,14 @@ export function ResearchRefresh() {
 }
 
 /** Inline rename for a theme cluster. Python groups; the name is yours. */
-export function ClusterAlias({ clusterKey, alias }: { clusterKey: string; alias: string | null }) {
+export function ClusterAlias({ clusterKey, themeId = null, alias }: { clusterKey: string; themeId?: number | null; alias: string | null }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(alias ?? "");
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
-    await fetch("/api/research/alias", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clusterKey, alias: value }) });
+    await fetch("/api/research/alias", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clusterKey, themeId, alias: value }) });
     setBusy(false);
     setEditing(false);
     router.refresh();

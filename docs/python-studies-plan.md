@@ -1,6 +1,6 @@
 # Python studies — five releases plus the page they live on
 
-**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migration pending: `npm run migrate`) · **R3 next** · R4 · R5. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
+**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migrated 2026-11-03) · **R3 next** · R4 · R5. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
 
 **Approved by Billy in the Lavish explainer `.lavish/python-heavy-lifting.html` (git-ignored).** His picks, in build order: confidence bands → follow-through paths → stable theme ids → exit sweep → drawdown fan. Not picked: relative-strength deciles (and the deck keeps tightest-first regardless). Answers to the three questions: (1) **the exit routine may change** — if the paths and the exit sweep are clear at 30+ rows with ranges apart, change it as a scored `RULE_CHANGES` row; (2) **the research page keeps to the read, the scorecard and the rule changes; the studies live on `/studies`** in the gear's list; (3) relative strength is study only, not picked.
 

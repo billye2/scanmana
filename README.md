@@ -108,7 +108,10 @@ overlays. A Python research layer scores the scanner's own history every night
   setup, which the momentum screen cannot show — traded at the next open with
   the stop at the gap day's low, split by how neglected the name was before the
   gap and by the volume multiple). The page reads top-down as one question — is the scanner
-  working, did the last rule change help: a **scorecard** (four numbers, all
+  working, did the last rule change help: **this week's read** (the verdict in words,
+  written by rules from the numbers below — `researchRead` in `lib/research-story.ts`:
+  nothing to change / the last change holds / revisit, then the deck's rate since the
+  change and the tape), a **scorecard** (four numbers, all
   history vs since the last change), the **rule changes** (`RULE_CHANGES` in
   `lib/research-story.ts`, one entry per shipped change with the number it is
   scored on, grey until 30 rows), then the rates, the sweep (headline knob

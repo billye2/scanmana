@@ -10,6 +10,10 @@ import {
   lensFromMetrics,
   lensFromTrades,
   metrics,
+  researchRead,
+  type ChangeScore,
+  type Metrics,
+  type ReadInput,
   researchHealth,
   scoreChange,
   scorecardSentence,
@@ -121,5 +125,47 @@ describe("research health line", () => {
   it("says when the latest scan has no research run yet", () => {
     expect(researchHealth([ok("outcomes", "2026-09-19"), ok("breadth", "2026-09-19")], "2026-09-21")).toMatch(/No research run yet for the 2026-09-21 scan/);
     expect(researchHealth([ok("outcomes", "2026-09-21"), ok("breadth", "2026-09-19")], "2026-09-21")).toBeNull(); // partly current: not stale
+  });
+});
+
+describe("researchRead — the page's verdict in words", () => {
+  const m = (over: Partial<Metrics> = {}): Metrics => ({
+    deckHit: 0.5, deckN: 200, waitHit: 0.6, waitN: 100, passHit: 0.4, passN: 100, gap: 0.2, waitAvgR: 0.1, waitRN: 80, bullishShare: 0.5, nights: 40, ...over,
+  });
+  const change = (over: Partial<ChangeScore> = {}): ChangeScore => ({
+    effective: "2026-10-27", version: "1.3.8", label: "Kullamägi exit", lens: "paper_avg_r",
+    before: { value: -0.27, n: 24 }, after: { value: 0.1, n: 5 }, ready: false, firstRead: "2026-11-10", ...over,
+  });
+  const base: ReadInput = {
+    all: m(), since: m({ deckHit: 0.54, deckN: 50 }), sinceDate: "2026-10-27", changes: [change()],
+    breadth: { today: 0.61, prev: 0.48 }, bullish: false, sizeLabel: "half",
+    ep: { label: "Neglected and 10×+ (his description)", n: 36, avgR: 0.37 }, jobs: { ok: 7, total: 7, at: "2026-11-03 04:00:55" },
+  };
+
+  it("says nothing to change while the latest change is short of a read, with the deck and the tape", () => {
+    const r = researchRead(base);
+    expect(r.headline).toBe("Nothing to change.");
+    expect(r.body).toBe(
+      "Kullamägi exit has 5 rows since 2026-10-27, under the 30 it needs for a read. The deck's breakout rate since 2026-10-27 is 54% on 50, against 50% over all history. Breadth is 61% (from 48% ten sessions ago) and the index filter is off: paper size half.",
+    );
+    expect(r.watch).toBe("Watch: Neglected and 10×+ (his description) is +0.37R on 36 results. Jobs 7 of 7 ok at 04:00:55.");
+  });
+
+  it("asks for a revisit when a scored change moved its lens the wrong way", () => {
+    const r = researchRead({ ...base, changes: [change({ ready: true, after: { value: -0.4, n: 31 } })] });
+    expect(r.headline).toBe("Revisit Kullamägi exit.");
+    expect(r.body.startsWith("Kullamägi exit: -0.40R after against -0.27R before, on 31 rows.")).toBe(true);
+  });
+
+  it("says the change holds when it moved its lens the right way", () => {
+    const r = researchRead({ ...base, changes: [change({ ready: true, after: { value: 0.1, n: 31 } })] });
+    expect(r.headline).toBe("The last change holds.");
+  });
+
+  it("copes with no breadth, no EP row, no jobs and nothing labelled", () => {
+    const r = researchRead({ ...base, all: m({ deckHit: null, deckN: 0 }), since: m({ deckHit: null }), breadth: { today: null, prev: null }, bullish: null, ep: null, jobs: { ok: 0, total: 0, at: null }, changes: [] });
+    expect(r.headline).toBe("Nothing to change.");
+    expect(r.body).toBe("No rule change is being scored. No deck rows are labelled yet. Breadth is not computed yet; paper size half.");
+    expect(r.watch).toBeNull();
   });
 });

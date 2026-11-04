@@ -170,6 +170,13 @@ export default async function Help() {
         Splits, the paper replay and the job log sit under <em>Maintenance</em> at the bottom. The deck, the market
         strip and the paper page each show one line from it.
       </Term>
+      <Term name="This week's read">
+        The page opens with its verdict, written by rules from the numbers below it, the way a card&apos;s analysis is. The headline follows
+        the rule-change table: <em>Nothing to change</em> while no change has its 30 rows yet, <em>The last change holds</em> when a scored
+        change moved its number the right way, <em>Revisit …</em> when one moved it the wrong way. Then the deck&apos;s breakout rate since the
+        last change against all history, and the tape: breadth now and ten sessions ago, the index filter, the paper size that follows. The
+        grey line names the episodic-pivot row worth watching and the job status. Nothing here is a model&apos;s opinion.
+      </Term>
       <Term name="Scorecard">
         Four numbers, each shown for all labelled history and again for everything since the last rule change took
         effect: the share of deck names that broke out within ten sessions, Wait minus Pass on that share, the average

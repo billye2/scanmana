@@ -212,3 +212,85 @@ export function researchHealth(runs: HealthRun[], latestScanDate: string | null)
   }
   return null;
 }
+
+/* ---------- this week's read ---------- */
+
+export interface ReadInput {
+  all: Metrics;
+  since: Metrics;
+  sinceDate: string | null;
+  changes: ChangeScore[];
+  /** Share of the universe above its 20-day average: the latest night and ten sessions earlier. */
+  breadth: { today: number | null; prev: number | null };
+  /** The index filter's verdict on the latest scan. */
+  bullish: boolean | null;
+  /** Paper size in force (lib/tape.ts). */
+  sizeLabel: string;
+  /** The episodic-pivot row the interview describes (neglected and 10×+), when the study has one. */
+  ep: { label: string; n: number; avgR: number | null } | null;
+  jobs: { ok: number; total: number; at: string | null };
+}
+
+export interface ResearchRead {
+  /** The verdict: "Nothing to change." / "The last change holds." / "Revisit …". */
+  headline: string;
+  /** Two or three sentences of evidence. */
+  body: string;
+  /** The grey line: what to keep an eye on, and the job status. */
+  watch: string | null;
+}
+
+const rrr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : ""}${x.toFixed(2)}R`);
+
+/**
+ * The research page's verdict, written by rules from the numbers the page
+ * already shows (like the card analysis: numbers, no adjectives). The headline
+ * follows the rule-change table: a scored change that moved its lens the wrong
+ * way asks for a revisit; one that held says so; none scored yet means nothing
+ * to change. The body gives the deck's breakout rate since the last change
+ * against all history, then the tape. The watch line names the episodic-pivot
+ * row and the job status. Pure.
+ */
+export function researchRead(i: ReadInput): ResearchRead {
+  const scored = i.changes.filter((c) => c.ready && c.after.value !== null && c.before.value !== null);
+  const worse = scored.filter((c) => c.after.value! < c.before.value!);
+  const latest = [...i.changes].sort((a, b) => (a.effective < b.effective ? 1 : -1))[0] ?? null;
+  const show = (c: ChangeScore) => `${c.label}: ${formatLens(c.lens, c.after.value)} after against ${formatLens(c.lens, c.before.value)} before, on ${c.after.n.toLocaleString()} rows.`;
+
+  let headline: string;
+  let first: string;
+  if (worse.length > 0) {
+    headline = `Revisit ${worse.map((c) => c.label).join(" and ")}.`;
+    first = worse.map(show).join(" ");
+  } else if (scored.length > 0) {
+    headline = scored.length === 1 ? "The last change holds." : "The scored changes hold.";
+    first = scored.map(show).join(" ");
+  } else {
+    headline = "Nothing to change.";
+    first = latest
+      ? `${latest.label} has ${latest.after.n.toLocaleString()} rows since ${latest.effective}, under the ${MIN_AFTER_N} it needs for a read.`
+      : "No rule change is being scored.";
+  }
+
+  const deck =
+    i.sinceDate && i.since.deckHit !== null
+      ? `The deck's breakout rate since ${i.sinceDate} is ${pc(i.since.deckHit)} on ${i.since.deckN.toLocaleString()}, against ${i.all.deckHit === null ? "—" : pc(i.all.deckHit)} over all history.`
+      : i.all.deckHit !== null
+        ? `The deck's breakout rate is ${pc(i.all.deckHit)} on ${i.all.deckN.toLocaleString()}${i.sinceDate ? `; nothing is labelled since ${i.sinceDate} yet` : ""}.`
+        : "No deck rows are labelled yet.";
+
+  let tape: string;
+  if (i.breadth.today === null) tape = `Breadth is not computed yet; paper size ${i.sizeLabel}.`;
+  else {
+    const move =
+      i.breadth.prev === null ? "" : i.breadth.today > i.breadth.prev ? ` (from ${pc(i.breadth.prev)} ten sessions ago)` : i.breadth.today < i.breadth.prev ? ` (down from ${pc(i.breadth.prev)} ten sessions ago)` : ` (flat over ten sessions)`;
+    const filter = i.bullish === null ? "the index filter has no read" : i.bullish ? "the index filter is on" : "the index filter is off";
+    tape = `Breadth is ${pc(i.breadth.today)}${move} and ${filter}: paper size ${i.sizeLabel}.`;
+  }
+
+  const watchParts: string[] = [];
+  if (i.ep) watchParts.push(`Watch: ${i.ep.label} is ${rrr(i.ep.avgR)} on ${i.ep.n} results${i.ep.n < MIN_AFTER_N ? `, ${MIN_AFTER_N - i.ep.n} short of a read` : ""}.`);
+  if (i.jobs.total > 0) watchParts.push(`Jobs ${i.jobs.ok} of ${i.jobs.total} ok${i.jobs.at ? ` at ${i.jobs.at.slice(11, 19) || i.jobs.at}` : ""}.`);
+
+  return { headline, body: `${first} ${deck} ${tape}`, watch: watchParts.length ? watchParts.join(" ") : null };
+}

@@ -16,8 +16,9 @@ import {
   getStory,
   getSweep,
 } from "@/lib/research";
-import { LENS_LABEL, MIN_AFTER_N, formatLens, researchHealth, sweepHeadline } from "@/lib/research-story";
+import { LENS_LABEL, MIN_AFTER_N, formatLens, researchHealth, researchRead, sweepHeadline } from "@/lib/research-story";
 import { latestScanSlim } from "@/lib/scan";
+import { tapeMultiplier } from "@/lib/tape";
 
 export const metadata = { title: "Research — Scanmana" };
 export const dynamic = "force-dynamic";
@@ -95,6 +96,22 @@ export default async function ResearchPage() {
   const n = (x: number) => x.toLocaleString();
   const epGroups = [ep.overall, ...ep.byNeglect, ...ep.byVolume, ...ep.byHeld, ...ep.byBoth];
   const epReady = ep.overall.n >= MIN_AFTER_N;
+  // This week's read (1.5.6): the page's verdict in words, by rules, from the numbers below. No new query.
+  const bRows = breadth.rows;
+  const bToday = bRows.length ? bRows[bRows.length - 1].pctAbove20 : null;
+  const bPrev = bRows.length > 10 ? bRows[bRows.length - 11].pctAbove20 : null;
+  const bullish = scan?.market ? scan.market.verdict === "bullish" : null;
+  const read = researchRead({
+    all,
+    since,
+    sinceDate: story.sinceDate,
+    changes: story.changes,
+    breadth: { today: bToday, prev: bPrev },
+    bullish,
+    sizeLabel: tapeMultiplier(bullish, bToday).label,
+    ep: ep.byBoth.find((g) => g.key === "both") ?? null,
+    jobs: { ok: okJobs, total: summary.runs.length, at: summary.runs.map((r) => r.finishedAt).filter((t): t is string => !!t).sort().at(-1) ?? null },
+  });
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
@@ -109,6 +126,16 @@ export default async function ResearchPage() {
         <Card className="mt-4 text-[12px] leading-relaxed text-neutral-400">
           No research run yet. The history backfill (<span className="font-mono">npm run backfill:scans</span>) fills{" "}
           <span className="font-mono">scan_history</span>; then the jobs run after the next scan or from Maintenance below.
+        </Card>
+      )}
+
+      {ran && (
+        <Card className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">This week&apos;s read</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-neutral-200">
+            <span className="font-semibold">{read.headline}</span> {read.body}
+          </p>
+          {read.watch && <p className="mt-1 text-[11px] text-neutral-500">{read.watch}</p>}
         </Card>
       )}
 

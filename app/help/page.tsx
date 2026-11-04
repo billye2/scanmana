@@ -91,8 +91,8 @@ export default async function Help() {
         {CONFIG.MAX_DIST_FROM_HIGH * 100}% of the 6-month high, and both moving averages rising. Anything further
         from its high is &ldquo;extended&rdquo; or broken and is dropped before ranking.
         <span className="mt-1 block">
-          <span className="text-neutral-100">Parabolic guard:</span> ADR above {CONFIG.MAX_ADR_PCT}% or more than +
-          {CONFIG.MAX_RET_1M * 100}% in a month is rejected — a shell that went from $1 to $18 in three weeks
+          <span className="text-neutral-100">Parabolic guard:</span> {Number.isFinite(CONFIG.MAX_ADR_PCT) ? `ADR above ${CONFIG.MAX_ADR_PCT}% or more than` : "More than"} +
+          {CONFIG.MAX_RET_1M * 100}% in a month is rejected{Number.isFinite(CONFIG.MAX_ADR_PCT) ? "" : " (the ADR ceiling came off in 1.6.2 — a big ADR is what a mover looks like)"} — a shell that went from $1 to $18 in three weeks
           passes every floor above on today&apos;s numbers, but it is the vertical leg of a spike, not a setup.
           The deck ranks names with a box first, then by tightness.
         </span>

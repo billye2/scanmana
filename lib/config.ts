@@ -6,7 +6,11 @@
 // Parabolic guard, shared by the screen (hard filter) and the analysis (verdict).
 // A stock above these is in the vertical leg of a spike, not a swing setup.
 const PARABOLIC = {
-  MAX_ADR_PCT: 15, // avg daily range above this = not tradeable with a sane stop
+  // Uncapped since 1.6.2 (2026-11-03, Billy's call: his biggest movers carry the biggest ADRs). Was 15
+  // from day one; the return cap and the 21-session price floor still catch the $1-to-$18 shell.
+  // Infinity keeps every `adrPct > MAX_ADR_PCT` check in place and false; the screen and Help omit
+  // the rule while it is not finite. Scored with the floor change as one RULE_CHANGES row.
+  MAX_ADR_PCT: Infinity,
   MAX_RET_1M: 3.0, // +300% in 21 sessions = no base underneath
   MIN_PRICE_WINDOW: 21, // every close in this window must be >= MIN_PRICE (no sub-$10 shells)
 } as const;
@@ -21,12 +25,12 @@ export const CONFIG = {
   LOOKBACK: { M1: 21, M3: 63, M6: 126 }, // trading days
 
   // Volatility / trend / structure
-  // 5 since 1.6.1 (2026-11-03), from the threshold sweep on 2026-11-02's research run: the deck's
-  // 10-session breakout rate was 69.5% at the inherited 3.5% (44 names a night, n=7,279) and 72.4%
-  // at 5% (29 a night, n=4,880); 5.5% gave 72.5% on 22 a night — the lowest floor within a point
-  // of the best. Kullamägi's 5-star setup is a mover resting; this is the "mover" half. Scored as a
-  // RULE_CHANGES row (lens: deck breakout rate). Avg R under the old plan was flat across the curve.
-  MIN_ADR_PCT: 5,
+  // 3 since 1.6.2 (2026-11-03), Billy's call, replacing the 5 set an hour earlier in 1.6.1 before any
+  // scan ran under it (so the two are one RULE_CHANGES row). For the record, the 2026-11-02 sweep: the
+  // deck's 10-session breakout rate was 69.2% at 3% (47 names a night, n=7,647), 69.5% at the
+  // inherited 3.5% (44, n=7,279), 72.4% at 5% (29, n=4,880), 72.5% at 5.5% (22); avg R under the old
+  // plan flat at −0.08 throughout. The rule-change row scores the choice from the 2026-11-03 scan on.
+  MIN_ADR_PCT: 3,
   ...PARABOLIC,
   ADR_WINDOW: 20,
   SMA_FAST: 10,

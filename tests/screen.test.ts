@@ -66,7 +66,7 @@ describe("parabolic guard and ranking", () => {
   it("rejects a $1 shell that spiked to $18 even though today's numbers pass every floor", () => {
     const c = buildCandidate("PUMP", "Pump", pump())!;
     expect(c.price).toBeGreaterThan(CONFIG.MIN_PRICE);
-    expect(c.adrPct).toBeGreaterThan(CONFIG.MAX_ADR_PCT);
+    expect(c.ret1m).toBeGreaterThan(CONFIG.MAX_RET_1M); // the return cap and the 21-session price floor catch it (the ADR ceiling is off since 1.6.2)
     expect(screenTicker("PUMP", "Pump", pump())).toBeNull();
   });
   it("ranks boxed setups ahead of tighter no-box names", () => {
@@ -85,7 +85,7 @@ describe("explainScreen", () => {
     const good = breakoutSetup();
     const c = buildCandidate("GOOD", "Good", good)!;
     expect(explainScreen(c, good).every((k) => k.ok)).toBe(true);
-    expect(explainScreen(c, good)).toHaveLength(10);
+    expect(explainScreen(c, good)).toHaveLength(Number.isFinite(CONFIG.MAX_ADR_PCT) ? 10 : 9); // the ADR ceiling row exists only while the ceiling is finite
 
     resetDays();
     const slow = flatBars(200, 150);

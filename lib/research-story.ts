@@ -29,7 +29,9 @@ export const RULE_CHANGES: RuleChange[] = [
     label: "Auto trades Kullamägi's playbook: buy the open after a close above the box, stop at the day's low, half off day 4, breakeven, 10-day exit",
     lens: "paper_avg_r",
   },
-  { effective: "2026-11-03", version: "1.6.1", label: "ADR floor 3.5% → 5%", lens: "deck_hit" },
+  // 1.6.1 set the floor to 5 from the sweep; 1.6.2 the same afternoon, before any scan ran under it,
+  // set 3 and removed the 15% ceiling (Billy's call) — one change as far as the scans are concerned.
+  { effective: "2026-11-03", version: "1.6.2", label: "ADR floor 3.5% → 3%, ADR ceiling off (was 15%)", lens: "deck_hit" },
 ];
 
 /** Labelled rows (or closed trades) the "after" side needs before its number is shown in colour. */

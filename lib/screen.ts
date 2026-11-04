@@ -105,7 +105,10 @@ export function explainScreen(c: DeckCard, bars: Bar[], limits: ScreenLimits = B
       detail: `1M ${pc(c.ret1m)} · 3M ${pc(c.ret3m)} · 6M ${pc(c.ret6m)}`,
     },
     { label: `ADR ≥ ${L.MIN_ADR_PCT}% (moves enough to pay)`, ok: c.adrPct >= L.MIN_ADR_PCT, detail: `ADR ${c.adrPct.toFixed(1)}%` },
-    { label: `ADR ≤ ${CONFIG.MAX_ADR_PCT}% (not parabolic)`, ok: c.adrPct <= CONFIG.MAX_ADR_PCT, detail: `ADR ${c.adrPct.toFixed(1)}%` },
+    // The ADR ceiling is a rule only while it is finite (uncapped since 1.6.2; see CONFIG).
+    ...(Number.isFinite(CONFIG.MAX_ADR_PCT)
+      ? [{ label: `ADR ≤ ${CONFIG.MAX_ADR_PCT}% (not parabolic)`, ok: c.adrPct <= CONFIG.MAX_ADR_PCT, detail: `ADR ${c.adrPct.toFixed(1)}%` }]
+      : []),
     { label: `1M return ≤ ${th(CONFIG.MAX_RET_1M)} (has a base)`, ok: c.ret1m <= CONFIG.MAX_RET_1M, detail: `1M ${pc(c.ret1m)}` },
     { label: `Every close of the last ${CONFIG.MIN_PRICE_WINDOW} sessions ≥ $${L.MIN_PRICE}`, ok: lowClose >= L.MIN_PRICE, detail: `lowest close ${usd(lowClose)}` },
     {

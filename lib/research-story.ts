@@ -29,6 +29,7 @@ export const RULE_CHANGES: RuleChange[] = [
     label: "Auto trades Kullamägi's playbook: buy the open after a close above the box, stop at the day's low, half off day 4, breakeven, 10-day exit",
     lens: "paper_avg_r",
   },
+  { effective: "2026-11-03", version: "1.6.1", label: "ADR floor 3.5% → 5%", lens: "deck_hit" },
 ];
 
 /** Labelled rows (or closed trades) the "after" side needs before its number is shown in colour. */

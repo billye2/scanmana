@@ -204,7 +204,7 @@ but nothing is traded from it until it holds out of sample.
 
 Hard filters: price > $10 on every close of the last 21 sessions · 20d avg
 dollar volume > $20M · US common stock/ADR · momentum (1M ≥ +25% OR 3M ≥ +50%
-OR 6M ≥ +100%) · ADR% between 3.5 and 15 · 1M return ≤ +300% · close above
+OR 6M ≥ +100%) · ADR% between 5 and 15 (5 since 1.6.1, from the sweep: 69.5% → 72.4% breakout rate, deck 44 → 29 a night) · 1M return ≤ +300% · close above
 rising 10/20 SMA · within 5% of 6-month high. The ADR ceiling, return cap
 and 21-session price floor are the parabolic guard: a sub-dollar shell that
 spiked to $18 passes every floor on today's numbers alone. Ranked with boxed

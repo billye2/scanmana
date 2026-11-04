@@ -21,7 +21,12 @@ export const CONFIG = {
   LOOKBACK: { M1: 21, M3: 63, M6: 126 }, // trading days
 
   // Volatility / trend / structure
-  MIN_ADR_PCT: 3.5,
+  // 5 since 1.6.1 (2026-11-03), from the threshold sweep on 2026-11-02's research run: the deck's
+  // 10-session breakout rate was 69.5% at the inherited 3.5% (44 names a night, n=7,279) and 72.4%
+  // at 5% (29 a night, n=4,880); 5.5% gave 72.5% on 22 a night — the lowest floor within a point
+  // of the best. Kullamägi's 5-star setup is a mover resting; this is the "mover" half. Scored as a
+  // RULE_CHANGES row (lens: deck breakout rate). Avg R under the old plan was flat across the curve.
+  MIN_ADR_PCT: 5,
   ...PARABOLIC,
   ADR_WINDOW: 20,
   SMA_FAST: 10,

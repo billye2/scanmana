@@ -521,7 +521,9 @@ export default function Deck({
           <button
             onClick={() => go(1)}
             disabled={candidates.length < 2}
-            className="mx-2 my-0.5 flex items-center justify-center rounded-lg border border-neutral-600 py-2 text-sm font-medium tabular-nums text-neutral-300 active:bg-neutral-800 active:text-neutral-100 disabled:opacity-30"
+            // whitespace-nowrap + tighter inset (1.7.2): with four picks the column is ~65px on a phone and
+            // "12 of 24" wrapped onto two lines, which made the whole bar taller.
+            className="mx-1 my-0.5 flex items-center justify-center whitespace-nowrap rounded-lg border border-neutral-600 px-1 py-2 text-xs font-medium tabular-nums text-neutral-300 active:bg-neutral-800 active:text-neutral-100 disabled:opacity-30"
             aria-label={`Card ${idx + 1} of ${candidates.length} — tap for the next card`}
           >
             {idx + 1} of {candidates.length}

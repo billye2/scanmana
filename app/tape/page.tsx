@@ -1,5 +1,7 @@
 import Link from "next/link";
+import Band from "@/components/Band";
 import MarketBar from "@/components/MarketBar";
+import { meanInterval, wilson } from "@/lib/stats";
 import { BreadthLines, HighsLows } from "@/components/TapeCharts";
 import { BucketBars } from "@/components/ResearchCharts";
 import TopNav from "@/components/TopNav";
@@ -153,9 +155,9 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
                     {r.bullish === null ? "No verdict stored" : r.bullish ? "Bullish" : "Not bullish"}
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-neutral-300">{r.n.toLocaleString()}</td>
-                  <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-neutral-100">{pc(r.hitRate)}</td>
+                  <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-neutral-100"><Band text={pc(r.hitRate)} value={r.hitRate} interval={wilson(r.hitRate, r.n)} kind="rate" tone="" /></td>
                   <td className="px-2 py-1.5 text-right font-mono text-xs tabular-nums text-neutral-300">
-                    {rr(r.avgKR)}<span className="text-neutral-500"> on {r.kN}</span>
+                    <Band text={rr(r.avgKR)} value={r.avgKR} interval={meanInterval(r.avgKR, r.sdKR, r.kN)} kind="r" tone="" /><span className="text-neutral-500"> on {r.kN}</span>
                   </td>
                 </tr>
               ))}

@@ -5,27 +5,36 @@ import { Card, H, NUM, SUMMARY, TD, TH, money, n, pc, rr } from "@/components/Re
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
 import { closedTrades, getBreadth, getEpStudy, getReplay, getResearchSummary, getSplits, getStory } from "@/lib/research";
-import { LENS_LABEL, MIN_AFTER_N, formatLens, researchHealth, researchRead } from "@/lib/research-story";
+import Band from "@/components/Band";
+import { LENS_LABEL, MIN_AFTER_N, formatLens, researchHealth, researchRead, type Lens } from "@/lib/research-story";
 import { latestScanSlim } from "@/lib/scan";
+import type { Interval } from "@/lib/stats";
 import { tapeMultiplier } from "@/lib/tape";
 
 export const metadata = { title: "Research — Scanmana" };
 export const dynamic = "force-dynamic";
 
-/** One scorecard tile: the all-history number large, the since-last-change number under it. */
-function Tile({ label, all, since, n, sinceN, sinceDate, firstRead }: {
+const lensKind = (lens: Lens): "rate" | "r" | "pts" => (lens === "deck_hit" ? "rate" : lens === "paper_avg_r" ? "r" : "pts");
+
+/** One scorecard tile: the all-history number large, the since-last-change number under it; each with its 95% range when it has one (1.7.6). */
+function Tile({ label, all, since, n, sinceN, sinceDate, firstRead, band }: {
   label: string; all: string; since: string; n: string; sinceN: string; sinceDate: string | null; firstRead: string | null;
+  band?: { kind: "rate" | "r" | "pts"; all: { value: number | null; interval: Interval | null }; since: { value: number | null; interval: Interval | null } };
 }) {
   const empty = sinceN === "0";
   return (
     <Card className="min-w-0">
       <div className="text-[10px] font-semibold tracking-wide text-neutral-500 uppercase">{label}</div>
-      <div className="mt-1 font-mono text-2xl tabular-nums text-neutral-100">{all}</div>
+      <div className="mt-1 font-mono text-2xl tabular-nums text-neutral-100">
+        {band ? <Band text={all} value={band.all.value} interval={band.all.interval} kind={band.kind} /> : all}
+      </div>
       <div className="text-[10px] text-neutral-600">all · n={n}</div>
       {sinceDate && (
         <div className="mt-2 border-t border-neutral-800 pt-1.5 text-[11px]">
           <span className="text-neutral-500">since {sinceDate.slice(5)} · </span>
-          <span className={`font-mono tabular-nums ${empty ? "text-neutral-600" : "text-amber-300"}`}>{since}</span>
+          <span className={`font-mono tabular-nums ${empty ? "text-neutral-600" : "text-amber-300"}`}>
+            {band && !empty ? <Band text={since} value={band.since.value} interval={band.since.interval} kind={band.kind} tone="" /> : since}
+          </span>
           <span className="text-neutral-600"> n={sinceN}</span>
           {empty && firstRead && <div className="text-[10px] text-neutral-600">first read around {firstRead}</div>}
         </div>
@@ -110,15 +119,18 @@ export default async function ResearchPage() {
         <p className="mb-3 rounded-lg border border-red-900/60 bg-red-950/40 px-3 py-2 text-[12px] text-red-300">{health}</p>
       )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Tile label="Deck broke out" all={pc(all.deckHit)} since={pc(since.deckHit)} n={n(all.deckN)} sinceN={n(since.deckN)} sinceDate={story.sinceDate} firstRead={story.firstRead} />
-        <Tile label="Wait − Pass" all={all.gap === null ? "—" : formatLens("verdict_gap", all.gap).replace(/ points?$/, " pts")} since={since.gap === null ? "—" : formatLens("verdict_gap", since.gap).replace(/ points?$/, " pts")} n={n(Math.min(all.waitN, all.passN))} sinceN={n(Math.min(since.waitN, since.passN))} sinceDate={story.sinceDate} firstRead={story.firstRead} />
-        <Tile label="Avg R on Wait" all={rr(all.waitAvgR)} since={rr(since.waitAvgR)} n={n(all.waitRN)} sinceN={n(since.waitRN)} sinceDate={story.sinceDate} firstRead={story.firstRead} />
+        <Tile label="Deck broke out" all={pc(all.deckHit)} since={pc(since.deckHit)} n={n(all.deckN)} sinceN={n(since.deckN)} sinceDate={story.sinceDate} firstRead={story.firstRead}
+          band={{ kind: "rate", all: { value: all.deckHit, interval: all.deckHitCI }, since: { value: since.deckHit, interval: since.deckHitCI } }} />
+        <Tile label="Wait − Pass" all={all.gap === null ? "—" : formatLens("verdict_gap", all.gap).replace(/ points?$/, " pts")} since={since.gap === null ? "—" : formatLens("verdict_gap", since.gap).replace(/ points?$/, " pts")} n={n(Math.min(all.waitN, all.passN))} sinceN={n(Math.min(since.waitN, since.passN))} sinceDate={story.sinceDate} firstRead={story.firstRead}
+          band={{ kind: "pts", all: { value: all.gap, interval: all.gapCI }, since: { value: since.gap, interval: since.gapCI } }} />
+        <Tile label="Avg R on Wait" all={rr(all.waitAvgR)} since={rr(since.waitAvgR)} n={n(all.waitRN)} sinceN={n(since.waitRN)} sinceDate={story.sinceDate} firstRead={story.firstRead}
+          band={{ kind: "r", all: { value: all.waitAvgR, interval: all.waitAvgRCI }, since: { value: since.waitAvgR, interval: since.waitAvgRCI } }} />
         <Tile label="Bullish nights" all={pc(all.bullishShare)} since={pc(since.bullishShare)} n={n(all.nights)} sinceN={n(since.nights)} sinceDate={story.sinceDate} firstRead={story.firstRead} />
       </div>
       <p className="mt-3 text-[13px] leading-relaxed text-neutral-200">{story.sentence}</p>
 
       {/* ---------- 2. Rule changes ---------- */}
-      <H id="changes" sub={`One row per shipped change, scored on the number it was meant to move: all labelled history before it against everything from it on. A row stays grey until the after side has ${MIN_AFTER_N} rows.`}>
+      <H id="changes" sub={`One row per shipped change, scored on the number it was meant to move: all labelled history before it against everything from it on. A row stays grey until the after side has ${MIN_AFTER_N} rows, and turns green or red only once the two 95% ranges (the bars under the numbers) are apart; amber means they still overlap.`}>
         Rule changes
       </H>
       <Card className="overflow-x-auto p-0">
@@ -130,9 +142,16 @@ export default async function ResearchPage() {
                 <td className={`${TD} whitespace-normal ${c.ready ? "text-neutral-100" : ""}`}>{c.label} <span className="font-mono text-[10px] text-neutral-600">{c.version}</span></td>
                 <td className={`${TD} font-mono`}>{c.effective}</td>
                 <td className={`${TD} whitespace-normal text-[11px]`}>{LENS_LABEL[c.lens]}</td>
-                <td className={NUM}>{formatLens(c.lens, c.before.value)} <span className="text-neutral-600">n={n(c.before.n)}</span></td>
-                <td className={`${NUM} ${c.ready ? (c.after.value !== null && c.before.value !== null && c.after.value >= c.before.value ? "text-emerald-300" : "text-red-300") : "text-neutral-600"}`}>
-                  {c.after.n === 0 ? <span className="font-sans text-[11px]">first read around {c.firstRead}</span> : formatLens(c.lens, c.after.value)}
+                <td className={NUM}>
+                  <Band text={formatLens(c.lens, c.before.value)} value={c.before.value} interval={c.before.interval ?? null} kind={lensKind(c.lens)} tone="" />{" "}
+                  <span className="text-neutral-600">n={n(c.before.n)}</span>
+                </td>
+                <td className={`${NUM} ${c.ready ? (c.separated !== true ? "text-amber-300" : c.after.value !== null && c.before.value !== null && c.after.value >= c.before.value ? "text-emerald-300" : "text-red-300") : "text-neutral-600"}`}>
+                  {c.after.n === 0 ? (
+                    <span className="font-sans text-[11px]">first read around {c.firstRead}</span>
+                  ) : (
+                    <Band text={formatLens(c.lens, c.after.value)} value={c.after.value} interval={c.after.interval ?? null} kind={lensKind(c.lens)} tone="" />
+                  )}
                 </td>
                 <td className={`${NUM} ${c.ready ? "" : "text-neutral-600"}`}>{n(c.after.n)}</td>
               </tr>

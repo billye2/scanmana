@@ -322,6 +322,7 @@ export interface ThemeBucket {
   n: number;
   hitRate: number | null;
   avgKR: number | null;
+  sdKR: number | null;
   kN: number;
 }
 export interface ThemeRow {
@@ -332,6 +333,7 @@ export interface ThemeRow {
   n: number;
   hitRate: number | null;
   avgKR: number | null;
+  sdKR: number | null;
   kN: number;
   first: string;
   last: string;
@@ -382,13 +384,13 @@ export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
       ),
       m AS (SELECT date, cluster_key, count(*) AS n FROM d WHERE cluster_key IS NOT NULL GROUP BY 1, 2)
       SELECT CASE WHEN d.cluster_key IS NULL THEN 'none' WHEN m.n = 1 THEN 'alone' WHEN m.n <= 3 THEN 'few' ELSE 'many' END AS key,
-             count(*)::int AS rows, count(d.broke_10d)::int AS n, avg(d.broke_10d::int) AS hit, avg(d.k_r) AS avg_k_r, count(d.k_r)::int AS k_n
+             count(*)::int AS rows, count(d.broke_10d)::int AS n, avg(d.broke_10d::int) AS hit, avg(d.k_r) AS avg_k_r, stddev_samp(d.k_r) AS sd_k_r, count(d.k_r)::int AS k_n
       FROM d LEFT JOIN m ON m.date = d.date AND m.cluster_key = d.cluster_key
       GROUP BY 1
-    `) as { key: ThemeBucket["key"]; rows: number; n: number; hit: number | null; avg_k_r: number | null; k_n: number }[];
+    `) as { key: ThemeBucket["key"]; rows: number; n: number; hit: number | null; avg_k_r: number | null; sd_k_r: number | null; k_n: number }[];
     const themes = (await sql`
       SELECT ch.cluster_key, a.alias, count(DISTINCT h.date)::int AS nights, count(o.broke_10d)::int AS n,
-             avg(o.broke_10d::int) AS hit, avg(o.k_r) AS avg_k_r, count(o.k_r)::int AS k_n,
+             avg(o.broke_10d::int) AS hit, avg(o.k_r) AS avg_k_r, stddev_samp(o.k_r) AS sd_k_r, count(o.k_r)::int AS k_n,
              min(h.date)::text AS first, max(h.date)::text AS last,
              EXISTS (SELECT 1 FROM research_clusters c WHERE c.cluster_key = ch.cluster_key) AS current
       FROM scan_history h
@@ -400,7 +402,7 @@ export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
       HAVING count(o.broke_10d) >= 8
       ORDER BY n DESC, nights DESC
       LIMIT ${limit}
-    `) as { cluster_key: string; alias: string | null; nights: number; n: number; hit: number | null; avg_k_r: number | null; k_n: number; first: string; last: string; current: boolean }[];
+    `) as { cluster_key: string; alias: string | null; nights: number; n: number; hit: number | null; avg_k_r: number | null; sd_k_r: number | null; k_n: number; first: string; last: string; current: boolean }[];
     const by = new Map(mates.map((r) => [r.key, r]));
     const num = (x: number | null) => (x === null ? null : Number(x));
     return {
@@ -410,11 +412,11 @@ export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
       inTheme: mates.filter((r) => r.key !== "none").reduce((s, r) => s + r.rows, 0),
       byMates: (["none", "alone", "few", "many"] as const).map((key) => {
         const r = by.get(key);
-        return { key, label: MATES_LABEL[key], n: r?.n ?? 0, hitRate: num(r?.hit ?? null), avgKR: num(r?.avg_k_r ?? null), kN: r?.k_n ?? 0 };
+        return { key, label: MATES_LABEL[key], n: r?.n ?? 0, hitRate: num(r?.hit ?? null), avgKR: num(r?.avg_k_r ?? null), sdKR: num(r?.sd_k_r ?? null), kN: r?.k_n ?? 0 };
       }),
       themes: themes.map((r) => ({
         clusterKey: r.cluster_key, alias: r.alias, leaders: r.cluster_key.split("|"), nights: r.nights, n: r.n,
-        hitRate: num(r.hit), avgKR: num(r.avg_k_r), kN: r.k_n, first: r.first, last: r.last, current: r.current,
+        hitRate: num(r.hit), avgKR: num(r.avg_k_r), sdKR: num(r.sd_k_r), kN: r.k_n, first: r.first, last: r.last, current: r.current,
       })),
     };
   } catch {
@@ -428,6 +430,7 @@ export interface TapeVerdictRow {
   hitRate: number | null;
   /** Avg R of the Auto book's plan (k_r) on the boxed Wait rows scanned under that verdict. */
   avgKR: number | null;
+  sdKR: number | null;
   kN: number;
 }
 
@@ -440,12 +443,15 @@ export async function getTapeStudy(): Promise<TapeVerdictRow[]> {
   try {
     const rows = (await getSql()`
       SELECT h.market_bullish AS bullish, count(o.broke_10d)::int AS n, avg(o.broke_10d::int) AS hit,
-             avg(o.k_r) AS avg_k_r, count(o.k_r)::int AS k_n
+             avg(o.k_r) AS avg_k_r, stddev_samp(o.k_r) AS sd_k_r, count(o.k_r)::int AS k_n
       FROM scan_history h JOIN research_outcomes o USING (date, ticker)
       WHERE h.rank IS NOT NULL
       GROUP BY 1 ORDER BY 1 DESC NULLS LAST
-    `) as { bullish: boolean | null; n: number; hit: number | null; avg_k_r: number | null; k_n: number }[];
-    return rows.map((r) => ({ bullish: r.bullish, n: r.n, hitRate: r.hit === null ? null : Number(r.hit), avgKR: r.avg_k_r === null ? null : Number(r.avg_k_r), kN: r.k_n }));
+    `) as { bullish: boolean | null; n: number; hit: number | null; avg_k_r: number | null; sd_k_r: number | null; k_n: number }[];
+    return rows.map((r) => ({
+      bullish: r.bullish, n: r.n, hitRate: r.hit === null ? null : Number(r.hit),
+      avgKR: r.avg_k_r === null ? null : Number(r.avg_k_r), sdKR: r.sd_k_r === null ? null : Number(r.sd_k_r), kN: r.k_n,
+    }));
   } catch {
     return [];
   }
@@ -551,6 +557,8 @@ export interface PlanGroup {
   n: number;
   winRate: number | null;
   avgR: number | null;
+  /** Sample sd of R, for the average's range (1.7.6). */
+  sdR: number | null;
   /** Share of eligible rows the entry filled (entry table only). */
   filled: number | null;
 }
@@ -592,20 +600,20 @@ export async function getKullamagiStudy(): Promise<KullamagiStudy> {
       )
       SELECT 'width' AS dim,
              CASE WHEN k_stop_adr <= 0.5 THEN 'w1' WHEN k_stop_adr <= 1 THEN 'w2' WHEN k_stop_adr <= 1.5 THEN 'w3' ELSE 'w4' END AS key,
-             count(k_r)::int AS n, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL) AS win, avg(k_r) AS avg_r,
+             count(k_r)::int AS n, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL) AS win, avg(k_r) AS avg_r, stddev_samp(k_r) AS sd_r,
              NULL::double precision AS filled, (SELECT count(*) FROM b)::int AS total
       FROM b WHERE k_stop_adr IS NOT NULL GROUP BY 2
       UNION ALL
       SELECT 'adr', CASE WHEN adr_pct < 5 THEN 'a1' WHEN adr_pct < 7 THEN 'a2' ELSE 'a3' END,
-             count(k_r)::int, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL), avg(k_r), NULL, (SELECT count(*) FROM b)::int
+             count(k_r)::int, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL), avg(k_r), stddev_samp(k_r), NULL, (SELECT count(*) FROM b)::int
       FROM b WHERE adr_pct IS NOT NULL GROUP BY 2
       UNION ALL
-      SELECT 'entry', 'next_open', count(k_r)::int, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL), avg(k_r),
+      SELECT 'entry', 'next_open', count(k_r)::int, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL), avg(k_r), stddev_samp(k_r),
              avg((k_entry_day IS NOT NULL)::int), (SELECT count(*) FROM b)::int FROM b
       UNION ALL
-      SELECT 'entry', 'buy_stop', count(bs_r)::int, avg((bs_r > 0)::int) FILTER (WHERE bs_r IS NOT NULL), avg(bs_r),
+      SELECT 'entry', 'buy_stop', count(bs_r)::int, avg((bs_r > 0)::int) FILTER (WHERE bs_r IS NOT NULL), avg(bs_r), stddev_samp(bs_r),
              avg((bs_entry_day IS NOT NULL)::int), (SELECT count(*) FROM b)::int FROM b
-    `) as { dim: "width" | "adr" | "entry"; key: string; n: number; win: number | null; avg_r: number | null; filled: number | null; total: number }[];
+    `) as { dim: "width" | "adr" | "entry"; key: string; n: number; win: number | null; avg_r: number | null; sd_r: number | null; filled: number | null; total: number }[];
     const by = new Map(rows.map((r) => [`${r.dim}:${r.key}`, r]));
     const group = (dim: keyof typeof PLAN_ORDER): PlanGroup[] =>
       PLAN_ORDER[dim].map((key) => {
@@ -616,6 +624,7 @@ export async function getKullamagiStudy(): Promise<KullamagiStudy> {
           n: Number(r?.n ?? 0),
           winRate: r?.win == null ? null : Number(r.win),
           avgR: r?.avg_r == null ? null : Number(r.avg_r),
+          sdR: r?.sd_r == null ? null : Number(r.sd_r),
           filled: r?.filled == null ? null : Number(r.filled),
         };
       });
@@ -824,10 +833,11 @@ export async function periodSums(since: string): Promise<{ before: PeriodSums; s
              count(o.broke_10d) FILTER (WHERE h.verdict = 'pass')::int AS pass_n,
              coalesce(sum(o.broke_10d::int) FILTER (WHERE h.verdict = 'pass'), 0)::int AS pass_hits,
              count(o.k_r) FILTER (WHERE h.verdict = 'wait')::int AS wait_r_n,
-             coalesce(sum(o.k_r) FILTER (WHERE h.verdict = 'wait'), 0)::double precision AS wait_r_sum
+             coalesce(sum(o.k_r) FILTER (WHERE h.verdict = 'wait'), 0)::double precision AS wait_r_sum,
+             coalesce(sum(o.k_r * o.k_r) FILTER (WHERE h.verdict = 'wait'), 0)::double precision AS wait_r_sumsq
       FROM scan_history h LEFT JOIN research_outcomes o USING (date, ticker)
       WHERE h.rank IS NOT NULL GROUP BY 1
-    `) as { recent: boolean; n: number; hits: number; wait_n: number; wait_hits: number; pass_n: number; pass_hits: number; wait_r_n: number; wait_r_sum: number }[];
+    `) as { recent: boolean; n: number; hits: number; wait_n: number; wait_hits: number; pass_n: number; pass_hits: number; wait_r_n: number; wait_r_sum: number; wait_r_sumsq: number }[];
     const nights = (await sql`
       SELECT (d.date >= ${since}::date) AS recent, count(*)::int AS nights, count(*) FILTER (WHERE d.bullish)::int AS bullish
       FROM (SELECT date, bool_or(market_bullish) AS bullish FROM scan_history WHERE rank IS NOT NULL GROUP BY date) d GROUP BY 1
@@ -838,7 +848,7 @@ export async function periodSums(since: string): Promise<{ before: PeriodSums; s
       t.n = Number(r.n); t.hits = Number(r.hits);
       t.waitN = Number(r.wait_n); t.waitHits = Number(r.wait_hits);
       t.passN = Number(r.pass_n); t.passHits = Number(r.pass_hits);
-      t.waitRN = Number(r.wait_r_n); t.waitRSum = Number(r.wait_r_sum);
+      t.waitRN = Number(r.wait_r_n); t.waitRSum = Number(r.wait_r_sum); t.waitRSumSq = Number(r.wait_r_sumsq);
     }
     for (const r of nights) {
       const t = r.recent ? out.since : out.before;

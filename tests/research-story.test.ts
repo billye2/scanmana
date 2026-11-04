@@ -74,10 +74,10 @@ describe("scorecard metrics", () => {
 describe("rule-change scoring", () => {
   const m = metrics(sums({ n: 100, hits: 63, waitN: 40, waitHits: 27, passN: 60, passHits: 36 }));
   it("each lens reads its own number and sample size", () => {
-    expect(lensFromMetrics("verdict_gap", m)).toEqual({ value: expect.closeTo(0.075, 5), n: 40 });
-    expect(lensFromMetrics("deck_hit", m)).toEqual({ value: expect.closeTo(0.63, 5), n: 100 });
-    expect(lensFromTrades([1, -1, 0.5])).toEqual({ value: expect.closeTo(1 / 6, 5), n: 3 });
-    expect(lensFromTrades([])).toEqual({ value: null, n: 0 });
+    expect(lensFromMetrics("verdict_gap", m)).toMatchObject({ value: expect.closeTo(0.075, 5), n: 40 });
+    expect(lensFromMetrics("deck_hit", m)).toMatchObject({ value: expect.closeTo(0.63, 5), n: 100 });
+    expect(lensFromTrades([1, -1, 0.5])).toMatchObject({ value: expect.closeTo(1 / 6, 5), n: 3 });
+    expect(lensFromTrades([])).toMatchObject({ value: null, n: 0, interval: null });
   });
   it("a change is ready only once the after side has MIN_AFTER_N rows", () => {
     const c = RULE_CHANGES[1];
@@ -85,6 +85,18 @@ describe("rule-change scoring", () => {
     expect(notYet.ready).toBe(false);
     expect(notYet.firstRead).toBe("2026-10-05");
     expect(scoreChange(c, lensFromMetrics("deck_hit", m), { value: 0.7, n: MIN_AFTER_N }).ready).toBe(true);
+  });
+  it("carries each side's 95% range and says whether the two are apart (1.7.6)", () => {
+    const c = RULE_CHANGES[1];
+    const before = lensFromMetrics("deck_hit", m); // 63% on 100
+    expect(before.interval).not.toBeNull();
+    const far = scoreChange(c, before, lensFromMetrics("deck_hit", metrics(sums({ n: 800, hits: 600 })))); // 75% on 800
+    expect(far.separated).toBe(true);
+    const near = scoreChange(c, before, lensFromMetrics("deck_hit", metrics(sums({ n: 40, hits: 28 })))); // 70% on 40
+    expect(near.separated).toBe(false);
+    expect(scoreChange(c, before, { value: 0.7, n: 40 }).separated).toBeNull();
+    // mean 0.4, sd 1.1937, n 5 → ± 1.046
+    expect(lensFromTrades([1, -1, 0.5, 2, -0.5]).interval).toEqual({ lo: expect.closeTo(-0.646, 2), hi: expect.closeTo(1.446, 2) });
   });
   it("formats each lens in its own unit", () => {
     expect(formatLens("verdict_gap", 0.061)).toBe("+6 points");
@@ -130,11 +142,12 @@ describe("research health line", () => {
 
 describe("researchRead — the page's verdict in words", () => {
   const m = (over: Partial<Metrics> = {}): Metrics => ({
-    deckHit: 0.5, deckN: 200, waitHit: 0.6, waitN: 100, passHit: 0.4, passN: 100, gap: 0.2, waitAvgR: 0.1, waitRN: 80, bullishShare: 0.5, nights: 40, ...over,
+    deckHit: 0.5, deckN: 200, waitHit: 0.6, waitN: 100, passHit: 0.4, passN: 100, gap: 0.2, waitAvgR: 0.1, waitRN: 80, bullishShare: 0.5, nights: 40,
+    deckHitCI: null, gapCI: null, waitAvgRCI: null, ...over,
   });
   const change = (over: Partial<ChangeScore> = {}): ChangeScore => ({
     effective: "2026-10-27", version: "1.3.8", label: "Kullamägi exit", lens: "paper_avg_r",
-    before: { value: -0.27, n: 24 }, after: { value: 0.1, n: 5 }, ready: false, firstRead: "2026-11-10", ...over,
+    before: { value: -0.27, n: 24 }, after: { value: 0.1, n: 5 }, ready: false, separated: true, firstRead: "2026-11-10", ...over,
   });
   const base: ReadInput = {
     all: m(), since: m({ deckHit: 0.54, deckN: 50 }), sinceDate: "2026-10-27", changes: [change()],
@@ -160,6 +173,12 @@ describe("researchRead — the page's verdict in words", () => {
   it("says the change holds when it moved its lens the right way", () => {
     const r = researchRead({ ...base, changes: [change({ ready: true, after: { value: 0.1, n: 31 } })] });
     expect(r.headline).toBe("The last change holds.");
+  });
+
+  it("gives no verdict while a ready change's before and after ranges still overlap (1.7.6)", () => {
+    const r = researchRead({ ...base, changes: [change({ ready: true, separated: false, after: { value: 0.1, n: 31 } })] });
+    expect(r.headline).toBe("Nothing to change.");
+    expect(r.body.startsWith("Kullamägi exit: +0.10R after against -0.27R before, on 31 rows; the two ranges still overlap, so no verdict yet.")).toBe(true);
   });
 
   it("copes with no breadth, no EP row, no jobs and nothing labelled", () => {

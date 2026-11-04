@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { BreadthLine, BucketBars, RateBars, SweepPanel } from "@/components/ResearchCharts";
 import { ClusterAlias } from "@/components/ResearchControls";
+import Band from "@/components/Band";
 import { Card, H, NUM, SUMMARY, TD, TH, n, pc, rr } from "@/components/ResearchPrimitives";
+import { meanInterval, wilson } from "@/lib/stats";
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
 import {
@@ -61,7 +63,7 @@ export default async function StudiesPage() {
         The research layer&apos;s deeper reads: what the scanner&apos;s own history says about the plan, the screen, the tape and the themes.
         Each is a study — it reads the nightly tables and changes nothing; a rule changes only when a study says so, and then it is scored on{" "}
         <Link href="/research" className="text-neutral-100 underline underline-offset-4">Research</Link>. Terms in{" "}
-        <Link href="/help#studies" className="text-neutral-100 underline underline-offset-4">Help</Link>. Grey means fewer than {MIN_AFTER_N} rows.
+        <Link href="/help#studies" className="text-neutral-100 underline underline-offset-4">Help</Link>. Grey means fewer than {MIN_AFTER_N} rows; the thin bar under a number is its 95% range — where two bars overlap, the gap between them is not yet a finding.
       </p>
 
       {/* ---------- 1. Kullamägi's plan on history ---------- */}
@@ -87,8 +89,10 @@ export default async function StudiesPage() {
                     <tr key={g.key} className={`border-t border-neutral-800 ${ready ? "" : "text-neutral-500"}`}>
                       <td className={`${TD} whitespace-normal ${ready ? "text-neutral-100" : ""}`}>{g.label}</td>
                       <td className={NUM}>{n(g.n)}</td>
-                      <td className={NUM}>{pc(g.winRate)}</td>
-                      <td className={`${NUM} ${ready && g.avgR !== null ? (g.avgR >= 0 ? "text-emerald-300" : "text-red-300") : ""}`}>{rr(g.avgR)}</td>
+                      <td className={NUM}><Band text={pc(g.winRate)} value={g.winRate} interval={wilson(g.winRate, g.n)} kind="rate" tone="" /></td>
+                      <td className={`${NUM} ${ready && g.avgR !== null ? (g.avgR >= 0 ? "text-emerald-300" : "text-red-300") : ""}`}>
+                        <Band text={rr(g.avgR)} value={g.avgR} interval={meanInterval(g.avgR, g.sdR, g.n)} kind="r" tone="" />
+                      </td>
                       {head === "Entry" && <td className={NUM}>{pc(g.filled)}</td>}
                     </tr>
                   );
@@ -277,8 +281,10 @@ export default async function StudiesPage() {
                     <tr key={b.key} className="border-t border-neutral-800">
                       <td className={TD}>{b.label}</td>
                       <td className={NUM}>{n(b.n)}</td>
-                      <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}>{pc(b.hitRate)}</td>
-                      <td className={`${NUM} ${b.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>{rr(b.avgKR)}<span className="text-neutral-600"> · {b.kN}</span></td>
+                      <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}><Band text={pc(b.hitRate)} value={b.hitRate} interval={wilson(b.hitRate, b.n)} kind="rate" tone="" /></td>
+                      <td className={`${NUM} ${b.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>
+                        <Band text={rr(b.avgKR)} value={b.avgKR} interval={meanInterval(b.avgKR, b.sdKR, b.kN)} kind="r" tone="" /><span className="text-neutral-600"> · {b.kN}</span>
+                      </td>
                     </tr>
                   );
                 })}
@@ -310,8 +316,10 @@ export default async function StudiesPage() {
                       </td>
                       <td className={NUM}>{t.nights}</td>
                       <td className={NUM}>{t.n}</td>
-                      <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}>{pc(t.hitRate)}</td>
-                      <td className={`${NUM} ${t.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>{rr(t.avgKR)}<span className="text-neutral-600"> · {t.kN}</span></td>
+                      <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}><Band text={pc(t.hitRate)} value={t.hitRate} interval={wilson(t.hitRate, t.n)} kind="rate" tone="" /></td>
+                      <td className={`${NUM} ${t.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>
+                        <Band text={rr(t.avgKR)} value={t.avgKR} interval={meanInterval(t.avgKR, t.sdKR, t.kN)} kind="r" tone="" /><span className="text-neutral-600"> · {t.kN}</span>
+                      </td>
                     </tr>
                   );
                 })}

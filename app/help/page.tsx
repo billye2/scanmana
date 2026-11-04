@@ -219,6 +219,14 @@ export default async function Help() {
         decides which entry it keeps (the next open led the buy-stop, −0.03R to −0.17R, on that date). The paper replay carries the
         matching rule, &ldquo;stop one ADR under the entry&rdquo;, on the ledger&apos;s real trades.
       </Term>
+      <Term name="The bar under a number">
+        Since 1.7.6 every rate and average R on the Research, Studies and Tape pages carries its 95% range, drawn as a thin bar under the
+        number with a dot at the value (hover for the figures). A rate&apos;s range comes from its sample size alone (Wilson); an average
+        R&apos;s from its spread and sample size. Where two bars overlap, the gap between the two numbers is not yet a finding, however it
+        reads. A rule-change row turns green or red only once its before and after ranges are apart; amber means they still overlap, and
+        this week&apos;s read says so instead of giving a verdict. The ranges are closed-form, not bootstrapped: at thirty rows and up the
+        two agree, and the Python budget is kept for the studies that need it.
+      </Term>
       <Term name="Rule changes">
         One row per shipped change, scored on the number it was meant to move — all labelled history before it against
         everything from it on. A row stays grey until the after side has 30 rows (about two weeks of decks); before

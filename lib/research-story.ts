@@ -3,6 +3,8 @@
 // Pure functions only (no DB) so tests/research-story.test.ts can pin them; the
 // readers in lib/research.ts feed them.
 
+import { diffInterval, meanInterval, sd, sdFromSums, separated, wilson, type Interval } from "./stats";
+
 /** What a change is measured by. Each lens has its own before/after number. */
 export type Lens = "verdict_gap" | "deck_hit" | "paper_avg_r";
 
@@ -72,10 +74,11 @@ export interface PeriodSums {
   passHits: number;
   waitRN: number; // Wait rows with an R at exit
   waitRSum: number;
+  waitRSumSq: number; // sum of squares, for the average's range (1.7.6)
   nights: number; // scan dates
   bullishNights: number; // of which the index verdict was Bullish
 }
-export const ZERO_SUMS: PeriodSums = { n: 0, hits: 0, waitN: 0, waitHits: 0, passN: 0, passHits: 0, waitRN: 0, waitRSum: 0, nights: 0, bullishNights: 0 };
+export const ZERO_SUMS: PeriodSums = { n: 0, hits: 0, waitN: 0, waitHits: 0, passN: 0, passHits: 0, waitRN: 0, waitRSum: 0, waitRSumSq: 0, nights: 0, bullishNights: 0 };
 
 export function addSums(a: PeriodSums, b: PeriodSums): PeriodSums {
   const out = { ...ZERO_SUMS };
@@ -95,24 +98,33 @@ export interface Metrics {
   waitRN: number;
   bullishShare: number | null;
   nights: number;
+  /** 95% ranges (1.7.6): the deck rate, the Wait − Pass gap, the Wait average R. */
+  deckHitCI: Interval | null;
+  gapCI: Interval | null;
+  waitAvgRCI: Interval | null;
 }
 const ratio = (num: number, den: number) => (den > 0 ? num / den : null);
 
 export function metrics(s: PeriodSums): Metrics {
   const waitHit = ratio(s.waitHits, s.waitN);
   const passHit = ratio(s.passHits, s.passN);
+  const deckHit = ratio(s.hits, s.n);
+  const waitAvgR = ratio(s.waitRSum, s.waitRN);
   return {
-    deckHit: ratio(s.hits, s.n),
+    deckHit,
     deckN: s.n,
     waitHit,
     waitN: s.waitN,
     passHit,
     passN: s.passN,
     gap: waitHit === null || passHit === null ? null : waitHit - passHit,
-    waitAvgR: ratio(s.waitRSum, s.waitRN),
+    waitAvgR,
     waitRN: s.waitRN,
     bullishShare: ratio(s.bullishNights, s.nights),
     nights: s.nights,
+    deckHitCI: wilson(deckHit, s.n),
+    gapCI: diffInterval({ p: waitHit, n: s.waitN }, { p: passHit, n: s.passN }),
+    waitAvgRCI: meanInterval(waitAvgR, sdFromSums(s.waitRSum, s.waitRSumSq, s.waitRN), s.waitRN),
   };
 }
 
@@ -133,26 +145,38 @@ export function scorecardSentence(all: Metrics): string {
 export interface LensValue {
   value: number | null;
   n: number;
+  /** 95% range of the value (1.7.6); absent or null when it cannot be formed. */
+  interval?: Interval | null;
 }
 export interface ChangeScore extends RuleChange {
   before: LensValue;
   after: LensValue;
   ready: boolean; // after.n ≥ MIN_AFTER_N
+  /** The before and after ranges do not overlap (1.7.6); null when either range is missing. A row is coloured only when ready and separated. */
+  separated: boolean | null;
   firstRead: string; // when the first after-labels can exist
 }
 
 /** Pick the lens value out of a period's metrics (paper lenses come from the trade list instead). */
 export function lensFromMetrics(lens: Exclude<Lens, "paper_avg_r">, m: Metrics): LensValue {
-  if (lens === "verdict_gap") return { value: m.gap, n: Math.min(m.waitN, m.passN) };
-  return { value: m.deckHit, n: m.deckN };
+  if (lens === "verdict_gap") return { value: m.gap, n: Math.min(m.waitN, m.passN), interval: m.gapCI };
+  return { value: m.deckHit, n: m.deckN, interval: m.deckHitCI };
 }
 
 export function lensFromTrades(rs: number[]): LensValue {
-  return { value: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null, n: rs.length };
+  const value = rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : null;
+  return { value, n: rs.length, interval: meanInterval(value, sd(rs), rs.length) };
 }
 
 export function scoreChange(change: RuleChange, before: LensValue, after: LensValue): ChangeScore {
-  return { ...change, before, after, ready: after.n >= MIN_AFTER_N, firstRead: firstReadDate(change.effective) };
+  return {
+    ...change,
+    before,
+    after,
+    ready: after.n >= MIN_AFTER_N,
+    separated: separated(before.interval, after.interval),
+    firstRead: firstReadDate(change.effective),
+  };
 }
 
 export function formatLens(lens: Lens, v: number | null): string {
@@ -259,7 +283,11 @@ const rrr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : ""}${x
  * row and the job status. Pure.
  */
 export function researchRead(i: ReadInput): ResearchRead {
-  const scored = i.changes.filter((c) => c.ready && c.after.value !== null && c.before.value !== null);
+  const readable = i.changes.filter((c) => c.ready && c.after.value !== null && c.before.value !== null);
+  // Since 1.7.6 a change is scored only once its before and after ranges are apart; a ready change
+  // whose ranges still overlap is named as such and gives no verdict.
+  const scored = readable.filter((c) => c.separated === true);
+  const overlapping = readable.filter((c) => c.separated !== true);
   const worse = scored.filter((c) => c.after.value! < c.before.value!);
   const latest = [...i.changes].sort((a, b) => (a.effective < b.effective ? 1 : -1))[0] ?? null;
   const show = (c: ChangeScore) => `${c.label}: ${formatLens(c.lens, c.after.value)} after against ${formatLens(c.lens, c.before.value)} before, on ${c.after.n.toLocaleString()} rows.`;
@@ -272,6 +300,9 @@ export function researchRead(i: ReadInput): ResearchRead {
   } else if (scored.length > 0) {
     headline = scored.length === 1 ? "The last change holds." : "The scored changes hold.";
     first = scored.map(show).join(" ");
+  } else if (overlapping.length > 0) {
+    headline = "Nothing to change.";
+    first = overlapping.map((c) => `${show(c).slice(0, -1)}; the two ranges still overlap, so no verdict yet.`).join(" ");
   } else {
     headline = "Nothing to change.";
     first = latest

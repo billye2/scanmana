@@ -1,8 +1,10 @@
 # HANDOFF — Scanmana (Vercel project `scanmana`, named `rc02` until 2026-08-31)
 
-_Last updated: 2026-11-03 (1.7.2). Read this first when picking up the project._
+_Last updated: 2026-11-03 (1.7.3). Read this first when picking up the project._
 
-**Latest (1.7.2, 2026-11-03) — the bottom bar's counter no longer wraps.** Billy: the pagination counter "gets squeezed and increases the height of the bottom nav." With four picks the column is ~65px on a phone and "12 of 24" broke onto two lines. The pill is now `whitespace-nowrap`, `text-xs`, inset `mx-1 px-1` (was `mx-2`, `text-sm`); the border still shows the tap target and the inset still keeps it off the iPhone's right edge (mistakes.md 2026-10-27).
+**Latest (1.7.3, 2026-11-03) — the gallery lights its own icon.** Billy: "best setups has wrong icon highlighted." `/gallery` was passing `current="/research"` to `TopNav` from 1.6.4, when it had no icon of its own and sat under the research flask; since 1.6.6 it has one. Now `current="/gallery"`.
+
+**1.7.2, 2026-11-03) — the bottom bar's counter no longer wraps.** Billy: the pagination counter "gets squeezed and increases the height of the bottom nav." With four picks the column is ~65px on a phone and "12 of 24" broke onto two lines. The pill is now `whitespace-nowrap`, `text-xs`, inset `mx-1 px-1` (was `mx-2`, `text-sm`); the border still shows the tap target and the inset still keeps it off the iPhone's right edge (mistakes.md 2026-10-27).
 
 **1.7.1, 2026-11-03) — `/paper` opens on Auto.** Billy: "make auto the default of the paper trading section, since i rarely look over the manual trades." `PaperBook` starts on the `auto` track and lists its tab first; nothing else moves.
 

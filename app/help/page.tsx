@@ -441,6 +441,20 @@ export default async function Help() {
       </Term>
 
       <H>
+        <span id="sections">The top bar and the gear</span>
+      </H>
+      <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
+        The icons beside the logo are yours to choose. The gear at the right end opens{" "}
+        <Link href="/sections" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/sections</Link>: every
+        section of the app, ranked by how often Kullamägi&apos;s routine has you open it — the deck list grouped by the open each evening, the paper
+        book each morning, the best setups and the research page each week, then the watchlist, the stop simulator, the lookup and this page.
+        Tick up to six and the bar carries them in that order, first thing needed first; once six are ticked the rest grey out until one is
+        unticked. Each row also opens its section, so whatever you leave off the bar stays two taps away. The choice is kept on this device
+        for a year (a cookie), so the phone and the desktop can carry different bars. The suggested six are the deck list, paper, best setups,
+        research, watchlist and lookup. The home deck&apos;s bottom bar (previous · watch · paper · deck list · counter) does not change.
+      </p>
+
+      <H>
         <span id="gallery">Best setups</span>
       </H>
       <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">

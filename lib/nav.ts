@@ -1,0 +1,117 @@
+/**
+ * The top bar's sections (1.6.6). Every signed-in page carries the same icons;
+ * which six is the reader's choice, made on /sections (the gear) and kept in a
+ * cookie, so the bar can be rebuilt around the routine without a redeploy. The
+ * registry below is ranked by how often Kullamägi's process has you open each
+ * page (2026-11-03): the bar draws the picks in this order, so the first thing
+ * needed each evening is the first icon. Pure; the cookie is read in TopNav and
+ * written by POST /api/nav.
+ */
+
+export type NavKey = "deck" | "paper" | "gallery" | "research" | "watchlist" | "sim" | "lookup" | "help";
+
+export interface NavSection {
+  key: NavKey;
+  href: string;
+  label: string;
+  /** How often his routine has you open it. */
+  cadence: string;
+  /** The piece of his method the page carries. */
+  why: string;
+}
+
+export const NAV_SECTIONS: readonly NavSection[] = [
+  {
+    key: "deck",
+    href: "/deck",
+    label: "Deck list grouped by the open",
+    cadence: "every evening",
+    why: "The nightly decision: what arms tonight, what sits inside its box, what is not ready. He scans every night and places the order before the open; this is that page.",
+  },
+  {
+    key: "paper",
+    href: "/paper",
+    label: "Paper book · At the open",
+    cadence: "every morning",
+    why: "Managing by rule: half off on day 4, breakeven, out on a close under the 10-day. What the rules do tomorrow, how each hold stands, the record in R.",
+  },
+  {
+    key: "gallery",
+    href: "/gallery",
+    label: "Best setups",
+    cadence: "weekly",
+    why: "His monthly review of the charts that worked. Pattern recognition comes from this page, not from the deck.",
+  },
+  {
+    key: "research",
+    href: "/research",
+    label: "Research",
+    cadence: "weekly",
+    why: "“Verify every setup.” The week's read, the scorecard, the rule-change rows, the plan scored on history.",
+  },
+  {
+    key: "watchlist",
+    href: "/watchlist",
+    label: "Watchlist",
+    cadence: "as needed",
+    why: "The names you chose to follow, with the live breakout buckets during the day.",
+  },
+  {
+    key: "sim",
+    href: "/sim",
+    label: "Stop simulator",
+    cadence: "occasional",
+    why: "For a trade taken off plan: his stop, the ladder of levels, the rest of the routine.",
+  },
+  {
+    key: "lookup",
+    href: "/s",
+    label: "Symbol lookup",
+    cadence: "utility",
+    why: "Any symbol as a deck card with the scan-fit checklist.",
+  },
+  {
+    key: "help",
+    href: "/help",
+    label: "Help",
+    cadence: "reference",
+    why: "Every term, the index charts, the sign-out. Always one tap away through this page, icon or not.",
+  },
+];
+
+/** The bar holds this many section icons beside the logo and the gear on a phone. */
+export const MAX_NAV = 6;
+/** The suggested six, in routine order. */
+export const DEFAULT_NAV: readonly NavKey[] = ["deck", "paper", "gallery", "research", "watchlist", "lookup"];
+export const NAV_COOKIE = "scm_nav";
+
+const KEYS = new Set<string>(NAV_SECTIONS.map((s) => s.key));
+const RANK = new Map<string, number>(NAV_SECTIONS.map((s, i) => [s.key, i]));
+
+/**
+ * The picks a stored value stands for: unknown keys dropped, duplicates
+ * removed, at most MAX_NAV kept, always in registry order. An absent or empty
+ * value means the default six; a value with no valid key means an empty bar
+ * (the reader unticked everything — the gear still shows).
+ */
+export function parseNav(raw: string | string[] | null | undefined): NavKey[] {
+  if (raw === null || raw === undefined) return [...DEFAULT_NAV];
+  const parts = Array.isArray(raw) ? raw : raw.split(",");
+  const picked = new Set<NavKey>();
+  for (const p of parts) {
+    const k = p.trim();
+    if (KEYS.has(k)) picked.add(k as NavKey);
+  }
+  if (!Array.isArray(raw) && raw.trim() === "") return [...DEFAULT_NAV];
+  return [...picked].sort((a, b) => RANK.get(a)! - RANK.get(b)!).slice(0, MAX_NAV);
+}
+
+/** The cookie value for a set of picks (registry order, validated). */
+export function navCookieValue(keys: readonly string[]): string {
+  return parseNav([...keys]).join(",");
+}
+
+/** The sections the bar draws, in order. */
+export function navSections(keys: readonly NavKey[]): NavSection[] {
+  return keys.map((k) => NAV_SECTIONS.find((s) => s.key === k)!).filter(Boolean);
+}

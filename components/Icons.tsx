@@ -166,3 +166,38 @@ export function ZoomOutIcon(p: P) {
     </Svg>
   );
 }
+
+/** Stacked pictures: the best-setups gallery. */
+export function GalleryIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="M18 22H4a2 2 0 0 1-2-2V6" />
+      <path d="m22 13-1.296-1.296a2.41 2.41 0 0 0-3.408 0L11 18" />
+      <circle cx="12" cy="8" r="2" />
+      <rect width="16" height="16" x="6" y="2" rx="2" />
+    </Svg>
+  );
+}
+
+/** Crosshair: the stop simulator. */
+export function CrosshairIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <circle cx="12" cy="12" r="10" />
+      <path d="M22 12h-4" />
+      <path d="M6 12H2" />
+      <path d="M12 6V2" />
+      <path d="M12 22v-4" />
+    </Svg>
+  );
+}
+
+/** Gear: the sections page, where the bar's six icons are chosen. */
+export function SettingsIcon(p: P) {
+  return (
+    <Svg {...p}>
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}

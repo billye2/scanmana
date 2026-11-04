@@ -43,9 +43,13 @@ but nothing is traded from it until it holds out of sample.
   the cron would).
 - **One top nav on every page** (`components/TopNav.tsx`): the ◎ SCM logo
   (the full wordmark left no room once the bar had six icons) always goes home,
-  a page line sits under it, and the same six icons sit on the right — Help,
-  symbol lookup, ★ Watchlist, paper book, research, deck list — with the current
-  page's icon lit. The symbol page adds its Live toggle beside them. The market
+  a page line sits under it, and on the right the sections you chose — up to six,
+  drawn in the order of Kullamägi's routine (`lib/nav.ts`; the suggested six are
+  deck list, paper book, best setups, research, ★ Watchlist, symbol lookup) — with
+  the current page's icon lit and a gear last that opens `/sections`: every
+  section ranked, a tick per row (six at most), each row a link. The choice is a
+  cookie on the device (`POST /api/nav`). The symbol page adds its Live toggle
+  beside them. The market
   strip's reason line is folded to one line with a chevron; tap to read it all.
 - **Paper trading** (`/paper`, `lib/paper-engine.ts` + `lib/paper-db.ts`): two
   ledgers priced on the same end-of-day bars, run right after each nightly scan.

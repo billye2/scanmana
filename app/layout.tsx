@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Scanmana",
-  description: "End-of-day momentum breakout scanner with Darvas boxes and Livermore pivots",
+  description: "End-of-day scanner for Kullamägi's 5-star breakout setup: finds leaders resting in a tight range and prices the night-before entry and stop",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Scanmana" },
   icons: { apple: "/icons/apple-touch-icon.png" },

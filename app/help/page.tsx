@@ -45,11 +45,16 @@ export default async function Help() {
       <TopNav current="/help" subtitle="Help" />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">
-        Scanmana runs one screen every night after the close: find the market&apos;s strongest stocks, keep only
-        the ones resting in a tight range near their highs, and draw the price levels that matter on each chart.
-        The screen follows <span className="text-neutral-100">Kristjan Kullamägi</span> (&ldquo;Qullamaggie&rdquo;), a
-        Swedish trader who published his breakout rules and numbers around 2019–2021. The chart overlays come from two
-        much older sources: Nicolas Darvas (1950s) and Jesse Livermore (1920s–30s).
+        Scanmana is built around one setup: the 5-star breakout of{" "}
+        <span className="text-neutral-100">Kristjan Kullamägi</span> (&ldquo;Qullamaggie&rdquo;), a Swedish trader who
+        published his rules and numbers around 2019–2021. A 5-star setup is a stock that has already made a big move,
+        then rests for weeks in a tight, orderly range while the 10- and 20-day averages catch up, with enough daily
+        range to move again when it goes. Every night after the close Scanmana finds those stocks from daily bars,
+        draws the range on the chart, and prices the entry and the stop a person can place the night before, without
+        watching the open. A boxed Wait card is the app&apos;s candidate for his setup. The chart overlays borrow two
+        older ideas: the Darvas box (1950s) is how the range is found, and the Livermore pivot (1920s–30s) is the
+        fallback trigger when there is no box — neither is a method of its own here. His other setup, the episodic
+        pivot, is a measured study on the Research page, not something the deck arms.
       </p>
       <div className="mt-3 flex justify-center">
         <RunScanButton />

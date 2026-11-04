@@ -1,8 +1,10 @@
 # HANDOFF — Scanmana (Vercel project `scanmana`, named `rc02` until 2026-08-31)
 
-_Last updated: 2026-11-03 (1.5.7). Read this first when picking up the project._
+_Last updated: 2026-11-03 (1.5.8). Read this first when picking up the project._
 
-**Latest (1.5.7, 2026-11-03) — fixes from the first live look at 1.5.1–1.5.6** (Chrome, signed in, desktop width; all six items rendered). The symbol page dedupes position lines and markers (VIA is held in both books at the same numbers and every label was doubled), passes `manualTakenTickers` so a held name shows "Taken" instead of "Take at open", and the deck list's live chip sizes to its label instead of a fixed width that clipped "failed back inside". Seen working: the "At the open" line on home and `/paper` ("Holds 11, nearest stop RNG −1.4%"), the deck list's four groups with the live chips, the stop ladder with the input prefilled, the position lines on `/s/VIA` (its Auto position predates the Kullamägi rule, so no day-4 marker — correct), and the research read, whose first live headline is "Revisit Livermore out of the verdict" (−13 points after against +6 before on 322 rows). Three entries in mistakes.md.
+**Latest (1.5.8, 2026-11-03) — the mission rewritten around the 5-star setup (docs only).** Decision record: Billy asked to refocus Scanmana on Kullamägi's 5-star setup because intraday EP trading needs market-watching he does not want. Pushback given and accepted: (1) the EP entry that pays in the study (neglected-and-10×, +0.36R on 37 at the next open) is a night-before order, not an intraday trade, so EPs stay a **scored study**, never armed, and the shelved EP list stays shelved; (2) the breakout at the next open is unproven (−0.42R on 22 closed Auto trades, all under the old entry; boxed Wait cards 61% vs 66% for all Wait), so the mission says "find and price" and claims the EOD trade only once it is scored; (3) the non-watcher's way to trade his breakout is a resting buy-stop, so that entry is measured too. The plan that follows (`~/.claude/plans/temporal-snuggling-owl.md`, approved 2026-11-03), one release each: **R1** `research/outcomes.py` labels every boxed deck row with the plan the Auto book trades (next open after the first close above the box, stop at that day's low, `_replay_kullamagi` exit → `k_r`, `k_stop_adr`) and with the resting buy-stop entry (stop one ADR under the fill → `bs_r`), new `/research` card with three tables (by stop width, by ADR, next-open vs buy-stop), scorecard tile switches to `k_r`; **R2** ADR floor 3.5% → 5% (sweep: 69% → 73%; the HANDOFF precondition "score the 5%-of-high change first" is met at 61% → 75% on 809), `RULE_CHANGES` row, lens `deck_hit`, stop if deck_size at the floor is under 15/night; **R3** only if R1's width table says wide stops lose: arming blocker "stop wider than one ADR" (skip, visible on the card, the list and `/paper` Skipped), `RULE_CHANGES` row, lens `paper_avg_r`, replay `CURRENT_RULE` → `kullamagi_adr`. Not doing: risk-based sizing, tighter-than-low stops, a new hit-rate definition, any EP change. Changed in this release: README intro, this section's "What this is", `app/layout.tsx` description, Help intro.
+
+**1.5.7, 2026-11-03 — fixes from the first live look at 1.5.1–1.5.6** (Chrome, signed in, desktop width; all six items rendered). The symbol page dedupes position lines and markers (VIA is held in both books at the same numbers and every label was doubled), passes `manualTakenTickers` so a held name shows "Taken" instead of "Take at open", and the deck list's live chip sizes to its label instead of a fixed width that clipped "failed back inside". Seen working: the "At the open" line on home and `/paper` ("Holds 11, nearest stop RNG −1.4%"), the deck list's four groups with the live chips, the stop ladder with the input prefilled, the position lines on `/s/VIA` (its Auto position predates the Kullamägi rule, so no day-4 marker — correct), and the research read, whose first live headline is "Revisit Livermore out of the verdict" (−13 points after against +6 before on 322 rows). Three entries in mistakes.md.
 
 **1.5.6, 2026-11-03 — the research page opens with its verdict.** Sixth and last mockup item. Pure `researchRead(input)` in `lib/research-story.ts` writes "This week's read" at the top of `/research` from numbers the page already loads (no new query): headline from the rule-change table (a ready change whose after-lens is below its before → "Revisit {label}."; ready and not worse → "The last change holds."; none ready → "Nothing to change." with the latest change's row count against `MIN_AFTER_N`), then the deck's breakout rate since the last change against all history, then the tape (breadth now vs ten sessions earlier from `getBreadth(120)`, the index filter from the latest scan, the paper size from `tapeMultiplier`); the grey watch line names the EP `both` row (neglected and 10×+) with its R and how many results short of a read, and the job status with the last finish time. Shown only once a research run exists. All six mockup items are shipped (1.5.1 → 1.5.6, 2026-11-03); the mockup itself stays at `.lavish/ux-improvements.html` (git-ignored).
 
@@ -18,13 +20,20 @@ _Last updated: 2026-11-03 (1.5.7). Read this first when picking up the project._
 
 ## What this is
 
-**Scanmana**: personal, single-user EOD stock scanner as a mobile-first PWA.
-Engine = Qullamaggie breakout screens (momentum leaders in tight
-consolidations); Darvas box + Livermore pivot drawn on each chart as
-trigger/stop overlays. A Python research layer scores the scanner's own history
-nightly (`/research`); rule changes are made from its numbers, registered in
-`lib/research-story.ts` so the page scores them, and logged in the config
-comment, the commit and here. Full product decisions and thresholds: see
+**Scanmana**: personal, single-user EOD stock scanner as a mobile-first PWA,
+built around one setup — Kullamägi's 5-star breakout (a momentum leader that has
+made its move and is resting in a tight range with the 10/20-day averages
+catching up). It finds that setup from daily bars and prices the entry and the
+stop a person can place the night before, without watching the open. The Darvas
+box is how the range is found; the Livermore pivot is the fallback trigger when
+there is no box; neither is a method of its own. The paper books measure whether
+the night-before versions of his entry pay. Episodic pivots are a measured study
+on `/research`, never armed, until they hold out of sample (mission rewritten
+2026-11-03, Billy's call: intraday EP trading needs market-watching he does not
+want; see the decision record in the Latest paragraph). A Python research layer
+scores the scanner's own history nightly (`/research`); rule changes are made
+from its numbers, registered in `lib/research-story.ts` so the page scores them,
+and logged in the config comment, the commit and here. Full product decisions and thresholds: see
 README.md and `lib/config.ts` (thresholds are deliberately hardcoded — no settings UI).
 
 ## Current state

@@ -2,11 +2,18 @@
 
 > Current project state, infra gotchas, and open questions live in [HANDOFF.md](HANDOFF.md) — read that first.
 
-Personal EOD momentum scanner as a mobile-first PWA. Engine: Qullamaggie-style
-breakout screens (momentum leaders in tight consolidations) with Darvas boxes
-and Livermore pivotal points drawn on each chart as entry-trigger / stop-zone
-overlays. A Python research layer scores the scanner's own history every night
-(`/research`) and scores every rule change made from it.
+Personal end-of-day scanner as a mobile-first PWA, built around one setup:
+Kristjan Kullamägi's 5-star breakout — a momentum leader that has made its move
+and is resting in a tight range with the 10- and 20-day averages catching up.
+Scanmana finds it from daily bars and prices the entry and the stop a person can
+place the night before, without watching the open. The Darvas box is how the
+range is found and the Livermore pivot is the fallback trigger when there is no
+box; neither is a method of its own. Two paper books measure whether the
+night-before versions of his entry pay, and a Python research layer scores the
+scanner's own history every night (`/research`) and every rule change made from
+it. Episodic pivots are a measured study on that page, not a setup the deck arms:
+the entry that pays there is also a night-before order, so the study stays open,
+but nothing is traded from it until it holds out of sample.
 
 ## Screenshots
 

@@ -379,6 +379,21 @@ CREATE TABLE IF NOT EXISTS research_replay (
   PRIMARY KEY (track, rule)
 );
 
+-- 1.8.0 (R5 of the Python-studies plan): the drawdown fan. research/mc.py shuffles the plan's
+-- k_r history into 5,000 sequences and stores the cumulative R after 1..T trades at five
+-- quantiles. book_pct is set on the one row whose trade count is the Auto book's: the share of
+-- sequences under the book's own cumulative R.
+CREATE TABLE IF NOT EXISTS research_mc (
+  trades integer PRIMARY KEY,
+  q05 double precision NOT NULL,
+  q25 double precision NOT NULL,
+  q50 double precision NOT NULL,
+  q75 double precision NOT NULL,
+  q95 double precision NOT NULL,
+  book_pct double precision,
+  as_of date NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS research_runs (
   job text PRIMARY KEY,
   scan_date date,

@@ -1,6 +1,6 @@
 # Python studies — five releases plus the page they live on
 
-**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migrated 2026-11-03) · R3 ✅ 1.7.8 (migrated 2026-11-03) · R4 ✅ 1.7.9 (migrated 2026-11-03) · **R5 next**. The exit rule change waits for the grid's real numbers. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
+**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migrated 2026-11-03) · R3 ✅ 1.7.8 (migrated 2026-11-03) · R4 ✅ 1.7.9 (migrated 2026-11-03) · R5 ✅ 1.8.0 (migration pending: `npm run migrate`). **Plan complete 2026-11-03.** The exit rule change waits for the grid's real numbers (first nightly 2026-11-05) and ships only if the gate sentence on `/studies` says so. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
 
 **Approved by Billy in the Lavish explainer `.lavish/python-heavy-lifting.html` (git-ignored).** His picks, in build order: confidence bands → follow-through paths → stable theme ids → exit sweep → drawdown fan. Not picked: relative-strength deciles (and the deck keeps tightest-first regardless). Answers to the three questions: (1) **the exit routine may change** — if the paths and the exit sweep are clear at 30+ rows with ranges apart, change it as a scored `RULE_CHANGES` row; (2) **the research page keeps to the read, the scorecard and the rule changes; the studies live on `/studies`** in the gear's list; (3) relative strength is study only, not picked.
 
@@ -38,7 +38,9 @@ Built as below, with one change of plumbing: the per-row grid is computed in the
 
 `research/sweep.py` gains a grid over the routine on all boxed Wait rows with a plan entry: partial day {3, 4, 5} × exit MA {10, 20} × breakeven {on, off}; `_replay_kullamagi` in `replay.py` gains `partial_day` and `breakeven` parameters (it has `ma`). Rows into `research_sweep` under params `EXIT_PARTIAL_DAY`, `EXIT_MA`, `EXIT_BREAKEVEN` plus a combined `EXIT_GRID` key (value encodes the cell); `tests/py/test_sweep.py` pins the grid's "current" cell to `CONFIG.PAPER.KULLAMAGI`. Card on `/studies` as a 12-cell grid with today's routine marked, bands (R1) in each cell. **Gate for the rule change:** the best cell beats today's cell on avg R with both n ≥ 30 and ranges apart, and the paths (R2) agree on the direction; then one `RULE_CHANGES` row, lens paper avg R, and `CONFIG.PAPER.KULLAMAGI` changes with the numbers in the comment.
 
-## R5 — drawdown fan
+## R5 — drawdown fan ✅ 1.8.0
+
+Built as below. The fan draws from the plan's full `k_r` history (wide stops included), so it describes the plan as scored, not the book's one-ADR skip; `book_pct` is stored by the job on the row for the book's trade count. First read: the book's 24 trades at the 15th percentile.
 
 **Migration first:** `research_mc`.
 

@@ -664,6 +664,42 @@ export async function getKullamagiStudy(): Promise<KullamagiStudy> {
   }
 }
 
+/* ---------- the drawdown fan (1.8.0, R5 of the Python-studies plan) ---------- */
+
+export interface FanRow {
+  trades: number;
+  q05: number;
+  q25: number;
+  q50: number;
+  q75: number;
+  q95: number;
+}
+export interface Fan {
+  rows: FanRow[];
+  /** The Auto book's trade count the job scored, and the share of chance sequences under its cumulative R. Null before the book has a closed trade. */
+  bookTrades: number | null;
+  bookPct: number | null;
+  asOf: string | null;
+}
+
+/** The chance bands of the plan's history (research_mc, written by research/mc.py). Empty before the first run. */
+export async function getFan(): Promise<Fan> {
+  try {
+    const rows = (await getSql()`SELECT trades, q05, q25, q50, q75, q95, book_pct, as_of::text AS as_of FROM research_mc ORDER BY trades`) as {
+      trades: number; q05: number; q25: number; q50: number; q75: number; q95: number; book_pct: number | null; as_of: string;
+    }[];
+    const scored = rows.find((r) => r.book_pct !== null);
+    return {
+      rows: rows.map((r) => ({ trades: r.trades, q05: Number(r.q05), q25: Number(r.q25), q50: Number(r.q50), q75: Number(r.q75), q95: Number(r.q95) })),
+      bookTrades: scored ? scored.trades : null,
+      bookPct: scored ? Number(scored.book_pct) : null,
+      asOf: rows[0]?.as_of ?? null,
+    };
+  } catch {
+    return { rows: [], bookTrades: null, bookPct: null, asOf: null };
+  }
+}
+
 /* ---------- follow-through paths (1.7.7, R2 of the Python-studies plan) ---------- */
 
 export interface PathDay {

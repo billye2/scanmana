@@ -8,7 +8,8 @@ import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
 import MorningLine from "@/components/MorningLine";
 import { stopProgress, type ExitReason, type MorningBrief, type Track, type TrailMode } from "@/lib/paper-engine";
-import type { ReplayRow } from "@/lib/research";
+import FanChart from "@/components/FanChart";
+import type { Fan, ReplayRow } from "@/lib/research";
 import type { Tape } from "@/lib/tape";
 
 const BTN = "rounded-lg bg-neutral-800 px-3 py-1.5 text-xs text-neutral-300 active:bg-neutral-700 disabled:opacity-40";
@@ -28,7 +29,19 @@ async function post(path: string, body: unknown, method = "POST"): Promise<strin
   return j.error ?? `${res.status}`;
 }
 
-export default function PaperBook({ book, replay = [], tape = null, brief = null }: { book: Book; replay?: ReplayRow[]; tape?: Tape | null; brief?: MorningBrief | null }) {
+export default function PaperBook({
+  book,
+  replay = [],
+  tape = null,
+  brief = null,
+  fan = null,
+}: {
+  book: Book;
+  replay?: ReplayRow[];
+  tape?: Tape | null;
+  brief?: MorningBrief | null;
+  fan?: { fan: Fan; path: number[]; sentence: string } | null;
+}) {
   const router = useRouter();
   // Auto opens first since 1.7.1 (Billy: "i rarely look over the manual trades").
   const [track, setTrack] = useState<Track>("auto");
@@ -65,6 +78,15 @@ export default function PaperBook({ book, replay = [], tape = null, brief = null
       <Stats t={t} />
       {tape && <TapeLine tape={tape} />}
       <ReplayLine rows={replay.filter((r) => r.track === track)} />
+      {track === "auto" && fan && fan.fan.rows.length > 0 && (
+        <div className="mt-2 rounded-xl bg-neutral-900 px-3 py-2">
+          <div className="mb-1 text-[11px] font-semibold text-neutral-400">The fan: what this plan produces by chance</div>
+          <FanChart rows={fan.fan.rows} path={fan.path} />
+          <p className="mt-1 text-[11px] leading-relaxed text-neutral-400">
+            {fan.sentence} <Link href="/help#fan" className="text-neutral-300 underline decoration-neutral-700 underline-offset-4">Why</Link>
+          </p>
+        </div>
+      )}
       <Section title={`Armed orders · ${t.orders.length}`}>
         {t.orders.length === 0 ? (
           <Empty>{track === "manual" ? "Nothing armed — tap Take on a deck card or a watchlist row." : "Nothing armed tonight."}</Empty>

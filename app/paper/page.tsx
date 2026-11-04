@@ -3,7 +3,8 @@ import PaperBook from "@/components/PaperBook";
 import TopNav from "@/components/TopNav";
 import { morningBrief, type MorningBrief } from "@/lib/paper-engine";
 import { ensureAccounts, getBook, type Book } from "@/lib/paper-db";
-import { getReplay, type ReplayRow } from "@/lib/research";
+import { closedTrades, getFan, getReplay, type Fan, type ReplayRow } from "@/lib/research";
+import { cumulativePath, fanSentence } from "@/lib/fan-read";
 import { latestTape, type Tape } from "@/lib/tape";
 
 export const metadata = { title: "Paper trading — Scanmana" };
@@ -14,6 +15,7 @@ export default async function PaperPage() {
   const { userId } = await auth();
   let book: Book | null = null;
   let replay: ReplayRow[] = [];
+  let fan: { fan: Fan; path: number[]; sentence: string } | null = null;
   let tape: Tape | null = null;
   let error: string | null = null;
   if (userId) {
@@ -22,6 +24,10 @@ export default async function PaperPage() {
       book = await getBook(userId);
       replay = await getReplay();
       tape = await latestTape();
+      // The drawdown fan (1.8.0): the plan's chance bands and the Auto book's own path, read here so the client book stays a renderer.
+      const [f, trades] = await Promise.all([getFan(), closedTrades("auto")]);
+      const path = cumulativePath(trades);
+      fan = { fan: f, path, sentence: fanSentence(f, path) };
     } catch (err) {
       error = err instanceof Error ? err.message : String(err);
     }
@@ -38,7 +44,7 @@ export default async function PaperPage() {
     <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
       <TopNav current="/paper" subtitle="Paper trading" />
       {book ? (
-        <PaperBook book={book} replay={replay} tape={tape} brief={brief} />
+        <PaperBook book={book} replay={replay} tape={tape} brief={brief} fan={fan} />
       ) : (
         <p className="mt-16 text-center text-sm text-neutral-500">
           {error ? `Paper book unavailable — ${error} (run npm run migrate?)` : "Sign in to see your paper book."}

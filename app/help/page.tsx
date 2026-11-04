@@ -467,6 +467,16 @@ export default async function Help() {
         effect at the next nightly run.
       </Term>
 
+      <Term name="The fan">
+        <span id="fan" />
+        Under the Auto ledger&apos;s replay line (1.8.0): the plan&apos;s own history — the R of every boxed Wait card it entered, the same
+        rows the plan card scores — shuffled five thousand times into runs of trades, and the cumulative R after each trade drawn as a
+        fan: the light band holds nine in ten runs, the darker band the middle half, the dashed line the median. The amber line is the
+        ledger&apos;s actual path, trade by trade, and the sentence places its last point as a percentile of the runs with the same count.
+        Inside the fan the book is doing what its plan does by chance, hot or cold; outside it on the low side, the trades deserve a
+        look before the plan does. The bands move only when history does (a fixed seed), and nothing on the book reads them: this one
+        card is understanding, not a decision.
+      </Term>
       <Term name="Reading the numbers">
         <span className="text-neutral-100">R</span> is the trade&apos;s result divided by the risk taken at entry (entry price minus the
         initial stop, times shares): −1R is a full stop-out, +2R made twice the risk. Win rate, average win and loss in R,{" "}

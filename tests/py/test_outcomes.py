@@ -90,7 +90,7 @@ def test_label_frame_aligns_on_scan_date_and_skips_missing():
             {"date": dates[2], "ticker": "ZZZ", "close": 1.0, "boxed": False, "box_top": None, "box_bottom": None, "pivot": 1.0},
         ]
     )
-    out = label_frame(rows, bars)
+    out, _ = label_frame(rows, bars)
     assert len(out) == 1
     row = out[0]
     assert row[1] == "AAA"
@@ -120,7 +120,7 @@ def test_label_frame_uses_the_20_session_high_when_pivot_is_below_close():
     bars = pd.DataFrame({"ticker": "T", "date": dates, "o": closes, "h": highs, "l": [99.0] * len(dates), "c": closes})
     rows = pd.DataFrame([{"date": dates[n_before], "ticker": "T", "close": 100.0, "boxed": False,
                           "box_top": None, "box_bottom": None, "pivot": 90.0}])
-    out = label_frame(rows, bars)
+    out, _ = label_frame(rows, bars)
     assert len(out) == 1
     rec = dict(zip(["date", "ticker", "level", "broke_10d", "broke_day"], out[0][:5]))
     assert rec["level"] == 112.0
@@ -199,3 +199,65 @@ def test_label_one_carries_the_plan_columns():
     out = label_one(_plan_after(), 100, 105, 105, 95, 0.04, [100])
     assert out["k_entry_day"] == 4 and out["bs_entry_day"] == 3
     assert label_one(_after([100] * 3), 100, 105, None, None)["k_r"] is None
+
+
+# ---------- follow-through paths (1.7.7, R2) ----------
+from research.outcomes import PATH_DAYS, PATH_DAYS_COL, follow_path, in_path_study  # noqa: E402
+
+
+def test_follow_path_counts_the_entry_session_as_day_one_and_carries_the_running_low():
+    frame = _after([110, 108, 115], lows=[105, 102, 110])
+    path = follow_path(frame, entry=100.0)
+    assert [d for d, _, _ in path] == [1, 2, 3]
+    assert [g for _, g, _ in path] == pytest.approx([0.10, 0.08, 0.15])
+    assert [lo for _, _, lo in path] == pytest.approx([0.05, 0.02, 0.02])  # the day-2 low holds on day 3
+    assert follow_path(frame, 0.0) == [] and follow_path(frame.iloc[:0], 100.0) == []
+    assert len(follow_path(_after([100.0] * 30), 100.0)) == PATH_DAYS
+
+
+def test_in_path_study_is_the_plan_card_population():
+    assert in_path_study(3, True, "wait", 100.0, 105.0)
+    assert not in_path_study(None, True, "wait", 100.0, 105.0)  # not on the deck
+    assert not in_path_study(3, False, "wait", 100.0, 105.0)
+    assert not in_path_study(3, True, "pass", 100.0, 105.0)
+    assert not in_path_study(3, True, "wait", 106.0, 105.0)  # already above the box
+    assert not in_path_study(3, True, "wait", 100.0, None)
+
+
+def _path_bars(sessions: int):
+    dates = pd.date_range("2026-08-03", periods=sessions, freq="B")
+    # Scan on dates[0] at 100 under a 105 box. Day 3 after the scan closes 106; the entry opens day 4 at 108.
+    closes = [100.0, 100, 101, 106, 108, 110, 112, 111, 113, 115, 114, 116, 118, 117, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136][:sessions]
+    c = np.asarray(closes)
+    return dates, pd.DataFrame({"ticker": "AAA", "date": dates, "o": c, "h": c * 1.01, "l": c * 0.99, "c": c, "v": 1e6})
+
+
+def _path_row(dates, **over):
+    row = {"date": dates[0], "ticker": "AAA", "close": 100.0, "boxed": True, "box_top": 105.0, "box_bottom": 95.0,
+           "pivot": None, "adr_pct": 4.0, "rank": 1, "verdict": "wait"}
+    row.update(over)
+    return pd.DataFrame([row])
+
+
+def test_label_frame_writes_the_path_from_the_entry_open_and_counts_its_days():
+    dates, bars = _path_bars(32)  # scan + 31 sessions: entry on session 4, twenty path days fit
+    out, paths = label_frame(_path_row(dates), bars)
+    assert out[0][PATH_DAYS_COL] == PATH_DAYS and len(paths) == PATH_DAYS
+    first = paths[0]
+    assert first[:3] == [dates[0].date(), "AAA", 1]
+    assert first[3] == pytest.approx(108 / 108 - 1)  # day 1 = the entry session, close over its own open
+    assert paths[1][3] == pytest.approx(110 / 108 - 1)
+    assert paths[1][4] == pytest.approx(108 * 0.99 / 108 - 1)  # the running low is the entry day's
+    assert paths[-1][2] == PATH_DAYS and paths[-1][3] == pytest.approx(bars["c"].iloc[4 + 19] / 108 - 1)
+
+
+def test_label_frame_path_is_short_while_the_bars_run_out_and_absent_off_the_deck():
+    dates, bars = _path_bars(21)  # the outcome window is complete (20 after) but only 17 path days exist
+    out, paths = label_frame(_path_row(dates), bars)
+    from research.outcomes import COMPLETE_COL
+
+    assert out[0][COMPLETE_COL] is True and out[0][PATH_DAYS_COL] == 17 and len(paths) == 17
+    out, paths = label_frame(_path_row(dates, rank=None), bars)
+    assert out[0][PATH_DAYS_COL] == 0 and paths == []
+    out, paths = label_frame(_path_row(dates, verdict="pass"), bars)
+    assert out[0][PATH_DAYS_COL] == 0 and paths == []

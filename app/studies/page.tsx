@@ -2,17 +2,24 @@ import Link from "next/link";
 import { BreadthLine, BucketBars, RateBars, SweepPanel } from "@/components/ResearchCharts";
 import { ClusterAlias } from "@/components/ResearchControls";
 import Band from "@/components/Band";
+import PathChart from "@/components/PathChart";
 import { Card, H, NUM, SUMMARY, TD, TH, n, pc, rr } from "@/components/ResearchPrimitives";
 import { meanInterval, wilson } from "@/lib/stats";
+import { pathSentence, pathSummary } from "@/lib/paths-read";
+import { CONFIG } from "@/lib/config";
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
 import {
   EP_NEGLECT_RET_3M,
+  PATH_DAYS,
+  PATH_SPLITS,
+  type PathSplitKey,
   SWEEP_CURRENT,
   getBreadth,
   getClusters,
   getEpStudy,
   getKullamagiStudy,
+  getPaths,
   getResearchSummary,
   getSweep,
   getThemeStudy,
@@ -34,13 +41,16 @@ const SWEEP_LABEL: Record<string, { title: string; sub: string; fmt: (v: number)
  * /studies — the research layer's deeper reads (1.7.5), moved off /research so
  * that page keeps to the verdict, the scorecard and the rule changes (Billy's
  * call, 2026-11-03). Everything here is a study: it reads the research tables
- * and changes nothing. In order: the plan on history, breakout rates, the EP
- * study, the threshold sweep, breadth, tonight's themes, themes scored.
+ * and changes nothing. In order: the plan on history, the follow-through paths
+ * (1.7.7, split by ?split=), breakout rates, the EP study, the threshold sweep,
+ * breadth, tonight's themes, themes scored.
  */
-export default async function StudiesPage() {
+export default async function StudiesPage({ searchParams }: { searchParams: Promise<{ split?: string }> }) {
+  const sp = await searchParams;
+  const split: PathSplitKey = sp.split && sp.split in PATH_SPLITS ? (sp.split as PathSplitKey) : "all";
   const scan = await latestScanSlim().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
-  const [summary, sweep, clusters, breadth, ep, plan, themeStudy] = await Promise.all([
+  const [summary, sweep, clusters, breadth, ep, plan, themeStudy, paths] = await Promise.all([
     getResearchSummary(),
     getSweep(),
     getClusters(deckTickers),
@@ -48,7 +58,15 @@ export default async function StudiesPage() {
     getEpStudy(),
     getKullamagiStudy(),
     getThemeStudy(),
+    getPaths(),
   ]);
+  const pathGroups = paths[split];
+  const pathMarks = [
+    { day: CONFIG.PAPER.KULLAMAGI.PARTIAL_DAY, label: `day ${CONFIG.PAPER.KULLAMAGI.PARTIAL_DAY} half` },
+    { day: CONFIG.PAPER.KULLAMAGI.MA, label: `${CONFIG.PAPER.KULLAMAGI.MA}-day` },
+  ];
+  const markDays = [CONFIG.PAPER.KULLAMAGI.PARTIAL_DAY, CONFIG.PAPER.KULLAMAGI.MA, PATH_DAYS];
+  const gainAt = (g: (typeof pathGroups)[number], day: number) => g.days.find((d) => d.day === day) ?? null;
   const sweepParams = Object.keys(SWEEP_LABEL).filter((p) => sweep.some((s) => s.param === p));
   const headline = sweepHeadline(sweep);
   const themes = clusters.filter((c) => c.inDeck.length >= 2).sort((a, b) => b.inDeck.length - a.inDeck.length || b.ret63d - a.ret63d).slice(0, 8);
@@ -103,7 +121,66 @@ export default async function StudiesPage() {
         ))}
       </div>
 
-      {/* ---------- 2. Breakout rates ---------- */}
+      {/* ---------- 2. Follow-through paths (1.7.7) ---------- */}
+      <H id="paths" sub={`The same cards, bought at the next open after the first close above the box and then simply held: the mean gain over the entry on each day of the trade (day 1 = the entry session) and the mean of the lowest low so far, with no exit applied. The two marks are where the Auto book acts — half off on day ${CONFIG.PAPER.KULLAMAGI.PARTIAL_DAY}, and the ${CONFIG.PAPER.KULLAMAGI.MA}-session average it sells under. Only cards with all ${PATH_DAYS} days count. With the exit sweep this decides whether the routine changes.`}>
+        Where the move goes after the entry
+      </H>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {(Object.keys(PATH_SPLITS) as PathSplitKey[]).map((k) => (
+          <Link
+            key={k}
+            href={k === "all" ? "/studies#paths" : `/studies?split=${k}#paths`}
+            scroll={false}
+            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${k === split ? "bg-neutral-100 text-neutral-900" : "bg-neutral-900 text-neutral-400 hover:text-neutral-100"}`}
+          >
+            {PATH_SPLITS[k].title}
+          </Link>
+        ))}
+      </div>
+      <Card>
+        <PathChart groups={pathGroups} days={PATH_DAYS} marks={pathMarks} />
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className={TH}>Group</th>
+                <th className={`${TH} text-right`}>Rows</th>
+                {markDays.map((d) => <th key={d} className={`${TH} text-right`}>Day {d}</th>)}
+                <th className={`${TH} text-right`}>Median day {PATH_DAYS}</th>
+                <th className={`${TH} text-right`}>Lowest mean low</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pathGroups.map((g) => {
+                const s = pathSummary(g.days, markDays);
+                const ready = g.n >= MIN_AFTER_N;
+                const fmt = (x: number | null | undefined) => (x == null ? "—" : `${x < 0 ? "−" : "+"}${Math.abs(x * 100).toFixed(1)}%`);
+                return (
+                  <tr key={g.key} className={`border-t border-neutral-800 ${ready ? "" : "text-neutral-500"}`}>
+                    <td className={`${TD} whitespace-normal ${ready ? "text-neutral-100" : ""}`}>{g.label}</td>
+                    <td className={NUM}>{n(g.n)}</td>
+                    {markDays.map((d) => {
+                      const v = gainAt(g, d);
+                      return <td key={d} className={`${NUM} ${ready && v ? (v.mean >= 0 ? "text-emerald-300" : "text-red-300") : ""}`}>{fmt(v?.mean)}</td>;
+                    })}
+                    <td className={NUM}>{fmt(gainAt(g, PATH_DAYS)?.median)}</td>
+                    <td className={NUM}>{s.troughDay === null ? "—" : `${fmt(s.troughLow)} on day ${s.troughDay}`}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-2 space-y-1 text-[12px] leading-relaxed text-neutral-400">
+          {pathGroups.filter((g) => g.days.length > 0).length === 0 ? (
+            <p>{pathSentence("", 0, pathSummary([], markDays))}</p>
+          ) : (
+            pathGroups.filter((g) => g.days.length > 0).map((g) => <p key={g.key}>{pathSentence(g.label, g.n, pathSummary(g.days, markDays))}</p>)
+          )}
+        </div>
+      </Card>
+
+      {/* ---------- 3. Breakout rates ---------- */}
       <H id="outcomes" sub={`Deck names only (the capped nightly deck), ${n(summary.labelled)} of ${n(summary.deckRows)} labelled so far. "Broke out" = a close within ten sessions of the scan above the box top, else above the pivot while it is still overhead, else above the 20-session high.`}>
         Breakout rate within 10 sessions
       </H>
@@ -131,7 +208,7 @@ export default async function StudiesPage() {
         </Card>
       </div>
 
-      {/* ---------- 3. Episodic pivots ---------- */}
+      {/* ---------- 4. Episodic pivots ---------- */}
       <H id="ep" sub={`Kullamägi's main setup, which the deck cannot show: a gap of 10%+ on 3× volume in the whole market (price ≥ $10, ≥ $20M/day), bought at the next open with the stop at the gap day's low and sold by the Auto book's routine. ${n(ep.candidates)} gap days${ep.firstDate ? ` since ${ep.firstDate}` : ""}, ${n(ep.taken)} tradeable, ${n(ep.labelled)} with a result. A study only — nothing is armed from it.`}>
         Episodic pivots, had the book traded them
       </H>
@@ -180,7 +257,7 @@ export default async function StudiesPage() {
         </div>
       )}
 
-      {/* ---------- 4. Sweep ---------- */}
+      {/* ---------- 5. Sweep ---------- */}
       <H id="sweep" sub="One screen floor moved at a time, the other three held at today's values, the deck cap re-applied. A report for retuning lib/config.ts, nothing on the deck reads it. The ADR floor is 3.5% for good (1.6.5), whatever its curve says.">
         Threshold sweep
       </H>
@@ -213,7 +290,7 @@ export default async function StudiesPage() {
         </Card>
       )}
 
-      {/* ---------- 5. Breadth ---------- */}
+      {/* ---------- 6. Breadth ---------- */}
       <H id="breadth" sub="Share of the universe (price ≥ $5, ≥ $5M/day) above its 20-day average. Green bands: sessions the index verdict called Bullish. Right: the deck's 10-session hit rate by the breadth on scan night. The tape page has the full read.">
         Market breadth
       </H>
@@ -225,7 +302,7 @@ export default async function StudiesPage() {
         </Card>
       </div>
 
-      {/* ---------- 6. Themes ---------- */}
+      {/* ---------- 7. Themes ---------- */}
       <H id="themes" sub="Groups that moved together over the last 63 sessions, from price alone, with two or more names in tonight's deck. Amber tickers are on the deck. Membership is saved nightly; the card below scores it.">
         Themes on tonight&apos;s deck
       </H>
@@ -256,7 +333,7 @@ export default async function StudiesPage() {
         </Card>
       )}
 
-      {/* ---------- 7. Themes, scored (1.7.4) ---------- */}
+      {/* ---------- 8. Themes, scored (1.7.4) ---------- */}
       <H
         id="themes-scored"
         sub={

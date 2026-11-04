@@ -14,6 +14,15 @@ the same function the replay row runs); bs_r is the non-watcher's version (a
 resting buy-stop at the box top, stop one ADR under the fill, the same exits).
 k_stop_adr is the next-open stop's width in ADR units. Rows are re-labelled
 until 20 sessions have passed (complete = true), then left alone.
+
+Follow-through paths (1.7.7, R2 of the Python-studies plan): for every boxed
+Wait deck row the next-open plan entered, research_paths holds day 1..PATH_DAYS
+from the entry session (day 1 = the entry day, as the replay counts it): gain =
+close / entry - 1, low = the lowest low so far / entry - 1 — the raw move with
+no exit applied, so the exit routine can be judged against it. path_days on the
+outcome row counts the days written; a row whose path is short of PATH_DAYS is
+re-labelled nightly until the bars reach that far, past its own 20-session
+window if need be.
 """
 from __future__ import annotations
 
@@ -40,13 +49,33 @@ PLAN_COLUMNS = ["k_entry_day", "k_stop_adr", "k_r", "bs_entry_day", "bs_stop_adr
 # version are re-labelled by the nightly run, a chunk at a time within its budget, so
 # a new column back-fills the whole history without a forced Refresh.
 PLAN_VERSION = 1
+PATH_DAYS = 20
+PATH_COLUMNS = ["date", "ticker", "day", "gain", "low"]
 COLUMNS = [
     "date", "ticker", "level", "broke_10d", "broke_day",
     "mfe_5", "mfe_10", "mfe_20", "mae_5", "mae_10", "mae_20",
     "r_at_exit", "filled", "sessions_after", "complete",
-    *PLAN_COLUMNS, "plan_v",
+    *PLAN_COLUMNS, "plan_v", "path_days",
 ]
 COMPLETE_COL = COLUMNS.index("complete")
+PATH_DAYS_COL = COLUMNS.index("path_days")
+
+
+def follow_path(frame: pd.DataFrame, entry: float, days: int = PATH_DAYS) -> list[tuple[int, float, float]]:
+    """The follow-through from `entry` over `frame` (columns l, c), whose first row
+    is the entry session: (day, gain, low) for day 1..min(days, len(frame)),
+    gain = close / entry - 1, low = min(low_1..day) / entry - 1. Pure."""
+    if entry <= 0 or frame.empty:
+        return []
+    c = frame["c"].to_numpy(dtype=float)[:days]
+    lo = np.minimum.accumulate(frame["l"].to_numpy(dtype=float)[:days])
+    return [(d + 1, float(c[d] / entry - 1), float(lo[d] / entry - 1)) for d in range(len(c))]
+
+
+def in_path_study(rank: Any, boxed: bool, verdict: Any, close: float, box_top: float | None) -> bool:
+    """The population the paths describe: boxed Wait deck rows resting under the
+    box top on scan night — the same rows the plan card on /studies scores."""
+    return rank is not None and boxed and verdict == "wait" and box_top is not None and close <= box_top
 
 
 def _plan_r(frame: pd.DataFrame, start: int, entry: float, stop: float, pre_closes: list[float], n: int) -> float | None:
@@ -134,7 +163,7 @@ def label_one(
         "level": level, "broke_10d": None, "broke_day": None,
         "mfe_5": None, "mfe_10": None, "mfe_20": None, "mae_5": None, "mae_10": None, "mae_20": None,
         "r_at_exit": None, "filled": None, "sessions_after": int(n), "complete": bool(n >= HORIZON),
-        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION,
+        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION, "path_days": 0,
     }
     if n == 0:
         return out
@@ -188,10 +217,16 @@ def label_one(
 
 
 def _pending_rows(conn: psycopg.Connection, force: bool) -> pd.DataFrame:
-    where = "" if force else f"WHERE o.date IS NULL OR NOT o.complete OR o.plan_v IS DISTINCT FROM {PLAN_VERSION}"
+    # A path-study row (boxed Wait deck row the plan entered) stays pending until its
+    # path reaches PATH_DAYS, which can be up to ten sessions after its outcome window.
+    short_path = (
+        "(h.rank IS NOT NULL AND h.boxed AND h.verdict = 'wait' AND h.close <= h.box_top"
+        f" AND o.k_entry_day IS NOT NULL AND COALESCE(o.path_days, 0) < {PATH_DAYS})"
+    )
+    where = "" if force else f"WHERE o.date IS NULL OR NOT o.complete OR o.plan_v IS DISTINCT FROM {PLAN_VERSION} OR {short_path}"
     return read_df(
         conn,
-        f"""SELECT h.date, h.ticker, h.close, h.boxed, h.box_top, h.box_bottom, h.pivot, h.adr_pct
+        f"""SELECT h.date, h.ticker, h.close, h.boxed, h.box_top, h.box_bottom, h.pivot, h.adr_pct, h.rank, h.verdict
             FROM scan_history h LEFT JOIN research_outcomes o USING (date, ticker) {where}
             ORDER BY h.ticker, h.date""",
     )
@@ -208,14 +243,17 @@ def breakout_level(scan_close: float, boxed: bool, box_top: float | None, pivot:
     return None
 
 
-def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> list[list[Any]]:
+def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> tuple[list[list[Any]], list[list[Any]]]:
     """Label every row of `rows` (one ticker or many) against `bars`. Pure.
+    Returns (outcome rows in COLUMNS order, path rows in PATH_COLUMNS order).
 
     `bars` should start at least HIGH_WINDOW sessions before the earliest row
-    so the fallback level (20-session high) has its history."""
+    so the fallback level (20-session high) has its history. Paths need `rank`
+    and `verdict` on the rows (rows without them get no path)."""
     out: list[list[Any]] = []
+    paths: list[list[Any]] = []
     if rows.empty or bars.empty:
-        return out
+        return out, paths
     bars = bars.sort_values(["ticker", "date"])
     for ticker, grp in rows.groupby("ticker", sort=False):
         tb = bars[bars["ticker"] == ticker]
@@ -237,8 +275,14 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> list[list[Any]]:
             lab = label_one(
                 after, float(r.close), level, _f(r.box_top) if boxed else None, _f(r.box_bottom) if boxed else None, adr, pre_closes
             )
+            entry_day = lab["k_entry_day"]
+            if entry_day is not None and in_path_study(getattr(r, "rank", None), boxed, getattr(r, "verdict", None), float(r.close), _f(r.box_top)):
+                start = i + entry_day  # after[0] is tb[i + 1], so entry day d (1-based in after) is tb[i + d]
+                path = follow_path(tb.iloc[start : start + PATH_DAYS], float(tb["o"].iloc[start]))
+                lab["path_days"] = len(path)
+                paths.extend([pyval(r.date), ticker, day, gain, low] for day, gain, low in path)
             out.append([pyval(r.date), ticker] + [pyval(lab[k]) for k in COLUMNS[2:]])
-    return out
+    return out, paths
 
 
 def _f(x: Any) -> float | None:
@@ -257,16 +301,17 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         return "nothing to label"
     rows["date"] = pd.to_datetime(rows["date"])
     tickers = rows["ticker"].unique().tolist()
-    written = complete = 0
+    written = complete = path_rows = 0
     for i in range(0, len(tickers), CHUNK):
         chunk = tickers[i : i + CHUNK]
         sub = rows[rows["ticker"].isin(chunk)]
         since: date = sub["date"].min().date() - timedelta(days=35)  # room for the 20-session high
         bars = load_bars(conn, tickers=chunk, since=since.isoformat())
-        labelled = label_frame(sub, bars)
+        labelled, paths = label_frame(sub, bars)
         written += write_rows(conn, "research_outcomes", COLUMNS, labelled, conflict=["date", "ticker"])
+        path_rows += write_rows(conn, "research_paths", PATH_COLUMNS, paths, conflict=["date", "ticker", "day"])
         complete += sum(1 for r in labelled if r[COMPLETE_COL])
         conn.commit()
         if not ctx.has_time(15):
-            return f"{written} rows labelled ({complete} complete) — out of time, resuming next run"
-    return f"{written} rows labelled ({complete} complete)"
+            return f"{written} rows labelled ({complete} complete), {path_rows} path days — out of time, resuming next run"
+    return f"{written} rows labelled ({complete} complete), {path_rows} path days"

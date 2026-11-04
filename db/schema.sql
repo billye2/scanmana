@@ -230,6 +230,22 @@ ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS bs_stop_adr double precis
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS bs_r double precision;
 -- plan_v: research/outcomes.py PLAN_VERSION. Null = not yet labelled with the plans.
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS plan_v smallint;
+-- 1.7.7 (R2 of the Python-studies plan): path_days = how many research_paths rows this
+-- outcome row has (0 when it is not a boxed Wait deck row the plan entered). A row short of
+-- research/outcomes.py PATH_DAYS is re-labelled nightly until the bars reach that far.
+ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS path_days smallint;
+
+-- 1.7.7: the follow-through of every boxed Wait deck card the next-open plan entered, day 1..20
+-- from the entry session (day 1 = the entry day, as the replay counts it), with no exit applied.
+-- gain = close / entry - 1 on that day, low = the lowest low so far / entry - 1.
+CREATE TABLE IF NOT EXISTS research_paths (
+  date date NOT NULL,
+  ticker text NOT NULL,
+  day smallint NOT NULL,
+  gain double precision NOT NULL,
+  low double precision NOT NULL,
+  PRIMARY KEY (date, ticker, day)
+);
 
 CREATE TABLE IF NOT EXISTS research_sweep (
   param text NOT NULL,

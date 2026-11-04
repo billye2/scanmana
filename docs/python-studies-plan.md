@@ -1,6 +1,6 @@
 # Python studies — five releases plus the page they live on
 
-**Status (2026-11-03, PST evening):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · **R2 next** · R3 · R4 · R5. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
+**Status (2026-11-03, PST night):** R0 ✅ 1.7.5 · R1 ✅ 1.7.6 · R2 ✅ 1.7.7 (migration pending: `npm run migrate`) · **R3 next** · R4 · R5. Work one module per step, mind context and session limits, report after each (Billy's rule). A release that needs a migration says so first: `npm run migrate` is Billy's to run (`!`).
 
 **Approved by Billy in the Lavish explainer `.lavish/python-heavy-lifting.html` (git-ignored).** His picks, in build order: confidence bands → follow-through paths → stable theme ids → exit sweep → drawdown fan. Not picked: relative-strength deciles (and the deck keeps tightest-first regardless). Answers to the three questions: (1) **the exit routine may change** — if the paths and the exit sweep are clear at 30+ rows with ranges apart, change it as a scored `RULE_CHANGES` row; (2) **the research page keeps to the read, the scorecard and the rule changes; the studies live on `/studies`** in the gear's list; (3) relative strength is study only, not picked.
 
@@ -14,9 +14,9 @@ Moved off `/research`: breakout rates, the threshold sweep, breadth, themes on t
 
 `lib/stats.ts` (pure): `wilson` for rates, `meanInterval` (mean ± 1.96·sd/√n) for averages, `diffInterval`, `separated`, `formatInterval`. `components/Band.tsx` draws the range under the number. Wired into the scorecard tiles, the rule-change rows (coloured only when ready **and** the two ranges are apart; amber while they overlap; `researchRead` gives no verdict on an overlapping change), the plan card and themes-scored tables on `/studies`, the verdict table on `/tape`. Readers return `stddev_samp` as `sdR`/`sdKR`; `PeriodSums.waitRSumSq`. Closed-form on purpose, no bootstrap.
 
-## R2 — follow-through paths (next)
+## R2 — follow-through paths ✅ 1.7.7
 
-**Migration first:** one table.
+**Migration first:** one table (`research_paths`) plus `path_days` on `research_outcomes`. Built as below; the population is the plan card's (boxed Wait deck rows under the box top that the plan entered), paths run past the outcome window until they have 20 days, and only full paths count in the reader.
 
 `research/outcomes.py` writes `research_paths (date, ticker, day smallint 1..20, gain double, low double, PRIMARY KEY (date, ticker, day))` for every boxed Wait row with a `k_entry_day` (the Auto plan's entry: the open after the first close above the box): gain = close_d / entry − 1, low = min(low_1..d) / entry − 1. Incremental with the row's `complete` flag (re-label with the plan columns, same chunk loop; the bars are the ones the job already loads). `db/schema.sql` gains the table (no semicolons in comments — the migrator splits on them).
 

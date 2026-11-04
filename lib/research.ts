@@ -635,6 +635,93 @@ export async function getKullamagiStudy(): Promise<KullamagiStudy> {
   }
 }
 
+/* ---------- follow-through paths (1.7.7, R2 of the Python-studies plan) ---------- */
+
+export interface PathDay {
+  day: number;
+  /** Mean close-over-entry gain on this day of the trade. */
+  mean: number;
+  median: number;
+  /** Mean of the running lowest low over entry, up to this day. */
+  low: number;
+}
+
+export interface PathSplit {
+  key: string;
+  label: string;
+  /** Rows with a full PATH_DAYS path in this group (the same on every day). */
+  n: number;
+  days: PathDay[];
+}
+
+export type PathSplitKey = "all" | "adr" | "tape" | "width";
+
+export const PATH_DAYS = 20;
+export const PATH_SPLITS: Record<PathSplitKey, { title: string; keys: string[] }> = {
+  all: { title: "All", keys: ["all"] },
+  adr: { title: "By ADR", keys: ["a1", "a2", "a3"] },
+  tape: { title: "By the tape", keys: ["bull", "not"] },
+  width: { title: "By stop width", keys: ["tight", "wide"] },
+};
+const PATH_LABELS: Record<string, string> = {
+  all: "Every card the plan entered",
+  a1: "ADR 3.5–5%", a2: "ADR 5–7%", a3: "ADR 7%+",
+  bull: "Index Bullish at the scan", not: "Index not Bullish",
+  tight: "Stop ≤ 1 ADR", wide: "Stop wider than 1 ADR",
+};
+
+/**
+ * The follow-through paths of the boxed Wait deck cards the next-open plan
+ * entered (research_paths, written by the outcomes job): per day 1..20 the mean
+ * and median gain over the entry and the mean running low, for every split at
+ * once. Only rows with the full twenty days count, so one n holds across the
+ * days of a group. Empty groups come back with no days.
+ */
+export async function getPaths(): Promise<Record<PathSplitKey, PathSplit[]>> {
+  const shape = (rows: { split: string; key: string; day: number; n: number; mean: number; median: number; low: number }[]) => {
+    const out = {} as Record<PathSplitKey, PathSplit[]>;
+    for (const split of Object.keys(PATH_SPLITS) as PathSplitKey[]) {
+      out[split] = PATH_SPLITS[split].keys.map((key) => {
+        const days = rows
+          .filter((r) => r.split === split && r.key === key)
+          .map((r) => ({ day: Number(r.day), mean: Number(r.mean), median: Number(r.median), low: Number(r.low) }))
+          .sort((a, b) => a.day - b.day);
+        const n = Number(rows.find((r) => r.split === split && r.key === key)?.n ?? 0);
+        return { key, label: PATH_LABELS[key], n, days };
+      });
+    }
+    return out;
+  };
+  try {
+    const sql = getSql();
+    const rows = (await sql`
+      WITH b AS (
+        SELECT p.day, p.gain, p.low, h.adr_pct, h.market_bullish, o.k_stop_adr
+        FROM research_paths p
+        JOIN scan_history h USING (date, ticker)
+        JOIN research_outcomes o USING (date, ticker)
+        WHERE h.rank IS NOT NULL AND h.boxed AND h.verdict = 'wait' AND h.box_top IS NOT NULL AND h.close <= h.box_top
+          AND o.path_days >= ${PATH_DAYS}
+      ), s AS (
+        SELECT 'all' AS split, 'all' AS key, day, gain, low FROM b
+        UNION ALL
+        SELECT 'adr', CASE WHEN adr_pct < 5 THEN 'a1' WHEN adr_pct < 7 THEN 'a2' ELSE 'a3' END, day, gain, low FROM b WHERE adr_pct IS NOT NULL
+        UNION ALL
+        SELECT 'tape', CASE WHEN market_bullish THEN 'bull' ELSE 'not' END, day, gain, low FROM b WHERE market_bullish IS NOT NULL
+        UNION ALL
+        SELECT 'width', CASE WHEN k_stop_adr <= 1 THEN 'tight' ELSE 'wide' END, day, gain, low FROM b WHERE k_stop_adr IS NOT NULL
+      )
+      SELECT split, key, day, count(*)::int AS n, avg(gain) AS mean,
+             percentile_cont(0.5) WITHIN GROUP (ORDER BY gain) AS median, avg(low) AS low
+      FROM s GROUP BY 1, 2, 3 ORDER BY 1, 2, 3
+    `) as { split: string; key: string; day: number; n: number; mean: number; median: number; low: number }[];
+    return shape(rows);
+  } catch (err) {
+    console.error("getPaths failed:", err);
+    return shape([]);
+  }
+}
+
 /**
  * Best setups (/gallery, 1.6.4): deck rows with twenty sessions of follow-through,
  * best close over the scan-night close first, from `sinceDate` on (null = all

@@ -219,6 +219,16 @@ export default async function Help() {
         decides which entry it keeps (the next open led the buy-stop, −0.03R to −0.17R, on that date). The paper replay carries the
         matching rule, &ldquo;stop one ADR under the entry&rdquo;, on the ledger&apos;s real trades.
       </Term>
+      <Term name="Where the move goes after the entry">
+        The follow-through card on Studies (1.7.7): the same boxed Wait cards the plan card scores, bought at the open after their
+        first close above the box and then simply held for twenty sessions, no exit applied. The solid line is the mean gain over the
+        entry on each day of the trade (day 1 is the entry session, as the ledger counts it), the dashed line the mean of the lowest low
+        so far — how deep the average shake-out runs. The two marks are where the Auto ledger acts: half off on day 4, and the 10-session
+        average it sells under. Tabs split the cards by ADR, by the index verdict on scan night and by stop width. Only cards with all
+        twenty days count, so a group&apos;s row count holds across the chart. The sentence under the table names the day the mean gain
+        peaks and the day the mean low bottoms. Together with the exit sweep this decides whether the ledger&apos;s routine changes — and
+        only then, as a scored rule change.
+      </Term>
       <Term name="The bar under a number">
         Since 1.7.6 every rate and average R on the Research, Studies and Tape pages carries its 95% range, drawn as a thin bar under the
         number with a dot at the value (hover for the figures). A rate&apos;s range comes from its sample size alone (Wilson); an average

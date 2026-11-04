@@ -5,10 +5,15 @@ research_outcomes: did the close clear the level within 10 sessions, the
 best/worst close at 5/10/20 sessions, and the R-multiple of the auto-track
 trade. The level is the box top when boxed, else the Livermore pivot when it
 is still overhead, else the highest high of the 20 sessions up to the scan (a
-name already past its pivot has to make a fresh high to count). The auto-track
-trade is a buy stop at the box top, stop at the box bottom, 10-session-low trail,
-the same rules as lib/paper-engine.ts. Rows are re-labelled until 20 sessions
-have passed (complete = true), then left alone.
+name already past its pivot has to make a fresh high to count). Three trades
+are scored per boxed row: r_at_exit is the pre-1.3.7 auto plan (buy stop at the
+box top, stop at the box bottom, 10-session-low trail); k_r is the plan the
+Auto book trades now (the open after the first close above the box within ten
+sessions, stop at that day's low, Kullamägi's exits from research/replay.py —
+the same function the replay row runs); bs_r is the non-watcher's version (a
+resting buy-stop at the box top, stop one ADR under the fill, the same exits).
+k_stop_adr is the next-open stop's width in ADR units. Rows are re-labelled
+until 20 sessions have passed (complete = true), then left alone.
 """
 from __future__ import annotations
 
@@ -20,6 +25,7 @@ import pandas as pd
 import psycopg
 
 from .db import load_bars, pyval, read_df, write_rows
+from .replay import KULLAMAGI_MA, _replay_kullamagi
 from .util import JobContext
 
 HORIZON = 20
@@ -27,12 +33,84 @@ BREAK_WINDOW = 10
 TRAIL = 10  # CONFIG.PAPER.TRAIL_LOOKBACK
 HIGH_WINDOW = 20  # sessions (ending on the scan day) whose highest high is the fallback level
 CHUNK = 250  # tickers per bars query
+PLAN_SHARES = 100  # a share count the day-4 half can split; R is per share so the number does not matter
 
+PLAN_COLUMNS = ["k_entry_day", "k_stop_adr", "k_r", "bs_entry_day", "bs_stop_adr", "bs_r"]
+# Bumped when the plan columns' meaning changes: rows written under an older (or no)
+# version are re-labelled by the nightly run, a chunk at a time within its budget, so
+# a new column back-fills the whole history without a forced Refresh.
+PLAN_VERSION = 1
 COLUMNS = [
     "date", "ticker", "level", "broke_10d", "broke_day",
     "mfe_5", "mfe_10", "mfe_20", "mae_5", "mae_10", "mae_20",
     "r_at_exit", "filled", "sessions_after", "complete",
+    *PLAN_COLUMNS, "plan_v",
 ]
+COMPLETE_COL = COLUMNS.index("complete")
+
+
+def _plan_r(frame: pd.DataFrame, start: int, entry: float, stop: float, pre_closes: list[float], n: int) -> float | None:
+    """R of the Auto book's exit from `entry` / `stop` over frame.iloc[start:], the
+    sessions after the entry day. None while the trade is still open inside an
+    incomplete window; marked to the last close once the window is complete."""
+    rest = frame.iloc[start:]
+    if rest.empty:
+        return float((float(frame["c"].iloc[start - 1]) - entry) / (entry - stop)) if n >= HORIZON else None
+    res = _replay_kullamagi(rest, entry, stop, PLAN_SHARES, pre_closes)
+    if res["mtm"] and n < HORIZON:
+        return None
+    return float(res["r"])
+
+
+def kullamagi_plans(
+    after: pd.DataFrame, scan_close: float, box_top: float | None, adr: float | None, pre_closes: list[float] | None
+) -> dict[str, Any]:
+    """The two night-before entries on one boxed row, from the sessions after the
+    scan (columns o,h,l,c; `date` optional). Pure.
+
+    Next open (the Auto book, lib/paper-engine.ts armDecisions): the first close
+    above the box top within BREAK_WINDOW is the breakout day; entry at the next
+    session's open, stop at the breakout day's low; the fill is cancelled when
+    that open is at or under the stop; a low at or under the stop on the entry
+    day is a same-day stop-out (−1R), as the engine books it. A card already
+    above its box on scan night is never armed ("broke out earlier"), so both
+    plans are None for it. Resting buy-stop: filled on the first session whose
+    high reaches the box top, at max(open, top), stop one ADR under the fill.
+    `adr` is a fraction (the card's scan-night ADR); without it the width and
+    the buy-stop plan are None. `pre_closes` are the closes up to and including
+    the scan day, so the 10-day average has history from the first session."""
+    out: dict[str, Any] = {k: None for k in PLAN_COLUMNS}
+    n = len(after)
+    if n == 0 or box_top is None or box_top <= 0 or scan_close > box_top:
+        return out
+    frame = after if "date" in after.columns else after.assign(date=np.arange(n))
+    o = frame["o"].to_numpy(dtype=float)
+    h = frame["h"].to_numpy(dtype=float)
+    lo = frame["l"].to_numpy(dtype=float)
+    c = frame["c"].to_numpy(dtype=float)
+    closes = list(pre_closes or [])
+
+    idx = np.flatnonzero(c[:BREAK_WINDOW] > box_top)
+    if idx.size:
+        b = int(idx[0])
+        if b + 1 < n:
+            entry, stop = float(o[b + 1]), float(lo[b])
+            if entry > stop:
+                out["k_entry_day"] = b + 2
+                if adr:
+                    out["k_stop_adr"] = float((entry - stop) / entry / adr)
+                out["k_r"] = -1.0 if lo[b + 1] <= stop else _plan_r(frame, b + 2, entry, stop, closes + c[: b + 2].tolist(), n)
+
+    if adr:
+        for j in range(min(n, BREAK_WINDOW)):
+            if h[j] >= box_top:
+                fill = float(max(o[j], box_top))
+                stop = fill * (1 - adr)
+                out["bs_entry_day"] = j + 1
+                out["bs_stop_adr"] = 1.0
+                out["bs_r"] = -1.0 if lo[j] <= stop else _plan_r(frame, j + 1, fill, stop, closes + c[: j + 1].tolist(), n)
+                break
+    return out
 
 
 def label_one(
@@ -41,8 +119,12 @@ def label_one(
     level: float | None,
     box_top: float | None,
     box_bottom: float | None,
+    adr: float | None = None,
+    pre_closes: list[float] | None = None,
 ) -> dict[str, Any]:
-    """Label one scan row from the sessions strictly after it (columns o,h,l,c). Pure."""
+    """Label one scan row from the sessions strictly after it (columns o,h,l,c). Pure.
+    `adr` (a fraction) and `pre_closes` feed `kullamagi_plans`; without them the
+    plan columns stay None except the next-open entry day and R."""
     n = len(after)
     o = after["o"].to_numpy(dtype=float)
     h = after["h"].to_numpy(dtype=float)
@@ -52,9 +134,12 @@ def label_one(
         "level": level, "broke_10d": None, "broke_day": None,
         "mfe_5": None, "mfe_10": None, "mfe_20": None, "mae_5": None, "mae_10": None, "mae_20": None,
         "r_at_exit": None, "filled": None, "sessions_after": int(n), "complete": bool(n >= HORIZON),
+        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION,
     }
     if n == 0:
         return out
+    if box_top is not None:
+        out.update(kullamagi_plans(after, scan_close, box_top, adr, pre_closes))
 
     # Breakout: first close above the level within BREAK_WINDOW sessions.
     if level is not None and level > 0:
@@ -103,10 +188,10 @@ def label_one(
 
 
 def _pending_rows(conn: psycopg.Connection, force: bool) -> pd.DataFrame:
-    where = "" if force else "WHERE o.date IS NULL OR NOT o.complete"
+    where = "" if force else f"WHERE o.date IS NULL OR NOT o.complete OR o.plan_v IS DISTINCT FROM {PLAN_VERSION}"
     return read_df(
         conn,
-        f"""SELECT h.date, h.ticker, h.close, h.boxed, h.box_top, h.box_bottom, h.pivot
+        f"""SELECT h.date, h.ticker, h.close, h.boxed, h.box_top, h.box_bottom, h.pivot, h.adr_pct
             FROM scan_history h LEFT JOIN research_outcomes o USING (date, ticker) {where}
             ORDER BY h.ticker, h.date""",
     )
@@ -146,7 +231,12 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> list[list[Any]]:
             high_20 = _f(tb["h"].iloc[max(0, i - HIGH_WINDOW + 1) : i + 1].max())
             boxed = bool(r.boxed)
             level = breakout_level(float(r.close), boxed, _f(r.box_top), _f(r.pivot), high_20)
-            lab = label_one(after, float(r.close), level, _f(r.box_top) if boxed else None, _f(r.box_bottom) if boxed else None)
+            adr_pct = _f(getattr(r, "adr_pct", None))
+            adr = adr_pct / 100 if adr_pct and adr_pct > 0 else None
+            pre_closes = tb["c"].iloc[max(0, i - KULLAMAGI_MA + 1) : i + 1].astype(float).tolist()
+            lab = label_one(
+                after, float(r.close), level, _f(r.box_top) if boxed else None, _f(r.box_bottom) if boxed else None, adr, pre_closes
+            )
             out.append([pyval(r.date), ticker] + [pyval(lab[k]) for k in COLUMNS[2:]])
     return out
 
@@ -175,7 +265,7 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
         bars = load_bars(conn, tickers=chunk, since=since.isoformat())
         labelled = label_frame(sub, bars)
         written += write_rows(conn, "research_outcomes", COLUMNS, labelled, conflict=["date", "ticker"])
-        complete += sum(1 for r in labelled if r[-1])
+        complete += sum(1 for r in labelled if r[COMPLETE_COL])
         conn.commit()
         if not ctx.has_time(15):
             return f"{written} rows labelled ({complete} complete) — out of time, resuming next run"

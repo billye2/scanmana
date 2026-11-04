@@ -185,9 +185,21 @@ export default async function Help() {
       <Term name="Scorecard">
         Four numbers, each shown for all labelled history and again for everything since the last rule change took
         effect: the share of deck names that broke out within ten sessions, Wait minus Pass on that share, the average
-        R a Wait card would have made on the box-top-buy / 10-low-trail plan, and the share of scan nights the index
-        filter called Bullish. The line under the tiles reads them out; a red line above them means a job failed or the
-        latest scan has no research run yet, so the numbers may be stale.
+        R a Wait card would have made on the plan the Auto ledger trades (the open after the first close above the box,
+        stop at that day&apos;s low, his exits), and the share of scan nights the index filter called Bullish. The line
+        under the tiles reads them out; a red line above them means a job failed or the latest scan has no research run
+        yet, so the numbers may be stale.
+      </Term>
+      <Term name="Kullamägi's plan on every boxed Wait card">
+        The Auto ledger has closed only a handful of trades under his entry, so this card scores that entry on the whole
+        deck history instead: every boxed Wait card that closed under its box top on scan night, bought at the open after
+        its first close above the box within ten sessions with the stop at that day&apos;s low, and sold by the ledger&apos;s own
+        routine. Three tables: by how wide that stop was in units of the card&apos;s ADR (a stop wider than one average day is
+        the one his rule would not take), by the card&apos;s ADR, and the same cards bought instead with a resting buy-stop at
+        the box top and the stop one ADR under the fill — the entry a person can leave with a broker without watching the
+        open. &ldquo;Filled&rdquo; is the share of cards each entry actually bought. The width table decides whether the ledger
+        should skip wide stops; the entry table which entry it keeps. The paper replay carries the matching rule,
+        &ldquo;stop one ADR under the entry&rdquo;, on the ledger&apos;s real trades.
       </Term>
       <Term name="Rule changes">
         One row per shipped change, scored on the number it was meant to move — all labelled history before it against

@@ -10,6 +10,7 @@ import {
   getBreadth,
   getClusters,
   getEpStudy,
+  getKullamagiStudy,
   getReplay,
   getResearchSummary,
   getSplits,
@@ -73,7 +74,7 @@ function Tile({ label, all, since, n, sinceN, sinceDate, firstRead }: {
 export default async function ResearchPage() {
   const scan = await latestScanSlim().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
-  const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades, ep] = await Promise.all([
+  const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades, ep, plan] = await Promise.all([
     getResearchSummary(),
     getStory(),
     getSweep(),
@@ -83,6 +84,7 @@ export default async function ResearchPage() {
     getReplay(),
     closedTrades("auto"),
     getEpStudy(),
+    getKullamagiStudy(),
   ]);
   const ran = summary.runs.some((r) => r.ok);
   const health = researchHealth(summary.runs, scan?.date ?? null);
@@ -153,6 +155,41 @@ export default async function ResearchPage() {
         <Tile label="Bullish nights" all={pc(all.bullishShare)} since={pc(since.bullishShare)} n={n(all.nights)} sinceN={n(since.nights)} sinceDate={story.sinceDate} firstRead={story.firstRead} />
       </div>
       <p className="mt-3 text-[13px] leading-relaxed text-neutral-200">{story.sentence}</p>
+
+      {/* ---------- 1b. Kullamägi's plan on history ---------- */}
+      <H id="plan" sub={`Every boxed Wait card that closed under its box top on scan night (${n(plan.rows)} rows), traded two ways on the stored bars and sold by the Auto book's routine: the book's own entry — the open after the first close above the box within ten sessions, stop at that day's low — and a resting buy-stop at the box top with the stop one ADR under the fill. Grey under ${MIN_AFTER_N}. The stop-width table decides whether the book should skip wide stops; the entry table which entry it keeps.`}>
+        Kullamägi&apos;s plan on every boxed Wait card
+      </H>
+      <div className="grid gap-3 md:grid-cols-3">
+        {(
+          [
+            ["By stop width · next-open entry", plan.byWidth, "Width"],
+            ["By the card's ADR · next-open entry", plan.byAdr, "ADR"],
+            ["Entry against entry", plan.byEntry, "Entry"],
+          ] as const
+        ).map(([title, groups, head]) => (
+          <Card key={title} className="overflow-x-auto p-0">
+            <div className="px-2 pt-2 text-[11px] font-semibold text-neutral-400">{title}</div>
+            <table className="w-full">
+              <thead><tr><th className={TH}>{head}</th><th className={`${TH} text-right`}>Trades</th><th className={`${TH} text-right`}>Win</th><th className={`${TH} text-right`}>Avg R</th>{head === "Entry" && <th className={`${TH} text-right`}>Filled</th>}</tr></thead>
+              <tbody>
+                {groups.map((g) => {
+                  const ready = g.n >= MIN_AFTER_N;
+                  return (
+                    <tr key={g.key} className={`border-t border-neutral-800 ${ready ? "" : "text-neutral-500"}`}>
+                      <td className={`${TD} whitespace-normal ${ready ? "text-neutral-100" : ""}`}>{g.label}</td>
+                      <td className={NUM}>{n(g.n)}</td>
+                      <td className={NUM}>{pc(g.winRate)}</td>
+                      <td className={`${NUM} ${ready && g.avgR !== null ? (g.avgR >= 0 ? "text-emerald-300" : "text-red-300") : ""}`}>{rr(g.avgR)}</td>
+                      {head === "Entry" && <td className={NUM}>{pc(g.filled)}</td>}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        ))}
+      </div>
 
       {/* ---------- 2. Rule changes ---------- */}
       <H id="changes" sub={`One row per shipped change, scored on the number it was meant to move: all labelled history before it against everything from it on. A row stays grey until the after side has ${MIN_AFTER_N} rows.`}>

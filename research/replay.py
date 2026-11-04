@@ -50,6 +50,7 @@ RULES: dict[str, str] = {
     "kullamagi": "Kullamägi: half off day 4, breakeven, 10-day exit",
     "kullamagi_20": "Kullamägi, 20-day exit",
     "kullamagi_adr": "Kullamägi, skipped when the stop is wider than one ADR",
+    "kullamagi_adrstop": "Kullamägi, stop one ADR under the entry",
     "trail_5": "Trail 5-session low",
     "trail_10": "Trail 10-session low",
     "trail_15": "Trail 15-session low",
@@ -233,7 +234,7 @@ def replay_position(
     date, o, h, l, c (any order, ascending or not — this sorts by date). Mirrors
     lib/paper-engine.ts: a stop-out fills at min(open, stop); a target fills at
     max(open, target). `rule` is one of kullamagi, kullamagi_20, kullamagi_adr,
-    trail_5/10/15/20, pct_8, half_2r. `pre_closes` and `pre_lows` are the closes
+    kullamagi_adrstop, trail_5/10/15/20, pct_8, half_2r. `pre_closes` and `pre_lows` are the closes
     and lows of the sessions up to and including the entry day, oldest first: the
     kullamagi rules' moving average and the percent trail's peak read the closes,
     the lowest-low trails seed their window from the lows. Leaving them out
@@ -261,6 +262,12 @@ def replay_position(
         if adr is not None and entry_price > 0 and (entry_price - initial_stop) / entry_price > adr:
             return _skipped(initial_stop, bars.iloc[0]["date"])
         return _replay_kullamagi(bars, entry_price, initial_stop, shares, closes)
+    if rule == "kullamagi_adrstop":
+        # The non-watcher's stop: one average day's range under the entry, whatever the
+        # box or the breakout day said (research/outcomes.py scores the same stop on
+        # every boxed deck row as bs_r). R is measured against that stop.
+        stop = entry_price * (1 - adr) if adr is not None and entry_price > 0 else initial_stop
+        return _replay_kullamagi(bars, entry_price, stop, shares, closes)
     if rule.startswith("trail_"):
         return _replay_trail(bars, entry_price, initial_stop, shares, int(rule.split("_", 1)[1]), lows)
     if rule == "pct_8":

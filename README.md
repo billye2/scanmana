@@ -119,6 +119,11 @@ but nothing is traded from it until it holds out of sample.
   written by rules from the numbers below — `researchRead` in `lib/research-story.ts`:
   nothing to change / the last change holds / revisit, then the deck's rate since the
   change and the tape), a **scorecard** (four numbers, all
+  history vs since the last change; the R tile is the Auto book's own plan scored on
+  every boxed Wait card — `k_r` from `research/outcomes.py`), **Kullamägi's plan on
+  every boxed Wait card** (that plan by stop width in ADR units and by the card's ADR,
+  and against a resting buy-stop with a one-ADR stop — the tables that decide whether
+  the book skips wide stops and which entry it keeps), a **scorecard** (four numbers, all
   history vs since the last change), the **rule changes** (`RULE_CHANGES` in
   `lib/research-story.ts`, one entry per shipped change with the number it is
   scored on, grey until 30 rows), then the rates, the sweep (headline knob

@@ -95,7 +95,10 @@ def test_label_frame_aligns_on_scan_date_and_skips_missing():
     row = out[0]
     assert row[1] == "AAA"
     assert row[3] is True  # broke_10d: closes rise past 105 within 10 sessions
-    assert row[-1] is True  # complete: 22 sessions after
+    from research.outcomes import COMPLETE_COL
+
+    assert row[COMPLETE_COL] is True  # complete: 22 sessions after
+    assert len(row) == len(__import__("research.outcomes", fromlist=["COLUMNS"]).COLUMNS)
 
 
 def test_breakout_level_prefers_box_then_overhead_pivot_then_20d_high():
@@ -123,3 +126,76 @@ def test_label_frame_uses_the_20_session_high_when_pivot_is_below_close():
     assert rec["level"] == 112.0
     assert rec["broke_10d"] is True
     assert rec["broke_day"] == 7
+
+
+# ---------- the plan the Auto book trades, and the resting buy-stop ----------
+
+from research.outcomes import kullamagi_plans  # noqa: E402
+from research.replay import _replay_kullamagi  # noqa: E402
+
+
+def _plan_after():
+    # Scan close 100 under a 105 box top. Day 3 closes above the top (106); day 4 opens 108.
+    closes = [100, 101, 106, 108, 110, 112, 111, 113, 115, 114, 116, 118, 117, 119, 120, 121, 122, 123, 124, 125]
+    return _after(closes)
+
+
+def test_next_open_plan_enters_the_open_after_the_first_close_above_the_box():
+    after = _plan_after()
+    out = kullamagi_plans(after, scan_close=100, box_top=105, adr=0.04, pre_closes=[99, 100])
+    assert out["k_entry_day"] == 4
+    entry, stop = 108.0, 106 * 0.99  # day-4 open, day-3 low
+    assert out["k_stop_adr"] == pytest.approx((entry - stop) / entry / 0.04)
+    rest = after.assign(date=np.arange(len(after))).iloc[4:]
+    expected = _replay_kullamagi(rest, entry, stop, 100, [99, 100, 100, 101, 106, 108])
+    assert out["k_r"] == pytest.approx(expected["r"])
+
+
+def test_next_open_plan_is_cancelled_when_that_open_is_under_the_stop():
+    after = _plan_after()
+    opens = after["c"].to_numpy().copy()
+    opens[3] = 104.0  # gaps back under the breakout day's low (104.94)
+    after = after.assign(o=opens)
+    out = kullamagi_plans(after, 100, 105, 0.04, [100])
+    assert out["k_entry_day"] is None and out["k_r"] is None
+    assert out["bs_entry_day"] == 3  # the buy-stop filled on the breakout day regardless
+
+
+def test_next_open_plan_books_a_same_day_stop_out_at_minus_one_r():
+    after = _plan_after()
+    lows = after["l"].to_numpy().copy()
+    lows[3] = 104.0  # the entry day trades through the stop
+    after = after.assign(l=lows)
+    assert kullamagi_plans(after, 100, 105, 0.04, [100])["k_r"] == -1.0
+
+
+def test_plans_are_none_for_a_card_already_above_its_box_and_without_a_top():
+    after = _plan_after()
+    assert all(v is None for v in kullamagi_plans(after, 106, 105, 0.04, [100]).values())
+    assert all(v is None for v in kullamagi_plans(after, 100, None, 0.04, [100]).values())
+
+
+def test_buy_stop_plan_fills_at_the_top_with_a_one_adr_stop():
+    after = _plan_after()  # day 3 high 107.06 is the first high at or above 105
+    out = kullamagi_plans(after, 100, 105, 0.04, [100])
+    assert out["bs_entry_day"] == 3
+    assert out["bs_stop_adr"] == 1.0
+    fill, stop = 106.0, 106.0 * 0.96  # max(open 106, top 105); one ADR under
+    rest = after.assign(date=np.arange(len(after))).iloc[3:]
+    expected = _replay_kullamagi(rest, fill, stop, 100, [100, 100, 101, 106])
+    assert out["bs_r"] == pytest.approx(expected["r"])
+    # Without an ADR there is no width and no buy-stop plan, but the next-open plan still scores.
+    bare = kullamagi_plans(after, 100, 105, None, [100])
+    assert bare["bs_r"] is None and bare["k_stop_adr"] is None and bare["k_r"] is not None
+
+
+def test_plan_r_is_none_while_open_inside_an_incomplete_window():
+    after = _after([100, 101, 106, 108, 110, 112])  # six sessions, trade still open
+    out = kullamagi_plans(after, 100, 105, 0.04, [100])
+    assert out["k_entry_day"] == 4 and out["k_r"] is None
+
+
+def test_label_one_carries_the_plan_columns():
+    out = label_one(_plan_after(), 100, 105, 105, 95, 0.04, [100])
+    assert out["k_entry_day"] == 4 and out["bs_entry_day"] == 3
+    assert label_one(_after([100] * 3), 100, 105, None, None)["k_r"] is None

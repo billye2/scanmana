@@ -407,6 +407,89 @@ const epGrp = (key: string, label: string, a: EpAgg | undefined): EpGroup => ({
  * neglected the name was before the gap, by the volume multiple, and by whether
  * the gap day closed above its open. Reads research_ep only. Never throws.
  */
+/* ---------- Kullamägi's plan on every boxed Wait card (research/outcomes.py k_* / bs_*) ---------- */
+
+export interface PlanGroup {
+  key: string;
+  label: string;
+  n: number;
+  winRate: number | null;
+  avgR: number | null;
+  /** Share of eligible rows the entry filled (entry table only). */
+  filled: number | null;
+}
+export interface KullamagiStudy {
+  /** Boxed Wait deck rows that closed under their box top on scan night — the rows the Auto book could arm. */
+  rows: number;
+  byWidth: PlanGroup[];
+  byAdr: PlanGroup[];
+  byEntry: PlanGroup[];
+}
+
+const PLAN_LABELS: Record<string, string> = {
+  w1: "≤ ½ ADR", w2: "½–1 ADR", w3: "1–1½ ADR", w4: "> 1½ ADR",
+  a1: "ADR 3.5–5%", a2: "ADR 5–7%", a3: "ADR 7%+",
+  next_open: "Next open after the first close above the box, stop at that day's low (the Auto book)",
+  buy_stop: "Resting buy-stop at the box top, stop one ADR under the fill",
+};
+const PLAN_ORDER: Record<"width" | "adr" | "entry", string[]> = {
+  width: ["w1", "w2", "w3", "w4"],
+  adr: ["a1", "a2", "a3"],
+  entry: ["next_open", "buy_stop"],
+};
+
+/**
+ * The plan the Auto book trades, and the resting buy-stop, scored on every boxed
+ * Wait card in the deck history: by the next-open stop's width in ADR units, by
+ * the card's ADR, and entry against entry. The width table decides whether the
+ * book should skip wide stops; the entry table which entry it keeps.
+ */
+export async function getKullamagiStudy(): Promise<KullamagiStudy> {
+  const empty: KullamagiStudy = { rows: 0, byWidth: [], byAdr: [], byEntry: [] };
+  try {
+    const sql = getSql();
+    const rows = (await sql`
+      WITH b AS (
+        SELECT o.k_r, o.k_stop_adr, o.k_entry_day, o.bs_r, o.bs_entry_day, h.adr_pct
+        FROM scan_history h JOIN research_outcomes o USING (date, ticker)
+        WHERE h.rank IS NOT NULL AND h.boxed AND h.verdict = 'wait' AND h.box_top IS NOT NULL AND h.close <= h.box_top
+      )
+      SELECT 'width' AS dim,
+             CASE WHEN k_stop_adr <= 0.5 THEN 'w1' WHEN k_stop_adr <= 1 THEN 'w2' WHEN k_stop_adr <= 1.5 THEN 'w3' ELSE 'w4' END AS key,
+             count(k_r)::int AS n, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL) AS win, avg(k_r) AS avg_r,
+             NULL::double precision AS filled, (SELECT count(*) FROM b)::int AS total
+      FROM b WHERE k_stop_adr IS NOT NULL GROUP BY 2
+      UNION ALL
+      SELECT 'adr', CASE WHEN adr_pct < 5 THEN 'a1' WHEN adr_pct < 7 THEN 'a2' ELSE 'a3' END,
+             count(k_r)::int, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL), avg(k_r), NULL, (SELECT count(*) FROM b)::int
+      FROM b WHERE adr_pct IS NOT NULL GROUP BY 2
+      UNION ALL
+      SELECT 'entry', 'next_open', count(k_r)::int, avg((k_r > 0)::int) FILTER (WHERE k_r IS NOT NULL), avg(k_r),
+             avg((k_entry_day IS NOT NULL)::int), (SELECT count(*) FROM b)::int FROM b
+      UNION ALL
+      SELECT 'entry', 'buy_stop', count(bs_r)::int, avg((bs_r > 0)::int) FILTER (WHERE bs_r IS NOT NULL), avg(bs_r),
+             avg((bs_entry_day IS NOT NULL)::int), (SELECT count(*) FROM b)::int FROM b
+    `) as { dim: "width" | "adr" | "entry"; key: string; n: number; win: number | null; avg_r: number | null; filled: number | null; total: number }[];
+    const by = new Map(rows.map((r) => [`${r.dim}:${r.key}`, r]));
+    const group = (dim: keyof typeof PLAN_ORDER): PlanGroup[] =>
+      PLAN_ORDER[dim].map((key) => {
+        const r = by.get(`${dim}:${key}`);
+        return {
+          key,
+          label: PLAN_LABELS[key],
+          n: Number(r?.n ?? 0),
+          winRate: r?.win == null ? null : Number(r.win),
+          avgR: r?.avg_r == null ? null : Number(r.avg_r),
+          filled: r?.filled == null ? null : Number(r.filled),
+        };
+      });
+    return { rows: Number(rows[0]?.total ?? 0), byWidth: group("width"), byAdr: group("adr"), byEntry: group("entry") };
+  } catch (err) {
+    console.error("getKullamagiStudy failed:", err);
+    return empty;
+  }
+}
+
 export async function getEpStudy(): Promise<EpStudy> {
   const sql = getSql();
   try {
@@ -564,8 +647,8 @@ export async function periodSums(since: string): Promise<{ before: PeriodSums; s
              coalesce(sum(o.broke_10d::int) FILTER (WHERE h.verdict = 'wait'), 0)::int AS wait_hits,
              count(o.broke_10d) FILTER (WHERE h.verdict = 'pass')::int AS pass_n,
              coalesce(sum(o.broke_10d::int) FILTER (WHERE h.verdict = 'pass'), 0)::int AS pass_hits,
-             count(o.r_at_exit) FILTER (WHERE h.verdict = 'wait')::int AS wait_r_n,
-             coalesce(sum(o.r_at_exit) FILTER (WHERE h.verdict = 'wait'), 0)::double precision AS wait_r_sum
+             count(o.k_r) FILTER (WHERE h.verdict = 'wait')::int AS wait_r_n,
+             coalesce(sum(o.k_r) FILTER (WHERE h.verdict = 'wait'), 0)::double precision AS wait_r_sum
       FROM scan_history h LEFT JOIN research_outcomes o USING (date, ticker)
       WHERE h.rank IS NOT NULL GROUP BY 1
     `) as { recent: boolean; n: number; hits: number; wait_n: number; wait_hits: number; pass_n: number; pass_hits: number; wait_r_n: number; wait_r_sum: number }[];

@@ -343,3 +343,15 @@ def test_adr_pct_mirrors_the_typescript_indicator():
     pre = pd.DataFrame({"h": [105.0] * 20, "l": [100.0] * 20})
     assert adr_pct(pre) == pytest.approx(0.05)
     assert adr_pct(pre.head(19)) is None
+
+
+def test_kullamagi_adrstop_puts_the_stop_one_adr_under_the_entry():
+    bars = _bars([{"date": _d(1), "o": 101, "h": 103, "l": 99, "c": 102}, {"date": _d(2), "o": 102, "h": 104, "l": 94, "c": 95}])
+    # ADR 5%: the stop is 95, whatever the box said; day 2's low of 94 stops it out at min(open, stop) = 95.
+    out = replay_position(bars, entry_price=100, initial_stop=90, shares=10, rule="kullamagi_adrstop", adr=0.05)
+    same = replay_position(bars, entry_price=100, initial_stop=95, shares=10, rule="kullamagi")
+    assert out == same
+    assert out["exit_price"] == pytest.approx(95.0)
+    assert out["r"] == pytest.approx(-1.0)
+    # Without an ADR the rule keeps the position's own stop.
+    assert replay_position(bars, 100, 90, 10, "kullamagi_adrstop") == replay_position(bars, 100, 90, 10, "kullamagi")

@@ -465,7 +465,10 @@ export default async function Help() {
         the move into the box, the scan night and the Auto book&apos;s buy (the open after the first close above the box) marked under the
         bars, and the follow-through; the line under it says how far price went, which day it broke, and what the Auto plan made with
         how wide its stop was; the grey line is the scan-night facts (ADR, tightness, distance from the high, the three returns, the tape).
-        The box at the top says what the shown setups had in common that night — the question the review exists to answer. A card
+        The box at the top says what the shown setups had in common that night — the question the review exists to answer. The{" "}
+        <span className="text-emerald-400">5-star only</span> switch keeps just the boxed Wait cards that were still resting under their box
+        top on scan night — the app&apos;s candidate for his 5-star setup — so you can compare the best of those with the best of the whole
+        deck; a small green star before a ticker marks such a card in either view. A card
         appears only once twenty sessions have passed and the nightly outcomes job has scored it. Reads history, writes nothing; linked
         from the research page, no nav icon.
       </p>

@@ -95,7 +95,8 @@ but nothing is traded from it until it holds out of sample.
   per name, over 60 / 180 days or all history; each drawn with the box, the scan
   night and the Auto book's buy marked, the follow-through, the Auto plan's R
   and the scan-night facts, plus one line on what the shown setups had in
-  common. Linked from `/research` and Help; no nav icon.
+  common; a "5-star only" switch keeps just the boxed Wait cards resting under
+  their box top (`isFiveStar`). Linked from `/research` and Help; on the bar by default.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.

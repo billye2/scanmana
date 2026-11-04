@@ -497,9 +497,10 @@ export async function getKullamagiStudy(): Promise<KullamagiStudy> {
  * history). Fetches a few times `limit` so `pickGallery` can keep one row per
  * ticker and still fill the page. Empty on any error, like every reader here.
  */
-export async function getGallery(sinceDate: string | null, limit: number): Promise<GalleryRow[]> {
+export async function getGallery(sinceDate: string | null, limit: number, fiveStar = false): Promise<GalleryRow[]> {
   try {
     const sql = getSql();
+    // fiveStar mirrors lib/gallery.ts isFiveStar in SQL: boxed Wait, close at or under the box top.
     const rows = (await sql`
       SELECT h.date::text AS date, h.ticker, h.close, h.verdict, h.boxed, h.box_top, h.box_bottom, h.pivot, h.adr_pct, h.tightness,
              h.dist_from_high, h.ret_1m, h.ret_3m, h.ret_6m, h.market_bullish,
@@ -507,6 +508,7 @@ export async function getGallery(sinceDate: string | null, limit: number): Promi
       FROM scan_history h JOIN research_outcomes o USING (date, ticker)
       WHERE h.rank IS NOT NULL AND o.complete AND o.mfe_20 IS NOT NULL
         AND h.date >= COALESCE(${sinceDate}::date, '1900-01-01'::date)
+        AND (${fiveStar}::boolean = false OR (h.boxed AND h.verdict = 'wait' AND h.box_top IS NOT NULL AND h.close <= h.box_top))
       ORDER BY o.mfe_20 DESC, h.date
       LIMIT ${limit * 8}
     `) as {

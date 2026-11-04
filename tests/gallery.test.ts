@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isFiveStar,
   galleryBox,
   galleryFacts,
   galleryMarkers,
@@ -68,6 +69,16 @@ describe("pickGallery — best follow-through first, one row per ticker", () => 
     const rows = [row({ ticker: "B", date: "2026-06-02", mfe20: 0.3 }), row({ ticker: "A", date: "2026-06-01", mfe20: 0.3 })];
     expect(pickGallery(rows, 5).map((r) => r.ticker)).toEqual(["A", "B"]);
     expect(rows[0].ticker).toBe("B");
+  });
+});
+
+describe("isFiveStar — the boxed Wait card resting under its top", () => {
+  it("is a boxed Wait row with the close at or under the box top", () => {
+    expect(isFiveStar(row({}))).toBe(true);
+    expect(isFiveStar(row({ close: 52 }))).toBe(true);
+    expect(isFiveStar(row({ close: 52.5 }))).toBe(false); // already above the box on scan night
+    expect(isFiveStar(row({ verdict: "pass" }))).toBe(false);
+    expect(isFiveStar(row({ boxed: false, boxTop: null, boxBottom: null, pivot: 55 }))).toBe(false);
   });
 });
 

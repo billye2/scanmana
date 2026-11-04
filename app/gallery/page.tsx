@@ -1,8 +1,9 @@
 import Link from "next/link";
 import GalleryChart from "@/components/GalleryChart";
+import { StarIcon } from "@/components/Icons";
 import TopNav from "@/components/TopNav";
 import { addDays, etToday } from "@/lib/dates";
-import { galleryBox, galleryFacts, galleryMarkers, gallerySentence, gallerySummary, gallerySummaryText, galleryWindow } from "@/lib/gallery";
+import { galleryBox, galleryFacts, galleryMarkers, gallerySentence, gallerySummary, gallerySummaryText, galleryWindow, isFiveStar } from "@/lib/gallery";
 import { getGallery } from "@/lib/research";
 import { loadBarWindows } from "@/lib/scan";
 import type { Bar } from "@/lib/types";
@@ -29,16 +30,24 @@ const LIMIT = 12;
  * Reads scan_history × research_outcomes × bars; writes nothing. No nav icon —
  * linked from /research and Help.
  */
-export default async function GalleryPage({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
-  const p = (await searchParams).p;
-  const period: Period = p === "180" || p === "all" ? p : DEFAULT_PERIOD;
+export default async function GalleryPage({ searchParams }: { searchParams: Promise<{ p?: string; f?: string }> }) {
+  const sp = await searchParams;
+  const period: Period = sp.p === "180" || sp.p === "all" ? sp.p : DEFAULT_PERIOD;
   const since = period === "all" ? null : addDays(etToday(), -Number(period));
+  // The 5-star filter (1.6.7): only boxed Wait cards resting under their box top on scan night (lib/gallery.ts isFiveStar).
+  const fiveStar = sp.f === "5";
+  const href = (per: Period, five: boolean) => {
+    const q: string[] = [];
+    if (per !== DEFAULT_PERIOD) q.push(`p=${per}`);
+    if (five) q.push("f=5");
+    return q.length ? `/gallery?${q.join("&")}` : "/gallery";
+  };
 
   let rows: Awaited<ReturnType<typeof getGallery>> = [];
   let bars = new Map<string, Bar[]>();
   let error: string | null = null;
   try {
-    rows = await getGallery(since, LIMIT);
+    rows = await getGallery(since, LIMIT, fiveStar);
     bars = await loadBarWindows(rows.map((r) => ({ ticker: r.ticker, ...galleryWindow(r.date) })));
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
@@ -56,11 +65,11 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
         <Link href="/help#gallery" className="text-neutral-100 underline underline-offset-4">Help</Link>.
       </p>
 
-      <div className="mt-4 flex items-center gap-2" role="tablist" aria-label="Scan nights from">
+      <div className="mt-4 flex flex-wrap items-center gap-2" role="tablist" aria-label="Scan nights from">
         {PERIODS.map((x) => (
           <Link
             key={x.key}
-            href={x.key === DEFAULT_PERIOD ? "/gallery" : `/gallery?p=${x.key}`}
+            href={href(x.key, fiveStar)}
             role="tab"
             aria-selected={x.key === period}
             className={`rounded-full px-3 py-1 text-xs ${x.key === period ? "bg-neutral-100 font-semibold text-neutral-900" : "bg-neutral-900 text-neutral-400 active:bg-neutral-800"}`}
@@ -68,7 +77,16 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
             {x.label}
           </Link>
         ))}
-        <span className="ml-auto text-[11px] text-neutral-500">scan nights with 20 sessions of follow-through</span>
+        <span className="mx-1 h-4 w-px bg-neutral-800" aria-hidden="true" />
+        <Link
+          href={href(period, !fiveStar)}
+          role="switch"
+          aria-checked={fiveStar}
+          className={`rounded-full px-3 py-1 text-xs ${fiveStar ? "bg-emerald-400 font-semibold text-neutral-950" : "bg-neutral-900 text-neutral-400 active:bg-neutral-800"}`}
+        >
+          <span className="inline-flex items-center gap-1"><StarIcon size={12} fill="currentColor" /> 5-star only</span>
+        </Link>
+        <span className="ml-auto text-[11px] text-neutral-500">{fiveStar ? "boxed Wait cards resting under the box top" : "every deck card"} · scored 20 sessions on</span>
       </div>
 
       {error && <div className="mt-4 rounded-xl bg-red-950/60 px-3 py-2 text-xs text-red-300">{error}</div>}
@@ -76,13 +94,15 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
       {!error && rows.length === 0 && (
         <div className="mt-4 rounded-xl bg-neutral-900 px-3 py-3 text-[12px] leading-relaxed text-neutral-400">
           Nothing to show for this period yet: a scan night joins the gallery once twenty sessions have passed and the nightly
-          outcomes job has scored it. Try a longer period.
+          outcomes job has scored it. Try a longer period{fiveStar ? ", or switch off the 5-star filter" : ""}.
         </div>
       )}
 
       {summary && (
         <div className="mt-4 rounded-xl bg-neutral-900 px-3 py-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">What they had in common on scan night</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">
+            What {fiveStar ? "the best 5-star setups" : "they"} had in common on scan night
+          </div>
           <p className="mt-0.5 text-xs leading-snug text-neutral-200">{gallerySummaryText(summary)}</p>
         </div>
       )}
@@ -94,6 +114,11 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
             <section key={`${r.ticker}-${r.date}`} className="rounded-xl bg-neutral-900 p-3">
               <div className="flex items-baseline gap-2">
                 <span className="font-mono text-[11px] text-neutral-500">#{i + 1}</span>
+                {isFiveStar(r) && (
+                  <span className="flex text-emerald-400" title="5-star: boxed Wait, resting under the box top on scan night" aria-label="5-star setup">
+                    <StarIcon size={13} fill="currentColor" />
+                  </span>
+                )}
                 <Link href={`/s/${r.ticker}`} className="text-base font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">
                   {r.ticker}
                 </Link>

@@ -37,6 +37,17 @@ export interface GalleryRow {
   kEntryDay: number | null;
 }
 
+/**
+ * The app's candidate for Kullamägi's 5-star setup, as the mission words it: a
+ * boxed Wait card still resting under its box top on scan night (the leader that
+ * has made its move and is resting in a range; the Darvas box is how the range is
+ * found, the Wait verdict is the frameworks' agreement). Same test the research
+ * page's "Kullamägi's plan" card uses for its rows. Pure.
+ */
+export function isFiveStar(row: Pick<GalleryRow, "boxed" | "verdict" | "boxTop" | "close">): boolean {
+  return row.boxed && row.verdict === "wait" && row.boxTop !== null && row.close <= row.boxTop;
+}
+
 /** Sessions of history drawn before the scan night and the follow-through after it, as calendar days. */
 export const GALLERY_BEFORE_DAYS = 140; // ≈ 95 sessions: room for the box and the move into it
 export const GALLERY_AFTER_DAYS = 35; // ≈ 24 sessions: the 20 the outcome is scored on, and a little air

@@ -237,6 +237,13 @@ export default async function Help() {
         Stocks that moved together over the last three months, grouped from price alone (no sector data exists here).
         The chip counts tonight&apos;s deck names in the same group; the line names them. Kullamägi buys the leader
         of the strongest group. You name the groups on the Research page — the job only clusters.
+        <span className="mt-1 block">
+          <span className="text-neutral-100">Themes, scored</span> (Research, since 1.7.4): membership has been saved every night since
+          2026-09-21, so every deck row since then is scored by the theme it sat in that night — first by how many other deck names
+          shared the theme (none · alone · 2–3 · 4+; his claim is that leaders move in groups, so the 4+ row should break out most
+          often), then per theme by its key. A key is the three leaders sorted, so when a leader changes the theme continues under a
+          new key; the nights column says how long a key held. Grey under 30 rows.
+        </span>
       </Term>
       <Term name="Breadth">
         The share of the whole universe (about 5,000 names) above its 20-day average, under the market strip. The

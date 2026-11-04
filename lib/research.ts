@@ -316,6 +316,112 @@ export async function getBreadth(days = 120): Promise<{ rows: BreadthRow[]; buck
   }
 }
 /** The last two breadth rows (today and the session before), for the market strip. */
+export interface ThemeBucket {
+  key: "none" | "alone" | "few" | "many";
+  label: string;
+  n: number;
+  hitRate: number | null;
+  avgKR: number | null;
+  kN: number;
+}
+export interface ThemeRow {
+  clusterKey: string;
+  alias: string | null;
+  leaders: string[];
+  nights: number;
+  n: number;
+  hitRate: number | null;
+  avgKR: number | null;
+  kN: number;
+  first: string;
+  last: string;
+  /** The key is one of tonight's clusters (leaders unchanged since). */
+  current: boolean;
+}
+export interface ThemeStudy {
+  /** First night with saved membership; null before the clusters job has run. */
+  since: string | null;
+  nights: number;
+  /** Deck rows since then, and how many of them sat in a theme that night. */
+  deckRows: number;
+  inTheme: number;
+  byMates: ThemeBucket[];
+  themes: ThemeRow[];
+}
+
+const MATES_LABEL: Record<ThemeBucket["key"], string> = {
+  none: "In no theme that night",
+  alone: "Alone in its theme",
+  few: "2–3 deck-mates",
+  many: "4+ deck-mates",
+};
+
+/**
+ * Themes, scored (1.7.4): every deck row since membership began saving nightly
+ * (research_cluster_history, 2026-09-21), joined to the theme it sat in that
+ * night. Two reads — by how many other deck names shared the theme (his
+ * "leaders move in groups"), and per theme by its key (the sorted leaders; the
+ * key changes when a leader changes, so a theme can appear under several keys,
+ * which the "nights" column makes visible). Empty on any error.
+ */
+export async function getThemeStudy(limit = 12): Promise<ThemeStudy> {
+  const empty: ThemeStudy = { since: null, nights: 0, deckRows: 0, inTheme: 0, byMates: [], themes: [] };
+  try {
+    const sql = getSql();
+    const [cov] = (await sql`
+      SELECT min(as_of)::text AS since, count(DISTINCT as_of)::int AS nights FROM research_cluster_history
+    `) as { since: string | null; nights: number }[];
+    if (!cov?.since) return empty;
+    const mates = (await sql`
+      WITH d AS (
+        SELECT h.date, h.ticker, ch.cluster_key, o.broke_10d, o.k_r
+        FROM scan_history h
+        LEFT JOIN research_cluster_history ch ON ch.as_of = h.date AND ch.ticker = h.ticker
+        LEFT JOIN research_outcomes o ON o.date = h.date AND o.ticker = h.ticker
+        WHERE h.rank IS NOT NULL AND h.date >= ${cov.since}::date
+      ),
+      m AS (SELECT date, cluster_key, count(*) AS n FROM d WHERE cluster_key IS NOT NULL GROUP BY 1, 2)
+      SELECT CASE WHEN d.cluster_key IS NULL THEN 'none' WHEN m.n = 1 THEN 'alone' WHEN m.n <= 3 THEN 'few' ELSE 'many' END AS key,
+             count(*)::int AS rows, count(d.broke_10d)::int AS n, avg(d.broke_10d::int) AS hit, avg(d.k_r) AS avg_k_r, count(d.k_r)::int AS k_n
+      FROM d LEFT JOIN m ON m.date = d.date AND m.cluster_key = d.cluster_key
+      GROUP BY 1
+    `) as { key: ThemeBucket["key"]; rows: number; n: number; hit: number | null; avg_k_r: number | null; k_n: number }[];
+    const themes = (await sql`
+      SELECT ch.cluster_key, a.alias, count(DISTINCT h.date)::int AS nights, count(o.broke_10d)::int AS n,
+             avg(o.broke_10d::int) AS hit, avg(o.k_r) AS avg_k_r, count(o.k_r)::int AS k_n,
+             min(h.date)::text AS first, max(h.date)::text AS last,
+             EXISTS (SELECT 1 FROM research_clusters c WHERE c.cluster_key = ch.cluster_key) AS current
+      FROM scan_history h
+      JOIN research_cluster_history ch ON ch.as_of = h.date AND ch.ticker = h.ticker
+      LEFT JOIN research_outcomes o ON o.date = h.date AND o.ticker = h.ticker
+      LEFT JOIN research_cluster_alias a ON a.cluster_key = ch.cluster_key
+      WHERE h.rank IS NOT NULL
+      GROUP BY 1, 2
+      HAVING count(o.broke_10d) >= 8
+      ORDER BY n DESC, nights DESC
+      LIMIT ${limit}
+    `) as { cluster_key: string; alias: string | null; nights: number; n: number; hit: number | null; avg_k_r: number | null; k_n: number; first: string; last: string; current: boolean }[];
+    const by = new Map(mates.map((r) => [r.key, r]));
+    const num = (x: number | null) => (x === null ? null : Number(x));
+    return {
+      since: cov.since,
+      nights: cov.nights,
+      deckRows: mates.reduce((s, r) => s + r.rows, 0),
+      inTheme: mates.filter((r) => r.key !== "none").reduce((s, r) => s + r.rows, 0),
+      byMates: (["none", "alone", "few", "many"] as const).map((key) => {
+        const r = by.get(key);
+        return { key, label: MATES_LABEL[key], n: r?.n ?? 0, hitRate: num(r?.hit ?? null), avgKR: num(r?.avg_k_r ?? null), kN: r?.k_n ?? 0 };
+      }),
+      themes: themes.map((r) => ({
+        clusterKey: r.cluster_key, alias: r.alias, leaders: r.cluster_key.split("|"), nights: r.nights, n: r.n,
+        hitRate: num(r.hit), avgKR: num(r.avg_k_r), kN: r.k_n, first: r.first, last: r.last, current: r.current,
+      })),
+    };
+  } catch {
+    return empty;
+  }
+}
+
 export interface TapeVerdictRow {
   bullish: boolean | null;
   n: number;

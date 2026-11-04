@@ -16,6 +16,7 @@ import {
   getSplits,
   getStory,
   getSweep,
+  getThemeStudy,
 } from "@/lib/research";
 import { LENS_LABEL, MIN_AFTER_N, formatLens, researchHealth, researchRead, sweepHeadline } from "@/lib/research-story";
 import { latestScanSlim } from "@/lib/scan";
@@ -74,7 +75,7 @@ function Tile({ label, all, since, n, sinceN, sinceDate, firstRead }: {
 export default async function ResearchPage() {
   const scan = await latestScanSlim().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
-  const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades, ep, plan] = await Promise.all([
+  const [summary, story, sweep, clusters, splits, breadth, replay, autoTrades, ep, plan, themeStudy] = await Promise.all([
     getResearchSummary(),
     getStory(),
     getSweep(),
@@ -85,6 +86,7 @@ export default async function ResearchPage() {
     closedTrades("auto"),
     getEpStudy(),
     getKullamagiStudy(),
+    getThemeStudy(),
   ]);
   const ran = summary.runs.some((r) => r.ok);
   const health = researchHealth(summary.runs, scan?.date ?? null);
@@ -339,7 +341,7 @@ export default async function ResearchPage() {
       </div>
 
       {/* ---------- 6. Themes ---------- */}
-      <H id="themes" sub="Groups that moved together over the last 63 sessions, from price alone, with two or more names in tonight's deck. Amber tickers are on the deck. Membership is saved nightly so a per-theme hit rate can be measured once there is history.">
+      <H id="themes" sub="Groups that moved together over the last 63 sessions, from price alone, with two or more names in tonight's deck. Amber tickers are on the deck. Membership is saved nightly; the card below scores it.">
         Themes on tonight&apos;s deck
       </H>
       {themes.length === 0 ? (
@@ -367,6 +369,75 @@ export default async function ResearchPage() {
             </div>
           ))}
         </Card>
+      )}
+
+      {/* ---------- 6b. Themes, scored (1.7.4) ---------- */}
+      <H
+        id="themes-scored"
+        sub={
+          themeStudy.since
+            ? `Every deck row since membership began saving nightly (${themeStudy.since}, ${themeStudy.nights} nights; ${n(themeStudy.inTheme)} of ${n(themeStudy.deckRows)} deck rows sat in a theme), scored by the theme it sat in that night. Left: by how many other deck names shared the theme — Kullamägi's claim is that leaders move in groups, so the 4+ row should break out most often. Right: per theme by its key (the sorted leaders; a theme continues under a new key when a leader changes, and "nights" says how long a key held). Grey under ${MIN_AFTER_N}. Nothing here changes a scan.`
+            : "The clusters job has not saved a night of membership yet."
+        }
+      >
+        Themes, scored
+      </H>
+      {themeStudy.since && (
+        <div className="grid gap-3 lg:grid-cols-[1fr_1.4fr]">
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full">
+              <thead>
+                <tr><th className={TH}>Deck-mates that night</th><th className={`${TH} text-right`}>Rows</th><th className={`${TH} text-right`}>Broke out</th><th className={`${TH} text-right`}>Auto plan</th></tr>
+              </thead>
+              <tbody>
+                {themeStudy.byMates.map((b) => {
+                  const grey = b.n < MIN_AFTER_N;
+                  return (
+                    <tr key={b.key} className="border-t border-neutral-800">
+                      <td className={TD}>{b.label}</td>
+                      <td className={NUM}>{n(b.n)}</td>
+                      <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}>{pc(b.hitRate)}</td>
+                      <td className={`${NUM} ${b.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>{rr(b.avgKR)}<span className="text-neutral-600"> · {b.kN}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+          <Card className="overflow-x-auto p-0">
+            <table className="w-full">
+              <thead>
+                <tr><th className={TH}>Theme</th><th className={`${TH} text-right`}>Nights</th><th className={`${TH} text-right`}>Rows</th><th className={`${TH} text-right`}>Broke out</th><th className={`${TH} text-right`}>Auto plan</th></tr>
+              </thead>
+              <tbody>
+                {themeStudy.themes.length === 0 && (
+                  <tr><td colSpan={5} className={`${TD} text-neutral-500`}>No theme has eight scored deck rows yet.</td></tr>
+                )}
+                {themeStudy.themes.map((t) => {
+                  const grey = t.n < MIN_AFTER_N;
+                  return (
+                    <tr key={t.clusterKey} className="border-t border-neutral-800">
+                      <td className={`${TD} whitespace-normal`}>
+                        {t.alias && <span className="mr-1.5 font-semibold text-neutral-100">{t.alias}</span>}
+                        <span className="inline-flex flex-wrap gap-1">
+                          {t.leaders.map((m) => (
+                            <Link key={m} href={`/s/${m}`} className="rounded bg-neutral-800 px-1.5 py-px font-mono text-[10px] text-neutral-300">{m}</Link>
+                          ))}
+                        </span>
+                        {t.current && <span className="ml-1.5 rounded-full bg-emerald-950 px-1.5 py-px text-[10px] font-semibold text-emerald-300">tonight</span>}
+                        <span className="ml-1.5 text-[10px] text-neutral-600">{t.first.slice(5)} → {t.last.slice(5)}</span>
+                      </td>
+                      <td className={NUM}>{t.nights}</td>
+                      <td className={NUM}>{t.n}</td>
+                      <td className={`${NUM} ${grey ? "text-neutral-500" : "text-neutral-100"}`}>{pc(t.hitRate)}</td>
+                      <td className={`${NUM} ${t.kN < MIN_AFTER_N ? "text-neutral-500" : "text-neutral-100"}`}>{rr(t.avgKR)}<span className="text-neutral-600"> · {t.kN}</span></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </Card>
+        </div>
       )}
 
       {/* ---------- 7. Maintenance ---------- */}

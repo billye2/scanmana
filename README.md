@@ -148,6 +148,10 @@ but nothing is traded from it until it holds out of sample.
   book's one-ADR skip in 1.6.3, the entry table decides which entry it keeps), a **scorecard** (four numbers, all
   history vs since the last change), the **rule changes** (`RULE_CHANGES` in
   `lib/research-story.ts`, one entry per shipped change with the number it is
+  scored on), **themes, scored** (`getThemeStudy`: every deck row since nightly
+  membership began, by how many deck-mates shared its theme and per theme key —
+  the per-theme hit rate deferred since 1.3.3, shipped 1.7.4), the **rule changes** (the same table continues: `RULE_CHANGES` in
+  `lib/research-story.ts`, one entry per shipped change with the number it is
   scored on, grey until 30 rows), then the rates, the sweep (headline knob
   first, curves folded), the episodic-pivot study, breadth and tonight's themes; splits, replay and the
   job log live under a collapsed Maintenance block. Each deck card shows

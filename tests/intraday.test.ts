@@ -1,8 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { fetchMany, mergeLive, planFetch, provisionalBar, type CacheRow, type Quote } from "../lib/intraday";
+import { fetchMany, formatAsOf, mergeIndexQuotes, mergeLive, planFetch, provisionalBar, type CacheRow, type Quote } from "../lib/intraday";
+import { indexHealth } from "../lib/market";
 import { flatBars, resetDays } from "./fixtures";
 
 const q = (over: Partial<Quote> = {}): Quote => ({ c: 105, o: 101, h: 106, l: 100, pc: 100, t: 1_800_000_000, ...over });
+
+describe("formatAsOf", () => {
+  it("renders the quote's time in Eastern", () => {
+    expect(formatAsOf(1_800_000_000)).toBe("3:00 AM ET"); // 2027-01-15 08:00 UTC
+  });
+  it("falls back to now when the quote carries no time", () => {
+    expect(formatAsOf(0, 1_800_000_000_000)).toBe("3:00 AM ET");
+  });
+});
+
+describe("mergeIndexQuotes (the Help page's live index charts, 1.8.2)", () => {
+  it("appends today's bar to every index that has a quote and recomputes its health from it", () => {
+    resetDays();
+    const stored = new Map([
+      ["QQQ", flatBars(80, 100)],
+      ["SPY", flatBars(80, 200)],
+    ]);
+    const quotes = new Map([
+      ["QQQ", q({ c: 108, o: 101, h: 109, l: 100 })],
+      ["SPY", q({ c: 210, o: 201, h: 211, l: 200 })],
+    ]);
+    const { bars, provisional } = mergeIndexQuotes(stored, quotes, "2027-06-14");
+    expect(provisional).toBe(true);
+    expect(bars.get("QQQ")!.length).toBe(81);
+    expect(bars.get("QQQ")![80]).toMatchObject({ date: "2027-06-14", c: 108 });
+    expect(indexHealth("QQQ", bars.get("QQQ")!)!.close).toBe(108);
+    expect(indexHealth("SPY", bars.get("SPY")!)!.close).toBe(210);
+  });
+
+  it("keeps the stored history for an index with no quote", () => {
+    resetDays();
+    const stored = new Map([
+      ["QQQ", flatBars(80, 100)],
+      ["SPY", flatBars(80, 200)],
+    ]);
+    const { bars, provisional } = mergeIndexQuotes(stored, new Map([["QQQ", q()]]), "2027-06-14");
+    expect(provisional).toBe(true);
+    expect(bars.get("SPY")).toBe(stored.get("SPY"));
+    expect(bars.get("QQQ")!.length).toBe(81);
+  });
+
+  it("is not provisional once the nightly scan has stored today", () => {
+    resetDays();
+    const qqq = flatBars(80, 100);
+    const today = qqq[qqq.length - 1].date;
+    const { bars, provisional } = mergeIndexQuotes(new Map([["QQQ", qqq]]), new Map([["QQQ", q()]]), today);
+    expect(provisional).toBe(false);
+    expect(bars.get("QQQ")).toBe(qqq);
+  });
+});
 
 describe("provisionalBar", () => {
   it("builds today's bar with the 20-day average volume (finnhub quotes carry none)", () => {

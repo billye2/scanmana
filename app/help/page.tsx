@@ -6,8 +6,9 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import RunScanButton from "@/components/RunScanButton";
 import { CONFIG } from "@/lib/config";
-import { latestScanSlim, loadBars } from "@/lib/scan";
-import type { Bar, MarketHealth } from "@/lib/types";
+import { liveIndexBars } from "@/lib/intraday";
+import { latestScanSlim } from "@/lib/scan";
+import type { Bar, IndexHealth, MarketHealth } from "@/lib/types";
 
 export const metadata = { title: "Help — Scanmana" };
 export const dynamic = "force-dynamic";
@@ -32,11 +33,18 @@ const Blue = ({ children }: { children: React.ReactNode }) => <span className="f
 export default async function Help() {
   const m = CONFIG.MOMENTUM;
   let indexBars = new Map<string, Bar[]>();
+  let indexHealthRows: IndexHealth[] | undefined;
+  let indexAsOf: string | null = null;
+  let indexProvisional = false;
   let market: MarketHealth | undefined;
   try {
-    const [scan, bars] = await Promise.all([latestScanSlim(), loadBars([...CONFIG.MARKET.INDICES])]);
+    // The charts follow the day (live index quotes at the 30-minute TTL, 1.8.2); the verdict line stays the scan's.
+    const [scan, live] = await Promise.all([latestScanSlim(), liveIndexBars()]);
     market = scan?.market;
-    indexBars = bars;
+    indexBars = live.bars;
+    indexHealthRows = live.health.length > 0 ? live.health : market?.indices;
+    indexAsOf = live.asOf;
+    indexProvisional = live.provisional;
   } catch {
     // DB not configured — the page still renders the text.
   }
@@ -163,7 +171,12 @@ export default async function Help() {
             — {market.reason}
           </span>
         )}
-        <IndexCharts bars={indexBars} health={market?.indices} />
+        <span className="mt-2 block">
+          The charts below follow the day: during the session today&apos;s candle is a provisional bar from a live quote,
+          refreshed at most every 30 minutes when the page loads, and the chips over each chart are recomputed from it.
+          The verdict above, the strip on the other pages, the scan and the paper book stay on the close.
+        </span>
+        <IndexCharts bars={indexBars} health={indexHealthRows} asOf={indexAsOf} provisional={indexProvisional} />
       </Term>
       <Term name="The tape page">
         <span id="tape" />

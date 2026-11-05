@@ -4,10 +4,10 @@
 // touches the nightly scan or the bars table.
 import { CONFIG } from "./config";
 import { etToday, isWeekend } from "./dates";
-import { assessMarket } from "./market";
+import { assessMarket, indexHealth } from "./market";
 import { getSql } from "./db";
 import { loadBars } from "./scan";
-import type { Bar, MarketHealth } from "./types";
+import type { Bar, IndexHealth, MarketHealth } from "./types";
 
 export interface Quote {
   c: number; // current
@@ -164,6 +164,64 @@ export function mergeLive(bars: Bar[], q: Quote, today: string): Bar[] {
   return bar ? [...bars, bar] : bars;
 }
 
+/** "10:36 AM ET" for a quote's unix-seconds timestamp (now when the quote carries none). Pure; exported for tests. */
+export function formatAsOf(t: number, now: number = Date.now()): string {
+  const s = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(t > 0 ? t * 1000 : now));
+  return `${s} ET`;
+}
+
+export interface LiveIndexBundle {
+  bars: Map<string, Bar[]>; // stored history + provisional today, per index
+  health: IndexHealth[]; // recomputed from those bars (empty when the history is too short)
+  asOf: string | null; // newest quote's time, null when no index had a quote
+  provisional: boolean; // true when at least one index got today's bar appended
+}
+
+/**
+ * Append today's provisional bar to each index that has a quote; an index with
+ * no quote keeps its stored history. Pure; exported for tests.
+ */
+export function mergeIndexQuotes(
+  barsByTicker: Map<string, Bar[]>,
+  quotes: Map<string, Quote>,
+  today: string,
+): { bars: Map<string, Bar[]>; provisional: boolean } {
+  const out = new Map<string, Bar[]>();
+  let provisional = false;
+  for (const [t, bars] of barsByTicker) {
+    const q = quotes.get(t);
+    const merged = q ? mergeLive(bars, q, today) : bars;
+    if (merged.length > bars.length) provisional = true;
+    out.set(t, merged);
+  }
+  return { bars: out, provisional };
+}
+
+/**
+ * The index ETFs as of the last cached quote: the Help page's charts and their
+ * 10/20/50 chips follow the day at the lookup TTL (30 min) instead of waiting
+ * for the nightly scan. Two Finnhub calls per TTL window, shared with the
+ * symbol page's Live mode. Nothing here is stored.
+ */
+export async function liveIndexBars(ttlMs: number = LOOKUP_TTL_MS): Promise<LiveIndexBundle> {
+  const indices = [...CONFIG.MARKET.INDICES];
+  const stored = await loadBars(indices);
+  let quotes = new Map<string, CachedQuote>();
+  try {
+    quotes = await getQuotes(indices, ttlMs);
+  } catch {
+    // No key, no table, or Finnhub down: the stored history still renders.
+  }
+  const { bars, provisional } = mergeIndexQuotes(stored, quotes, etToday());
+  const health = indices.map((t) => indexHealth(t, bars.get(t) ?? [])).filter((h): h is IndexHealth => h !== null);
+  const newest = [...quotes.values()].reduce<number>((m, q) => Math.max(m, q.t), 0);
+  return { bars, health, asOf: quotes.size > 0 ? formatAsOf(newest) : null, provisional };
+}
+
 export interface LiveBundle {
   bars: Bar[]; // symbol history + provisional today
   market: MarketHealth | undefined; // recomputed with live index bars
@@ -189,15 +247,10 @@ export async function liveBundle(ticker: string): Promise<LiveBundle> {
     liveIndexMap.set(t, q ? mergeLive(bars, q, today) : bars);
   });
 
-  const asOf = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/New_York",
-    hour: "numeric",
-    minute: "2-digit",
-  }).format(new Date(symQuote.t > 0 ? symQuote.t * 1000 : Date.now()));
   return {
     bars: liveBars,
     market: assessMarket(liveIndexMap) ?? undefined,
-    asOf: `${asOf} ET`,
+    asOf: formatAsOf(symQuote.t),
     provisional: liveBars.length > symBars.length,
   };
 }

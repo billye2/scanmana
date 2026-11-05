@@ -85,7 +85,10 @@ but nothing is traded from it until it holds out of sample.
 - **Market strip** above the deck: Kullamägi's index filter on QQQ/SPY —
   10-day > 20-day, price above the 20 and 50, all three rising → **Bullish**,
   otherwise **Not bullish** naming the failing condition. `/help#market`
-  charts both ETFs with their 10/20/50 SMAs. Every chart has a **30d / All**
+  charts both ETFs with their 10/20/50 SMAs; during the session today's candle
+  is a provisional bar from a live quote (refreshed at most every 30 minutes on
+  load) and the chips over each chart are recomputed from it, while the
+  verdict stays on the close. Every chart has a **30d / All**
   pill: zoom to the last 30 sessions, tap again for the full window (the deck
   keeps the setting as you swipe). A
   second line carries **breadth** from the research layer — share of the
@@ -213,7 +216,7 @@ but nothing is traded from it until it holds out of sample.
   block (contraction sequence, final tightness, volume dry-up — an analysis
   lens, not a screen filter). Deck cards carry the same two panels below the
   buttons, collapsed to one-line summaries (every deck name passes the screen). A **Live** toggle reruns the whole read intraday:
-  Finnhub free quotes (symbol + QQQ/SPY, 30-minute in-memory cache) become
+  Finnhub free quotes (symbol + QQQ/SPY, 30-minute shared cache in Neon) become
   a provisional today-bar — volume assumed at the 20-day average — and the
   market filter recomputes from the live indexes; failures fall back to EOD
   with a note. The Analysis modal for a symbol outside the scan

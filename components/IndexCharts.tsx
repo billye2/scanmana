@@ -8,13 +8,28 @@ const SHOW_BARS = 130;
 export default function IndexCharts({
   bars,
   health,
+  asOf = null,
+  provisional = false,
 }: {
   bars: Map<string, Bar[]>;
   health: IndexHealth[] | undefined;
+  asOf?: string | null; // time of the live quote the charts carry; null = stored bars only
+  provisional?: boolean; // today's bar is built from that quote, not from the nightly scan
 }) {
   const byTicker = new Map((health ?? []).map((h) => [h.ticker, h]));
+  const lastDate = [...bars.values()].reduce<string>((m, b) => (b.length > 0 && b[b.length - 1].date > m ? b[b.length - 1].date : m), "");
   return (
     <div className="mt-3 space-y-5">
+      <p className="text-[11px] text-neutral-500">
+        {provisional && asOf ? (
+          <>
+            Today&apos;s candle is <span className="text-sky-300">provisional</span>, from a live quote as of{" "}
+            <span className="text-neutral-300">{asOf}</span> · refreshes every 30 minutes on reload
+          </>
+        ) : lastDate ? (
+          <>Through the {lastDate} close</>
+        ) : null}
+      </p>
       {CONFIG.MARKET.INDICES.map((t) => {
         const all = bars.get(t) ?? [];
         const h = byTicker.get(t);
@@ -29,13 +44,14 @@ export default function IndexCharts({
         }
         return (
           <div key={t}>
-            <div className="flex items-baseline justify-between text-xs">
-              <span className="font-semibold text-neutral-100">
+            {/* Wraps at phone width: the price and the four chips do not fit one 390px line (1.8.2). */}
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs">
+              <span className="whitespace-nowrap font-semibold text-neutral-100">
                 {t}
                 <span className="ml-2 font-normal text-neutral-400">{price(shown[shown.length - 1].c)}</span>
               </span>
               {h && (
-                <span className="flex gap-2 font-mono text-[11px]">
+                <span className="flex gap-2 whitespace-nowrap font-mono text-[11px]">
                   <span className={h.fastOverSlow ? "text-emerald-400" : "text-red-400"}>
                     {h.fastOverSlow ? "10>20" : "10<20"}
                   </span>
@@ -59,8 +75,9 @@ export default function IndexCharts({
       })}
       <p className="text-[11px] text-neutral-500">
         Lines: <span className="text-sky-400">10-day</span> · <span className="text-purple-400">20-day</span> ·{" "}
-        <span className="text-orange-400">50-day</span>. Status is from the latest scan; candles are the stored daily
-        bars.
+        <span className="text-orange-400">50-day</span>. Candles are the stored daily bars plus today&apos;s provisional
+        bar during the session; the chips are recomputed from them, so they can differ from the strip&apos;s verdict, which
+        stays on the scan night&apos;s close. Today&apos;s volume is assumed at the 20-day average.
       </p>
     </div>
   );

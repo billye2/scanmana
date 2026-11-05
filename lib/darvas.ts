@@ -51,3 +51,31 @@ export function findDarvasBox(
     confirmed: n - 1 - bottomIdx >= opts.confirm,
   };
 }
+
+/**
+ * The box a card is traded against tonight: the box the bars through *yesterday*
+ * formed, when tonight's close is above its top (the stock just left the box
+ * upward — last night's card said "arms on a close above X" and tonight it did);
+ * otherwise tonight's own box.
+ *
+ * Why this exists: `findDarvasBox` on the full bars can never return a box
+ * tonight's close is above — the top must cap every later high, tonight's
+ * included, so close ≤ high ≤ top. On the breakout day the box either vanished
+ * (the stock is the window high) or jumped to an older, taller ceiling, and
+ * every "closed above the box" rule (`breakingOut`, `armBlocker`, the Darvas
+ * paragraph) was unreachable: the Auto book armed nothing from 1.3.7 (2026-10-25)
+ * to 1.8.1 (2026-11-04). The prior box wins even when a taller ceiling exists on
+ * tonight's bars, matching what the research layer scores (the first close above
+ * the scan-night box, research/outcomes.py `kullamagi_plans`).
+ */
+export function findTradeBox(
+  bars: Bar[],
+  opts: { confirm: number; maxWindow: number; maxHeightPct: number } = CONFIG.DARVAS,
+): DarvasBox | null {
+  const last = bars[bars.length - 1];
+  if (last) {
+    const prior = findDarvasBox(bars.slice(0, -1), opts);
+    if (prior && last.c > prior.top) return prior;
+  }
+  return findDarvasBox(bars, opts);
+}

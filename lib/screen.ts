@@ -1,5 +1,5 @@
 import { CONFIG } from "./config";
-import { findDarvasBox } from "./darvas";
+import { findTradeBox } from "./darvas";
 import {
   adrPct,
   avgDollarVolume,
@@ -68,7 +68,9 @@ export function buildCandidate(ticker: string, name: string, bars: Bar[]): Candi
     adrPct: adr,
     distFromHigh: dist,
     tightness: tight,
-    box: findDarvasBox(bars),
+    // The box the card is traded against: last night's box when tonight closed above it
+    // (the breakout night), else tonight's — see findTradeBox for why the plain box can't arm.
+    box: findTradeBox(bars),
     pivot: findPivot(bars),
     ep: detectEp(bars, CONFIG.EP),
     bars: bars.slice(-CONFIG.CHART_BARS),

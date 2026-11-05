@@ -14,8 +14,9 @@ import {
   type EnginePosition,
   type SessionInput,
 } from "../lib/paper-engine";
+import { buildCandidate } from "../lib/screen";
 import type { Bar, Candidate } from "../lib/types";
-import { bar, flatBars, resetDays } from "./fixtures";
+import { bar, breakoutSetup, flatBars, resetDays } from "./fixtures";
 
 const order = (over: Partial<EngineOrder> = {}): EngineOrder => ({
   id: 1,
@@ -347,6 +348,21 @@ describe("armDecisions", () => {
     ]);
     // The wide break is the one blocker that is a trade declined, so it is reported as a skip with both numbers.
     expect(d.skip).toEqual([{ ticker: "WIDE", reason: "stop wider than one ADR: stop 8.5% under the close at 47.00, ADR 4.0%" }]);
+  });
+
+  it("arms a candidate built from real bars on the night it closes above its box (the box must come from the engine, not by hand)", () => {
+    // From 1.3.7 to 1.8.1 the hand-built boxes above hid that `findDarvasBox` on tonight's bars can never
+    // sit under tonight's close, so the Auto book armed nothing for seven scan nights.
+    const bars = breakoutSetup();
+    const top = buildCandidate("REAL", "Real Co", bars)!.box!.top;
+    const last = bars[bars.length - 1];
+    // Low 1% over the box top, close 3% over: a 2% stop on a ~4.5% ADR, inside the one-ADR rule.
+    const brokeTonight = [...bars, bar(last.c, top * 1.04, top * 1.01, top * 1.03)];
+    const c = { ...buildCandidate("REAL", "Real Co", brokeTonight)!, verdict: "wait" as const };
+    expect(c.box?.top).toBe(top);
+    expect(armBlocker(c)).toBeNull();
+    const d = armDecisions([c], [], new Set());
+    expect(d.arm).toEqual([{ ticker: "REAL", trigger: top, stop: brokeTonight[brokeTonight.length - 1].l, kind: "market" }]);
   });
 
   it("a close exactly at the box top is not a break", () => {

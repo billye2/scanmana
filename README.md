@@ -8,7 +8,9 @@ and is resting in a tight range with the 10- and 20-day averages catching up.
 Scanmana finds it from daily bars and prices the entry and the stop a person can
 place the night before, without watching the open. The Darvas box is how the
 range is found and the Livermore pivot is the fallback trigger when there is no
-box; neither is a method of its own. Two paper books measure whether the
+box; neither is a method of its own. A card keeps the box it closed above for
+that one night, so a break is judged against the level the card showed the
+night before. Two paper books measure whether the
 night-before versions of his entry pay, and a Python research layer scores the
 scanner's own history every night (`/research`) and every rule change made from
 it. Episodic pivots are a measured study on that page, not a setup the deck arms:

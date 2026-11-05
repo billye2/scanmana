@@ -104,8 +104,10 @@ export default async function Help() {
         $2M in the late 1950s trading by telegram; his book <em>How I Made $2,000,000 in the Stock Market</em>{" "}
         describes stocks moving in &ldquo;boxes&rdquo;. Scanmana finds the most recent high that has capped every
         bar since for at least {CONFIG.DARVAS.confirm} sessions — that ceiling is the box top. A close (or a
-        strong intraday move) <em>above</em> it is the buy signal: the stock has left the box upward. The small
-        percentage next to it is how far price is below the trigger right now.
+        strong intraday move) <em>above</em> it is the buy signal: the stock has left the box upward. On the night
+        that happens the card keeps the box it just left, so the trigger you see is the level the close beat; the
+        next night the box is gone or a higher ceiling takes its place. The small percentage next to it is how far
+        price is below the trigger right now.
       </Term>
       <Term name="Stop (dashed amber)" who="Darvas">
         The bottom of the same box: the lowest low since the box top formed. Darvas&apos;s rule was simple — if the

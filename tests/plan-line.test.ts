@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { autoPlan, openGroup, openHint, positionLines, takeLadder, takeRisk } from "../lib/plan-line";
+import { buildCandidate } from "../lib/screen";
 import type { DarvasBox } from "../lib/types";
-import { bar, flatBars, resetDays } from "./fixtures";
+import { bar, breakoutSetup, flatBars, resetDays } from "./fixtures";
 
 const box = { top: 100, bottom: 92 } as DarvasBox;
 // A 5% ADR: the 98-low / 101-close breakout bar used below is 3% wide (0.6×), inside the one-ADR rule.
@@ -23,6 +24,16 @@ describe("autoPlan — the Auto book's decision in words", () => {
     expect(p.chip).toBe("arms · buy at open");
     expect(p.detail).toContain("98.00");
     expect(p.detail).toContain("-3.0%");
+  });
+
+  it("reads 'arms' and files under Arms tonight for a card built from real bars that closed above its box", () => {
+    const bars = breakoutSetup();
+    const top = buildCandidate("REAL", "Real Co", bars)!.box!.top;
+    const last = bars[bars.length - 1];
+    const brokeTonight = [...bars, bar(last.c, top * 1.04, top * 1.01, top * 1.03)];
+    const c = { ...buildCandidate("REAL", "Real Co", brokeTonight)!, verdict: "wait" as const };
+    expect(autoPlan(c, c.bars)!.chip).toBe("arms · buy at open");
+    expect(openGroup(c, c.bars.slice(-2))).toBe("arms");
   });
 
   it("waits inside the box and says how far the close is from the top", () => {

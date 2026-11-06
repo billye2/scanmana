@@ -19,13 +19,23 @@ but nothing is traded from it until it holds out of sample.
 
 ## Screenshots
 
-| Deck | Analysis | Live watchlist |
-|---|---|---|
-| ![Deck: tonight's ranked setups with Darvas box, Livermore pivot and stop drawn on the chart](docs/screenshots/deck.png) | ![Analysis: rule-based Wait/Pass read per framework with the trade plan](docs/screenshots/analysis.png) | ![Live watchlist: starred names classified against their trigger in real time](docs/screenshots/watchlist-live.png) |
+Taken 2026-11-05 on v1.8.3, the night the Auto book armed its first order.
 
-| Symbol lookup | Help |
-|---|---|
-| ![Symbol lookup: the same card for any ticker plus the Scan fit checklist](docs/screenshots/symbol-lookup.png) | ![Help: every badge and chart line explained, with who each idea comes from](docs/screenshots/help.png) |
+| Deck card | Deck list, grouped by the open | Analysis |
+|---|---|---|
+| ![Deck card: the market strip, the morning line, and tonight's setup with the trigger and stop drawn on the chart](docs/screenshots/deck.png) | ![Deck list: Arms tonight, Wait cards the book cannot arm, Pass folded away, each with its live chip](docs/screenshots/deck-list.png) | ![Analysis: the rule-based Wait/Pass read per framework, with the plan line at the top](docs/screenshots/analysis.png) |
+
+| Symbol lookup | Paper book | Watchlist |
+|---|---|---|
+| ![Symbol lookup: the same card for any ticker, with the Auto book's plan for it](docs/screenshots/symbol-lookup.png) | ![Paper book: the Auto ledger's numbers, the replay line, the fan and the armed orders](docs/screenshots/paper.png) | ![Watchlist: starred names against their trigger, live during the session](docs/screenshots/watchlist-live.png) |
+
+| Research | Studies | Best setups |
+|---|---|---|
+| ![Research: this week's read, the scorecard and the rule changes, each with its range](docs/screenshots/research.png) | ![Studies: Kullamägi's plan scored on every boxed Wait card, by stop width and by ADR](docs/screenshots/studies.png) | ![Best setups: the deck cards that went furthest, with the scan night and the buy marked](docs/screenshots/gallery.png) |
+
+| Help: the index charts |
+|---|
+| ![Help: QQQ and SPY with the 10/20/50 averages, following the day at a 30-minute cadence](docs/screenshots/help.png) |
 
 ## How it works
 

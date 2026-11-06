@@ -141,3 +141,13 @@ export const BOTTOM_BAR_LINKS = 4;
 export function bottomBarLinks(keys: readonly NavKey[]): NavSection[] {
   return navSections(keys).slice(0, BOTTOM_BAR_LINKS);
 }
+
+/**
+ * What the bottom bar's Back does (1.8.4). The home-screen app has no browser
+ * chrome, so a deep page (a symbol, /sim) carries its own Back: history back
+ * when the app got here by a tap, the page's fallback when it was opened cold
+ * (a reload or a pasted link leaves one history entry). Pure.
+ */
+export function backAction(historyLength: number): "back" | "fallback" {
+  return historyLength > 1 ? "back" : "fallback";
+}

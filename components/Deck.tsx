@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import AnalysisModal from "@/components/AnalysisModal";
+import BackButton from "@/components/BackButton";
+import BottomBar, { BAR_ITEM } from "@/components/BottomBar";
 import Chart, { type ChartLine, type ChartMarker } from "@/components/Chart";
 import LiveChip from "@/components/LiveChip";
 import ScreenFit from "@/components/ScreenFit";
@@ -10,7 +12,6 @@ import { useLive } from "@/components/useLive";
 import { explainScreen } from "@/lib/screen";
 import { explainVcp } from "@/lib/minervini";
 import { BellIcon, ChevronLeftIcon, StarIcon } from "@/components/Icons";
-import { NAV_ICONS } from "@/components/NavIcons";
 import { NAV_SECTIONS, type NavSection } from "@/lib/nav";
 import { money, pct, price } from "@/lib/format";
 import { autoPlan, takeLadder, takeRisk, type PlanTone } from "@/lib/plan-line";
@@ -25,9 +26,6 @@ const PLAN_TONE: Record<PlanTone, string> = {
   red: "bg-red-900/40 text-red-300",
   neutral: "bg-neutral-800 text-neutral-300",
 };
-
-// Bottom bar items: one column each, the same icon size and colours as the top nav.
-const BAR_ITEM = "flex items-center justify-center py-2.5 text-neutral-400 active:text-neutral-100 disabled:opacity-30";
 
 function Badge({ label, tone = "neutral" }: { label: string; tone?: "neutral" | "green" | "amber" | "blue" }) {
   const tones = {
@@ -57,8 +55,11 @@ export default function Deck({
   chartLines,
   chartMarkers,
   barLinks,
+  backFallback,
 }: {
   candidates: DeckCard[];
+  /** One-card decks (the symbol page): the bottom bar's left slot is Back, landing here when the page was opened cold (1.8.4). */
+  backFallback?: string;
   /** Home deck: the bottom bar's section links, the reader's first picks (`bottomBarLinks` in lib/nav.ts). Absent → paper (+ deck list when live). */
   barLinks?: NavSection[];
   alerts: WatchlistAlert[];
@@ -499,25 +500,23 @@ export default function Deck({
           rarely tapped; the chip beside Analysis and the space key remain) and its column
           shows the card counter instead; tapping the counter pages forward, which made ›
           redundant (gone in 1.4.5; the keyboard's → / j still work). */}
-      <nav
-        aria-label="Deck navigation"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-neutral-800 bg-[#0a0e14]/95 pt-1 pb-[max(env(safe-area-inset-bottom),6px)] backdrop-blur"
-      >
-        <div className="mx-auto grid w-full max-w-xl" style={{ gridTemplateColumns: `repeat(${2 + bar.length}, minmax(0, 1fr))` }}>
-          <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
-            <ChevronLeftIcon size={25} />
-          </button>
-          {bar.map((s) => {
-            const Icon = NAV_ICONS[s.key];
-            return (
-              <Link key={s.key} href={s.href} className={BAR_ITEM} aria-label={s.label}>
-                <Icon size={25} />
-              </Link>
-            );
-          })}
-          {/* Bordered pill, inset from the column: the border shows where the tap lands, and
-              the inset keeps "of N" clear of the iPhone's right screen edge, where iOS holds
-              touches to test for a forward swipe (1.4.9, mistakes.md 2026-10-27). */}
+      <BottomBar
+        left={
+          // A one-card deck (the symbol page) has nothing to page back to, so its left slot is
+          // Back for the home-screen app instead of a chevron that can never do anything (1.8.4).
+          candidates.length < 2 && backFallback ? (
+            <BackButton fallback={backFallback} className={BAR_ITEM} />
+          ) : (
+            <button onClick={() => go(-1)} disabled={candidates.length < 2} className={BAR_ITEM} aria-label="Previous card">
+              <ChevronLeftIcon size={25} />
+            </button>
+          )
+        }
+        links={bar}
+        right={
+          /* Bordered pill, inset from the column: the border shows where the tap lands, and
+             the inset keeps "of N" clear of the iPhone's right screen edge, where iOS holds
+             touches to test for a forward swipe (1.4.9, mistakes.md 2026-10-27). */
           <button
             onClick={() => go(1)}
             disabled={candidates.length < 2}
@@ -528,8 +527,8 @@ export default function Deck({
           >
             {idx + 1} of {candidates.length}
           </button>
-        </div>
-      </nav>
+        }
+      />
 
       {bars && <ScreenFit checks={checks} vcp={vcpChecks} inDeck={date !== ""} />}
     </div>

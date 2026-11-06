@@ -106,6 +106,7 @@ export default async function SymbolPage({
         extra={
           <Link
             href={live ? `/s/${ticker}` : `/s/${ticker}?live=1`}
+            replace // the toggle is a view of the same page, not a place: Back should leave the page, not un-toggle it (1.8.4)
             className={`text-sm ${live ? "font-semibold text-emerald-400" : "text-neutral-400 active:text-neutral-200"}`}
           >
             {live ? "● Live" : "Live"}
@@ -134,6 +135,7 @@ export default async function SymbolPage({
           autoBook={inDeck}
           chartLines={chartLines.length > 0 ? chartLines : undefined}
           chartMarkers={chartMarkers.length > 0 ? chartMarkers : undefined}
+          backFallback="/deck"
         />
       ) : (
         <p className="mt-16 text-center text-sm text-neutral-500">{error}</p>

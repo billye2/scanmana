@@ -207,6 +207,9 @@ Taken 2026-11-05 on v1.8.3, the night the Auto book armed its first order.
   from the cache with their age; a 60-name deck is fully fresh every two
   polls. One bad symbol drops only itself and a 429 halts the refresh
   instead of failing it.
+- **Back in the bottom bar** on the symbol page and the stop simulator: the home-screen app has
+  no browser chrome, so the bar's left slot returns to the page you came from (history), or to
+  the deck list / paper book when the page was opened cold.
 - **Stop simulator** (`/sim`, linked from the lookup page, the watchlist, the paper book and Help): for a
   position opened without a plan, type the symbol, the entry price, an optional entry date
   and share count. `lib/stop-plan.ts` prices the stop by Kullamägi's rules — the low of the

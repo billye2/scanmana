@@ -322,7 +322,10 @@ export default async function Help() {
           Page through the deck with the ‹ › arrows in the bottom bar after each nightly scan; its <span className="text-neutral-100">Deck</span> button
           opens the whole list as a page, grouped live. Tightest setups come first; most cards are a pass. On a keyboard:{" "}
           <span className="text-neutral-100">←/→</span> or <span className="text-neutral-100">j/k</span> moves through the
-          deck (it wraps around), <span className="text-neutral-100">space</span> opens the Google search for the card.
+          deck (it wraps around), <span className="text-neutral-100">space</span> opens the Google search for the card. On a symbol
+          page and on the stop simulator the bar&apos;s left slot is <span className="text-neutral-100">Back</span>: it returns to the page
+          you came from, or to the deck list (the paper book from the simulator) when the page was opened cold — the home-screen app has
+          no browser bar of its own.
         </li>
         <li>
           The scan runs itself around midnight ET on weeknights (with a 1:30am retry). It always scores the most recent{" "}

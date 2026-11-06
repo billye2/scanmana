@@ -1,4 +1,6 @@
 import Link from "next/link";
+import BackButton from "@/components/BackButton";
+import BottomBar, { BAR_ITEM } from "@/components/BottomBar";
 import SimChart from "@/components/SimChart";
 import SimForm from "@/components/SimForm";
 import TopNav from "@/components/TopNav";
@@ -8,6 +10,7 @@ import { etToday } from "@/lib/dates";
 import { price as fmt } from "@/lib/format";
 import { liveBundle } from "@/lib/intraday";
 import { findPivot } from "@/lib/livermore";
+import { NAV_SECTIONS } from "@/lib/nav";
 import { loadBars } from "@/lib/scan";
 import { planStop, type StopCandidate, type StopPlan } from "@/lib/stop-plan";
 import type { Bar } from "@/lib/types";
@@ -68,7 +71,7 @@ export default async function SimPage({ searchParams }: { searchParams: Promise<
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto flex min-h-dvh w-full max-w-xl flex-col px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)]">
       <TopNav subtitle="Stop simulator — a position opened without a plan, priced by Kullamägi's rules" />
       <SimForm initial={{ t: sp.t, p: sp.p, d: sp.d, n: sp.n }} today={today} />
       {!ticker || !(entry > 0) ? (
@@ -87,6 +90,12 @@ export default async function SimPage({ searchParams }: { searchParams: Promise<
         Rules from <Link href="/help#sim" className="underline decoration-neutral-700 underline-offset-4">Help</Link>. The Take
         button on a card prices its stop with the same function, so this page and the paper book never disagree.
       </p>
+      {/* The symbol page's bottom bar, here too (1.8.4): Back on the left — the page is reached from the
+          paper book or a symbol card, and the home-screen app has no browser chrome to return with. */}
+      <BottomBar
+        left={<BackButton fallback="/paper" className={BAR_ITEM} />}
+        links={NAV_SECTIONS.filter((s) => s.key === "paper" || s.key === "deck").sort((a) => (a.key === "paper" ? -1 : 1))}
+      />
     </main>
   );
 }

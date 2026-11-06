@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_NAV, MAX_NAV, NAV_SECTIONS, bottomBarLinks, navCookieValue, navSections, parseNav } from "../lib/nav";
+import { DEFAULT_NAV, MAX_NAV, NAV_SECTIONS, backAction, bottomBarLinks, navCookieValue, navSections, parseNav } from "../lib/nav";
+
+describe("backAction — the bottom bar's Back (1.8.4)", () => {
+  it("goes back through history when the app got here by a tap", () => {
+    expect(backAction(2)).toBe("back");
+    expect(backAction(7)).toBe("back");
+  });
+  it("uses the fallback when the page was opened cold", () => {
+    expect(backAction(1)).toBe("fallback");
+    expect(backAction(0)).toBe("fallback");
+  });
+});
 
 describe("bottomBarLinks — the home deck's bottom bar follows the picks", () => {
   it("takes the first four picks in order", () => {

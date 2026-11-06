@@ -25,10 +25,10 @@ describe("mergeIndexQuotes (the Help page's live index charts, 1.8.2)", () => {
       ["QQQ", q({ c: 108, o: 101, h: 109, l: 100 })],
       ["SPY", q({ c: 210, o: 201, h: 211, l: 200 })],
     ]);
-    const { bars, provisional } = mergeIndexQuotes(stored, quotes, "2027-06-14");
+    const { bars, provisional } = mergeIndexQuotes(stored, quotes, "2027-01-15");
     expect(provisional).toBe(true);
     expect(bars.get("QQQ")!.length).toBe(81);
-    expect(bars.get("QQQ")![80]).toMatchObject({ date: "2027-06-14", c: 108 });
+    expect(bars.get("QQQ")![80]).toMatchObject({ date: "2027-01-15", c: 108 });
     expect(indexHealth("QQQ", bars.get("QQQ")!)!.close).toBe(108);
     expect(indexHealth("SPY", bars.get("SPY")!)!.close).toBe(210);
   });
@@ -39,7 +39,7 @@ describe("mergeIndexQuotes (the Help page's live index charts, 1.8.2)", () => {
       ["QQQ", flatBars(80, 100)],
       ["SPY", flatBars(80, 200)],
     ]);
-    const { bars, provisional } = mergeIndexQuotes(stored, new Map([["QQQ", q()]]), "2027-06-14");
+    const { bars, provisional } = mergeIndexQuotes(stored, new Map([["QQQ", q()]]), "2027-01-15");
     expect(provisional).toBe(true);
     expect(bars.get("SPY")).toBe(stored.get("SPY"));
     expect(bars.get("QQQ")!.length).toBe(81);
@@ -77,9 +77,21 @@ describe("mergeLive", () => {
   it("appends exactly one provisional bar", () => {
     resetDays();
     const prior = flatBars(30, 100);
-    const merged = mergeLive(prior, q(), "2027-01-04");
+    const merged = mergeLive(prior, q(), "2027-01-15"); // the quote's own day (t = 2027-01-15 03:00 ET)
     expect(merged.length).toBe(prior.length + 1);
     expect(merged[merged.length - 1].c).toBe(105);
+  });
+
+  it("does not append a quote whose last trade was on an earlier day (overnight and pre-market, 1.8.3)", () => {
+    resetDays();
+    const prior = flatBars(30, 100);
+    expect(mergeLive(prior, q(), "2027-01-18")).toBe(prior); // 1 AM ET on Monday: the quote is still Friday's close
+  });
+
+  it("still appends a quote that carries no time", () => {
+    resetDays();
+    const prior = flatBars(30, 100);
+    expect(mergeLive(prior, q({ t: 0 }), "2027-01-18").length).toBe(prior.length + 1);
   });
 
   it("leaves history alone when it already covers today", () => {

@@ -3,7 +3,7 @@
 // the live watchlist and the live deck all go through getQuotes(); nothing here
 // touches the nightly scan or the bars table.
 import { CONFIG } from "./config";
-import { etToday, isWeekend } from "./dates";
+import { etDate, etToday, isWeekend } from "./dates";
 import { assessMarket, indexHealth } from "./market";
 import { getSql } from "./db";
 import { loadBars } from "./scan";
@@ -160,6 +160,9 @@ export function mergeLive(bars: Bar[], q: Quote, today: string): Bar[] {
   if (bars.length === 0) return bars;
   const last = bars[bars.length - 1];
   if (last.date >= today) return bars; // scan already stored today (or clock skew) — nothing to append
+  // A quote carries the time of its last trade. Overnight and pre-market that is yesterday's
+  // close, and appending it as today would draw yesterday twice (seen at 1 AM ET on 1.8.2).
+  if (q.t > 0 && etDate(q.t * 1000) !== today) return bars;
   const bar = provisionalBar(q, bars, today);
   return bar ? [...bars, bar] : bars;
 }

@@ -1,8 +1,13 @@
 const ET_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
 
+/** A moment (ms epoch) as its US Eastern calendar date, YYYY-MM-DD. */
+export function etDate(ms: number): string {
+  return ET_FMT.format(new Date(ms));
+}
+
 /** Today's date in US Eastern time as YYYY-MM-DD. */
 export function etToday(): string {
-  return ET_FMT.format(new Date());
+  return etDate(Date.now());
 }
 
 /** date string +/- n calendar days -> YYYY-MM-DD (UTC math, safe for date-only). */

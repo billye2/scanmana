@@ -64,6 +64,24 @@ export default async function Help() {
         fallback trigger when there is no box — neither is a method of its own here. His other setup, the episodic
         pivot, is a measured study on the Research page, not something the deck arms.
       </p>
+
+      <div id="finding" className="mt-4 rounded-xl border border-emerald-900/60 bg-emerald-950/30 px-3 py-3">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">What the history says — read this first</div>
+        <p className="mt-1 text-[13px] leading-relaxed text-neutral-200">
+          <span className="font-semibold text-neutral-100">It is all about entry and exit management, not picking would-be winners.</span>{" "}
+          Kullamägi himself put his hit rate at 25 to 50%; his results came from cutting every loser small and holding the few that ran,
+          not from being right about which chart would go. Scanmana&apos;s own history says the same. Of 8,001 scored deck cards, 38% never
+          cleared their level in ten sessions, and of the ones that did, 47% ran 15% or more in twenty sessions — a coin toss, for anyone,
+          from the left side of the chart. The 5-star shape (a boxed Wait resting under its box top) ran{" "}
+          <em>less</em> often than the rest of the deck, 26% against 29%; the one factor that separated was the tape, 40% ran on a Bullish
+          night against 25% on a Not bullish one. And the Auto plan&apos;s own record, 41% wins at +1.4R against −0.9R losses, nets to about
+          zero: a sharper eye moves the 41% a little, holding the runners longer moves the +1.4R a lot. So use the deck for what it is, a
+          list of candidates on a tape that allows them, and spend the effort where the money is: the stop at entry, the half off, the trail,
+          and the discipline to stay in a winner. The <Link href="/drill" className="text-neutral-100 underline underline-offset-4">drill</Link>{" "}
+          will show you the coin toss first hand. Read on 2026-11-09, in-sample, raw price.
+        </p>
+      </div>
+
       <div className="mt-3 flex justify-center">
         <RunScanButton />
       </div>

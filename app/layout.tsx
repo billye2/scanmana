@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { cookies } from "next/headers";
+import { TEXT_COOKIE, parseTextSize } from "@/lib/nav";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,9 +20,11 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // The reader's text size (1.8.8): chosen on /sections, kept per device; globals.css scales from the attribute.
+  const text = parseTextSize((await cookies()).get(TEXT_COOKIE)?.value);
   return (
-    <html lang="en">
+    <html lang="en" data-text={text === "default" ? undefined : text}>
       <body className="min-h-dvh bg-[#0a0e14] font-sans text-neutral-100 antialiased">
         <ClerkProvider>{children}</ClerkProvider>
       </body>

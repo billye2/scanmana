@@ -137,6 +137,30 @@ export function navSections(keys: readonly NavKey[]): NavSection[] {
   return keys.map((k) => NAV_SECTIONS.find((s) => s.key === k)!).filter(Boolean);
 }
 
+/* ---------- text size (1.8.8) ---------- */
+
+/**
+ * The reader's text size, chosen on /sections and kept in a cookie per device
+ * like the bar's picks. The root layout puts it on <html data-text> and
+ * globals.css scales every text utility the app uses from it (the viewport
+ * forbids pinch zoom in the home-screen app, so this is the only way to make the
+ * prose larger). Default means no attribute and no override.
+ */
+export type TextSize = "default" | "large" | "larger";
+export const TEXT_SIZES: readonly { key: TextSize; label: string; note: string }[] = [
+  { key: "default", label: "Default", note: "as designed, 13px body" },
+  { key: "large", label: "Large", note: "about a fifth bigger, 16px body" },
+  { key: "larger", label: "Larger", note: "about two fifths bigger, 18px body" },
+];
+export const TEXT_COOKIE = "scm_text";
+
+const TEXT_KEYS = new Set<string>(TEXT_SIZES.map((s) => s.key));
+
+/** The size a stored value stands for: unknown or absent means default. Pure. */
+export function parseTextSize(raw: string | null | undefined): TextSize {
+  return raw && TEXT_KEYS.has(raw) ? (raw as TextSize) : "default";
+}
+
 /** The home deck's bottom bar carries this many section links between prev and the counter. */
 export const BOTTOM_BAR_LINKS = 4;
 

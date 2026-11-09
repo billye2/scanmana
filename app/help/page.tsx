@@ -552,7 +552,9 @@ export default async function Help() {
         unticked. Each row also opens its section, so whatever you leave off the bar stays two taps away. The choice is kept on this device
         for a year (a cookie), so the phone and the desktop can carry different bars. The suggested six are the deck list, paper, best setups,
         research, watchlist and lookup. The home deck&apos;s bottom bar follows: previous card · your first four picks · the card counter. The card&apos;s
-        watch star sits beside the ticker.
+        watch star sits beside the ticker. The same page carries <span className="font-semibold text-neutral-100">Text size</span>: Default, Large or
+        Larger scales every line of text in the app on this device (the body text here goes from 13 to 16 or 18 pixels; the charts keep their own
+        small labels). The home-screen app cannot pinch-zoom, so this is the way to make these pages readable.
       </p>
 
       <H>

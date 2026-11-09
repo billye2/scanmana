@@ -112,6 +112,13 @@ Taken 2026-11-05 on v1.8.3, the night the Auto book armed its first order.
   and the scan-night facts, plus one line on what the shown setups had in
   common; a "5-star only" switch keeps just the boxed Wait cards resting under
   their box top (`isFiveStar`). Linked from `/research` and Help; on the bar by default.
+- **Drill** (`/drill`, `lib/drill.ts`, since 1.8.5): the gallery with the answers
+  covered. One scored deck row at random — winners and losers alike — drawn up
+  to its scan night with the name and date hidden; call Take or Skip, then the
+  twenty sessions after are uncovered with the box and markers, who it was, what
+  the app said that night, and the grade (ran ≥ 15% best close / fizzled / never
+  filled). Your record sits beside the 5-star rule's hit rate on the very same
+  charts and the base rate; calls are stored per account (`drill_answers`).
 - **Studies** (`/studies`, since 1.7.5): the research layer's deeper reads,
   moved off `/research` so that page keeps to this week's read, the scorecard
   and the rule changes — the plan on every boxed Wait card, breakout rates, the
@@ -331,7 +338,7 @@ All of these inject secrets per-process from Vercel (`vercel env run -e producti
   runs them (`POST /api/research_job?job=a,b&force=1&budget=S`, Bearer
   `CRON_SECRET`); `.python-version`, `requirements.txt`, `vercel.json`
   `functions` block
-- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/research`, `/sim` stop simulator, `/s/[ticker]` symbol page (same card for
+- `app/` — deck (`/`), `/deck` list, `/watchlist`, `/paper` book, `/research`, `/gallery`, `/drill`, `/sim` stop simulator, `/s/[ticker]` symbol page (same card for
   any symbol; watchlist rows link here), `/help`, `/sign-in`, API routes
   (`cron/scan`, `scan/run`, `scan/live`, `analysis`, `watchlist`,
   `watchlist/live`, `scan/bars`, `push/subscribe`, `push/test`,

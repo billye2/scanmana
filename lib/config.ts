@@ -134,6 +134,12 @@ export const CONFIG = {
     KULLAMAGI: { PARTIAL_DAY: 4, PARTIAL_FRACTION: 0.5, MA: 10, MAX_STOP_ADR: 1 },
   },
 
+  // The drill (/drill, 1.8.5): the right side of the chart covered, one call per chart.
+  DRILL: {
+    RAN_MFE: 0.15, // a best close this far above the scan-night close in 20 sessions = the chart "ran"
+    RECENT_TICKERS: 30, // the reader's last answers whose tickers are kept out of the next draw
+  },
+
   // Data requirements
   MIN_BARS: 127, // 6-month return needs 126 bars of history + today
   CHART_BARS: 130, // bars embedded in the scan payload per candidate

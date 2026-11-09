@@ -37,6 +37,42 @@ export interface GalleryRow {
   kEntryDay: number | null;
 }
 
+/** A gallery row as the SQL returns it (scan_history × research_outcomes, snake_case). */
+export interface GalleryRowSql {
+  date: string;
+  ticker: string;
+  close: number;
+  verdict: "wait" | "pass";
+  boxed: boolean;
+  box_top: number | null;
+  box_bottom: number | null;
+  pivot: number | null;
+  adr_pct: number;
+  tightness: number;
+  dist_from_high: number;
+  ret_1m: number;
+  ret_3m: number;
+  ret_6m: number;
+  market_bullish: boolean | null;
+  mfe_20: number;
+  mae_20: number | null;
+  broke_10d: boolean | null;
+  broke_day: number | null;
+  k_r: number | null;
+  k_stop_adr: number | null;
+  k_entry_day: number | null;
+}
+
+/** One SQL row to the shape the page code reads (getGallery and the drill's readers select the same columns). Pure. */
+export function galleryRowFromSql(r: GalleryRowSql): GalleryRow {
+  return {
+    date: r.date, ticker: r.ticker, close: r.close, verdict: r.verdict, boxed: r.boxed, boxTop: r.box_top, boxBottom: r.box_bottom,
+    pivot: r.pivot, adrPct: r.adr_pct, tightness: r.tightness, distFromHigh: r.dist_from_high, ret1m: r.ret_1m, ret3m: r.ret_3m,
+    ret6m: r.ret_6m, marketBullish: r.market_bullish, mfe20: r.mfe_20, mae20: r.mae_20, broke10d: r.broke_10d, brokeDay: r.broke_day,
+    kR: r.k_r, kStopAdr: r.k_stop_adr, kEntryDay: r.k_entry_day,
+  };
+}
+
 /**
  * The app's candidate for Kullamägi's 5-star setup, as the mission words it: a
  * boxed Wait card still resting under its box top on scan night (the leader that

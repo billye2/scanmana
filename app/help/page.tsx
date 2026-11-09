@@ -557,6 +557,25 @@ export default async function Help() {
       </p>
 
       <H>
+        <span id="drill">Drill</span>
+      </H>
+      <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
+        <Link href="/drill" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/drill</Link> (dumbbell
+        icon) is the gallery with the answers covered. Kullamägi trained his eye on thousands of charts with the right side hidden; this page
+        draws one scored deck card at random — winners and losers alike — up to its scan night, with the name and the night hidden and only
+        the scan-night facts under it (ADR, tightness, distance from the high, the three returns, the tape), and asks for one call:{" "}
+        <span className="font-semibold text-emerald-400">Take</span> or <span className="font-semibold text-neutral-100">Skip</span>. Then it
+        uncovers the twenty sessions after, with the box and the gallery&apos;s markers, says who it was and what the app said that night, and
+        grades the call. A chart <em>ran</em> when its best close in those twenty sessions was 15% or more over the scan-night close; it{" "}
+        <em>never filled</em> when it did not close above its level in ten sessions (a Take on such a chart is no trade and gets no grade);
+        anything else <em>fizzled</em>. Take is right on a run, Skip is right on anything else. The box at the top is your record: charts
+        called, your hit rate, the 5-star rule&apos;s hit rate on the very same charts, the share of your filled takes that ran (the trader&apos;s
+        number), and the share of all charts that ran — what a coin toss would score. Each call is stored once against your account; a name
+        you called in your last thirty calls sits out so a second look is never from memory. &ldquo;Start over&rdquo; at the bottom forgets
+        every call.
+      </p>
+
+      <H>
         <span id="sim">Stop simulator</span>
       </H>
       <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">

@@ -8,7 +8,7 @@
  * written by POST /api/nav.
  */
 
-export type NavKey = "deck" | "paper" | "gallery" | "research" | "studies" | "tape" | "watchlist" | "sim" | "lookup" | "help";
+export type NavKey = "deck" | "paper" | "gallery" | "drill" | "research" | "studies" | "tape" | "watchlist" | "sim" | "lookup" | "help";
 
 export interface NavSection {
   key: NavKey;
@@ -41,6 +41,13 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: "Best setups",
     cadence: "weekly",
     why: "His monthly review of the charts that worked. Pattern recognition comes from this page, not from the deck.",
+  },
+  {
+    key: "drill",
+    href: "/drill",
+    label: "Drill",
+    cadence: "a few charts a day",
+    why: "His eye came from thousands of charts with the right side covered. A past deck card up to its scan night, name hidden: Take or Skip, then look. Your record against the 5-star rule.",
   },
   {
     key: "research",

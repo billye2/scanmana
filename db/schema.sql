@@ -394,6 +394,20 @@ CREATE TABLE IF NOT EXISTS research_mc (
   as_of date NOT NULL
 );
 
+-- 1.8.5: the drill (/drill). One row per chart a reader called with the right side covered,
+-- keyed by Clerk user id. The grade is computed at read time from research_outcomes
+-- (lib/drill.ts), nothing about the outcome is stored twice.
+CREATE TABLE IF NOT EXISTS drill_answers (
+  user_id text NOT NULL,
+  date date NOT NULL,
+  ticker text NOT NULL,
+  call text NOT NULL CHECK (call IN ('take', 'skip')),
+  answered_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, date, ticker)
+);
+
+CREATE INDEX IF NOT EXISTS drill_answers_user_time_idx ON drill_answers (user_id, answered_at DESC);
+
 CREATE TABLE IF NOT EXISTS research_runs (
   job text PRIMARY KEY,
   scan_date date,

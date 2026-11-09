@@ -3,7 +3,7 @@
 // returns an empty shape (never throws) so pages render before the first run.
 import { CONFIG } from "./config";
 import { getSql } from "./db";
-import { pickGallery, type GalleryRow } from "./gallery";
+import { galleryRowFromSql, pickGallery, type GalleryRow, type GalleryRowSql } from "./gallery";
 import {
   type ChangeScore,
   type Metrics,
@@ -807,21 +807,8 @@ export async function getGallery(sinceDate: string | null, limit: number, fiveSt
         AND (${fiveStar}::boolean = false OR (h.boxed AND h.verdict = 'wait' AND h.box_top IS NOT NULL AND h.close <= h.box_top))
       ORDER BY o.mfe_20 DESC, h.date
       LIMIT ${limit * 8}
-    `) as {
-      date: string; ticker: string; close: number; verdict: "wait" | "pass"; boxed: boolean; box_top: number | null; box_bottom: number | null;
-      pivot: number | null; adr_pct: number; tightness: number; dist_from_high: number; ret_1m: number; ret_3m: number; ret_6m: number;
-      market_bullish: boolean | null; mfe_20: number; mae_20: number | null; broke_10d: boolean | null; broke_day: number | null;
-      k_r: number | null; k_stop_adr: number | null; k_entry_day: number | null;
-    }[];
-    return pickGallery(
-      rows.map((r) => ({
-        date: r.date, ticker: r.ticker, close: r.close, verdict: r.verdict, boxed: r.boxed, boxTop: r.box_top, boxBottom: r.box_bottom,
-        pivot: r.pivot, adrPct: r.adr_pct, tightness: r.tightness, distFromHigh: r.dist_from_high, ret1m: r.ret_1m, ret3m: r.ret_3m,
-        ret6m: r.ret_6m, marketBullish: r.market_bullish, mfe20: r.mfe_20, mae20: r.mae_20, broke10d: r.broke_10d, brokeDay: r.broke_day,
-        kR: r.k_r, kStopAdr: r.k_stop_adr, kEntryDay: r.k_entry_day,
-      })),
-      limit,
-    );
+    `) as GalleryRowSql[];
+    return pickGallery(rows.map(galleryRowFromSql), limit);
   } catch {
     return [];
   }

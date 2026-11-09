@@ -26,6 +26,7 @@ export default function DrillCard({ row, bars, initialScore }: { row: GalleryRow
   const [err, setErr] = useState<string | null>(null);
   const [score, setScore] = useState(initialScore);
   const [resetStep, setResetStep] = useState<0 | 1>(0);
+  const [showSetup, setShowSetup] = useState(false);
   const [pending, startTransition] = useTransition();
 
   const covered = useMemo(() => blindBars(bars, row.date), [bars, row.date]);
@@ -129,6 +130,25 @@ export default function DrillCard({ row, bars, initialScore }: { row: GalleryRow
           />
         ) : (
           <div className="mt-2 rounded-lg bg-neutral-950 px-3 py-6 text-center text-xs text-neutral-500">bars pruned</div>
+        )}
+
+        {revealed && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => setShowSetup((v) => !v)}
+              aria-expanded={showSetup}
+              className="rounded-full bg-neutral-800 px-3 py-1 text-xs text-neutral-300 active:bg-neutral-700"
+            >
+              {showSetup ? "Hide setup" : "Review setup"}
+            </button>
+            {showSetup && (
+              <div className="mt-2 rounded-lg bg-neutral-950/60 p-2">
+                <div className="text-[11px] text-neutral-500">The chart as you saw it, right side covered</div>
+                <GalleryChart bars={covered} box={null} pivot={null} markers={NO_MARKERS} />
+              </div>
+            )}
+          </div>
         )}
 
         <p className="mt-2 text-[11px] leading-snug text-neutral-500">{galleryFacts(row)}</p>

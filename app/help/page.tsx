@@ -566,7 +566,8 @@ export default async function Help() {
         the scan-night facts under it (ADR, tightness, distance from the high, the three returns, the tape), and asks for one call:{" "}
         <span className="font-semibold text-emerald-400">Take</span> or <span className="font-semibold text-neutral-100">Skip</span>. Then it
         uncovers the twenty sessions after, with the box and the gallery&apos;s markers, says who it was and what the app said that night, and
-        grades the call. A chart <em>ran</em> when its best close in those twenty sessions was 15% or more over the scan-night close; it{" "}
+        grades the call; &ldquo;Review setup&rdquo; under the answer chart opens the covered chart again beneath it, so the setup and what
+        followed sit one above the other. A chart <em>ran</em> when its best close in those twenty sessions was 15% or more over the scan-night close; it{" "}
         <em>never filled</em> when it did not close above its level in ten sessions (a Take on such a chart is no trade and gets no grade);
         anything else <em>fizzled</em>. Take is right on a run, Skip is right on anything else. The box at the top is your record: charts
         called, your hit rate, the 5-star rule&apos;s hit rate on the very same charts, the share of your filled takes that ran (the trader&apos;s

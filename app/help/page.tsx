@@ -266,8 +266,8 @@ export default async function Help() {
         The post-mortem on Studies (1.8.9): every trade the Auto ledger would have bought, run through today&apos;s exit routine on its
         twenty sessions and taken apart. The table groups the trades by how they ended (the first stop, the breakeven stop after the
         partial, a close under the average, or still open on day 20) with the average R of each and how many ran after the exit, meaning
-        a later close in the window 15% or more over the entry. Two leaks are counted over all trades so they can be compared. Shaken
-        out: stopped at the first stop, then it ran. Gave back: the window offered one R or more at its best close and the routine kept
+        a later close in the window two R or more over the entry. Two leaks are counted over all trades so they can be compared. Shaken
+        out: stopped at the first stop, then it ran. Gave back: the best close while the trade was held reached one R or more and the routine kept
         less than half. The sentence names the larger when they differ by three points of all trades. It is a study and changes nothing:
         the exit routine still changes only through the sweep&apos;s gate.
       </Term>

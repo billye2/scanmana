@@ -3,7 +3,7 @@
 // returns an empty shape (never throws) so pages render before the first run.
 import { CONFIG } from "./config";
 import { getSql } from "./db";
-import { EMPTY_POST_MORTEM, PM_REASONS, type PostMortem } from "./post-mortem-read";
+import { EMPTY_POST_MORTEM, PM_RAN_R, PM_REASONS, type PostMortem } from "./post-mortem-read";
 import { galleryRowFromSql, pickGallery, type GalleryRow, type GalleryRowSql } from "./gallery";
 import {
   type ChangeScore,
@@ -711,13 +711,13 @@ export async function getFan(): Promise<Fan> {
 export async function getPostMortem(): Promise<PostMortem> {
   try {
     const sql = getSql();
-    const ran = CONFIG.DRILL.RAN_MFE;
     const maxAdr = CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR;
     const num = (x: number | null) => (x === null ? null : Number(x));
     const [reasons, rest] = await Promise.all([
       sql`
         SELECT post_mortem[1]::int AS reason, count(*)::int AS n, avg(post_mortem[4]) AS avg_r,
-               count(*) FILTER (WHERE post_mortem[8] * post_mortem[3] >= ${ran})::int AS ran_after,
+               count(*) FILTER (WHERE post_mortem[8] >= ${PM_RAN_R})::int AS ran_after,
+               count(*) FILTER (WHERE post_mortem[2] = 1)::int AS day1,
                percentile_cont(0.5) WITHIN GROUP (ORDER BY post_mortem[2]) AS med_exit_day
         FROM research_outcomes WHERE post_mortem IS NOT NULL AND k_stop_adr <= ${maxAdr}
         GROUP BY 1 ORDER BY 1`,
@@ -725,19 +725,19 @@ export async function getPostMortem(): Promise<PostMortem> {
         SELECT count(*) FILTER (WHERE post_mortem[4] > 0)::int AS win_n,
                percentile_cont(0.5) WITHIN GROUP (ORDER BY post_mortem[5]) FILTER (WHERE post_mortem[4] > 0) AS win_med_mae,
                count(*) FILTER (WHERE post_mortem[4] > 0 AND post_mortem[5] <= -0.5)::int AS win_deep,
-               count(*) FILTER (WHERE post_mortem[7] >= 1)::int AS off_n,
-               COALESCE(sum(post_mortem[4]) FILTER (WHERE post_mortem[7] >= 1), 0) AS off_r,
-               COALESCE(sum(post_mortem[7]) FILTER (WHERE post_mortem[7] >= 1), 0) AS off_peak,
-               count(*) FILTER (WHERE post_mortem[7] >= 1 AND post_mortem[4] < 0.5 * post_mortem[7])::int AS off_gave_back
+               count(*) FILTER (WHERE post_mortem[6] >= 1)::int AS off_n,
+               COALESCE(sum(post_mortem[4]) FILTER (WHERE post_mortem[6] >= 1), 0) AS off_r,
+               COALESCE(sum(post_mortem[6]) FILTER (WHERE post_mortem[6] >= 1), 0) AS off_peak,
+               count(*) FILTER (WHERE post_mortem[6] >= 1 AND post_mortem[4] < 0.5 * post_mortem[6])::int AS off_gave_back
         FROM research_outcomes WHERE post_mortem IS NOT NULL AND k_stop_adr <= ${maxAdr}`,
     ]);
     const r0 = (rest as Record<string, number | null>[])[0] ?? {};
     return {
-      reasons: (reasons as { reason: number; n: number; avg_r: number | null; ran_after: number; med_exit_day: number | null }[])
+      reasons: (reasons as { reason: number; n: number; avg_r: number | null; ran_after: number; day1: number; med_exit_day: number | null }[])
         .filter((r) => PM_REASONS[r.reason] !== undefined)
-        .map((r) => ({ reason: PM_REASONS[r.reason], n: r.n, avgR: num(r.avg_r), ranAfter: r.ran_after, medExitDay: num(r.med_exit_day) })),
+        .map((r) => ({ reason: PM_REASONS[r.reason], n: r.n, avgR: num(r.avg_r), ranAfter: r.ran_after, day1: r.day1, medExitDay: num(r.med_exit_day) })),
       winners: { n: Number(r0.win_n ?? 0), medMaeR: num(r0.win_med_mae ?? null), deep: Number(r0.win_deep ?? 0) },
-      offered: { n: Number(r0.off_n ?? 0), sumR: Number(r0.off_r ?? 0), sumWindowPeakR: Number(r0.off_peak ?? 0), gaveBack: Number(r0.off_gave_back ?? 0) },
+      offered: { n: Number(r0.off_n ?? 0), sumR: Number(r0.off_r ?? 0), sumPeakR: Number(r0.off_peak ?? 0), gaveBack: Number(r0.off_gave_back ?? 0) },
     };
   } catch {
     return EMPTY_POST_MORTEM;

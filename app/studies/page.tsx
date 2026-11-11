@@ -8,7 +8,7 @@ import { Card, H, NUM, SUMMARY, TD, TH, n, pc, rr } from "@/components/ResearchP
 import { meanInterval, wilson } from "@/lib/stats";
 import { pathSentence, pathSummary } from "@/lib/paths-read";
 import { EXIT_BREAKEVENS, EXIT_MAS, EXIT_PARTIAL_DAYS, exitCells, exitLabel, exitRead } from "@/lib/exit-read";
-import { PM_REASON_LABEL, postMortemRead } from "@/lib/post-mortem-read";
+import { PM_RAN_R, PM_REASON_LABEL, postMortemRead } from "@/lib/post-mortem-read";
 import { CONFIG } from "@/lib/config";
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
@@ -78,7 +78,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const sweepParams = Object.keys(SWEEP_LABEL).filter((p) => sweep.some((s) => s.param === p));
   const headline = sweepHeadline(sweep.filter((s) => s.param in SWEEP_LABEL));
   const cells = exitCells(sweep);
-  const pmRead = postMortemRead(pm, CONFIG.DRILL.RAN_MFE);
+  const pmRead = postMortemRead(pm);
   const exit = exitRead(cells, pathSummary(paths.all[0]?.days ?? [], []).peakDay);
   const themes = clusters.filter((c) => c.inDeck.length >= 2).sort((a, b) => b.inDeck.length - a.inDeck.length || b.ret63d - a.ret63d).slice(0, 8);
   const epGroups = [ep.overall, ...ep.byNeglect, ...ep.byVolume, ...ep.byHeld, ...ep.byBoth];
@@ -227,7 +227,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
       </Card>
 
       {/* ---------- Stop post-mortem (1.8.9) ---------- */}
-      <H id="postmortem" sub={`Each trade the Auto book would have bought (stop no wider than ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} ADR), run through today's exit routine on the same twenty sessions and taken apart: how it ended, what it made, and what the chart did after the last share was sold. "Ran after" = a later close in the window ${pc(CONFIG.DRILL.RAN_MFE)} or more over the entry. In-sample, raw price, no slippage.`}>
+      <H id="postmortem" sub={`Each trade the Auto book would have bought (stop no wider than ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} ADR), run through today's exit routine on the same twenty sessions and taken apart: how it ended, what it made, and what the chart did after the last share was sold. "Ran after" = a later close in the window ${PM_RAN_R}R or more over the entry. A stop here is about 3% under the entry, so one R is a small move. In-sample, raw price, no slippage.`}>
         Where the R leaks: stop or exit
       </H>
       {pmRead.state === "empty" ? (
@@ -247,7 +247,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
             <tbody>
               {pm.reasons.map((r) => (
                 <tr key={r.reason} className="border-t border-neutral-800">
-                  <td className={`${TD} text-neutral-100`}>{PM_REASON_LABEL[r.reason]}</td>
+                  <td className={`${TD} text-neutral-100`}>{PM_REASON_LABEL[r.reason]}{r.reason === "stop" && r.day1 > 0 ? <span className="text-neutral-500"> · {n(r.day1)} on the entry day</span> : null}</td>
                   <td className={NUM}>{n(r.n)} <span className="text-neutral-600">· {pc(r.n / pmRead.total)}</span></td>
                   <td className={`${NUM} ${r.avgR === null || r.n < MIN_AFTER_N ? "text-neutral-500" : r.avgR >= 0 ? "text-emerald-300" : "text-red-300"}`}>{rr(r.avgR)}</td>
                   <td className={NUM}>{r.medExitDay === null ? "—" : Math.round(r.medExitDay)}</td>
@@ -258,7 +258,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
           </table>
           <dl className="grid grid-cols-1 gap-y-1 border-t border-neutral-800 px-2 py-2 text-xs text-neutral-300">
             <div className="flex justify-between gap-3"><dt className="text-neutral-500">Winners that went half an R or more against the entry first</dt><dd className="font-mono tabular-nums">{n(pm.winners.deep)} of {n(pm.winners.n)} · {pc(pm.winners.n ? pm.winners.deep / pm.winners.n : null)}</dd></div>
-            <div className="flex justify-between gap-3"><dt className="text-neutral-500">Trades the window offered one R or more</dt><dd className="font-mono tabular-nums">{n(pm.offered.n)} · kept {pc(pmRead.capture)} of the best close</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-neutral-500">Held trades whose best close reached one R or more</dt><dd className="font-mono tabular-nums">{n(pm.offered.n)} · kept {pc(pmRead.capture)} of it</dd></div>
             <div className="flex justify-between gap-3"><dt className="text-neutral-500">Of those, kept less than half</dt><dd className="font-mono tabular-nums">{n(pm.offered.gaveBack)} · {pc(pmRead.gaveBackShare)} of all trades</dd></div>
           </dl>
           <p className="border-t border-neutral-800 px-2 py-2 text-[12px] leading-relaxed text-neutral-400">{pmRead.sentence}</p>

@@ -24,6 +24,9 @@ outcome row counts the days written; a row whose path is short of PATH_DAYS is
 re-labelled nightly until the bars reach that far, past its own 20-session
 window if need be.
 
+Both the grid and the post-mortem run on up to GRID_DAYS sessions from the entry
+since 1.9.1 (see GRID_DAYS below); the paths stay at PATH_DAYS.
+
 Post-mortem (1.8.9): on the same rows, once the path is full, post_mortem holds
 the live routine's trade taken apart (research/replay.py post_mortem, PM_FIELDS
 order): how it ended, how far it went against the entry while held, the best
@@ -45,7 +48,7 @@ import pandas as pd
 import psycopg
 
 from .db import load_bars, pyval, read_df, write_rows
-from .replay import EXIT_GRID, KULLAMAGI_MA, _replay_kullamagi, exit_grid_r, post_mortem
+from .replay import EXIT_GRID, KULLAMAGI_MA, PM_FIELDS, _replay_kullamagi, exit_grid_r, post_mortem
 from .util import JobContext
 
 HORIZON = 20
@@ -61,6 +64,15 @@ PLAN_COLUMNS = ["k_entry_day", "k_stop_adr", "k_r", "bs_entry_day", "bs_stop_adr
 # a new column back-fills the whole history without a forced Refresh.
 PLAN_VERSION = 1
 PATH_DAYS = 20
+# The exit grid and the post-mortem run on up to this many sessions from the entry
+# (1.9.1; PATH_DAYS before that, which marked every runner to its day-20 close so the
+# sweep could not tell a longer hold from a shorter one). Written once the path is
+# full, on the sessions that exist, and re-labelled nightly until all of them do: a
+# recent trade still open is marked to the last close, as a live book marks it.
+GRID_DAYS = 60
+# Calendar days back that a short window is still worth re-labelling: sixty sessions
+# and the ten to the breakout fit well inside. Older rows short of bars stay as they are.
+GRID_PENDING_DAYS = 130
 PATH_COLUMNS = ["date", "ticker", "day", "gain", "low"]
 COLUMNS = [
     "date", "ticker", "level", "broke_10d", "broke_day",
@@ -69,6 +81,7 @@ COLUMNS = [
     *PLAN_COLUMNS, "plan_v", "path_days", "exit_grid", "post_mortem",
 ]
 EXIT_CELLS = len(EXIT_GRID)
+PM_DAYS_AT = PM_FIELDS.index("days") + 1  # Postgres arrays count from 1
 EXIT_MA_MAX = max(ma for _, ma, _ in EXIT_GRID)  # closes of history the longest average needs
 COMPLETE_COL = COLUMNS.index("complete")
 PATH_DAYS_COL = COLUMNS.index("path_days")
@@ -234,7 +247,8 @@ def _pending_rows(conn: psycopg.Connection, force: bool) -> pd.DataFrame:
     # path reaches PATH_DAYS, which can be up to ten sessions after its outcome window.
     short_path = (
         "(h.rank IS NOT NULL AND h.boxed AND h.verdict = 'wait' AND h.close <= h.box_top"
-        f" AND o.k_entry_day IS NOT NULL AND (COALESCE(o.path_days, 0) < {PATH_DAYS} OR o.exit_grid IS NULL OR o.post_mortem IS NULL))"
+        f" AND o.k_entry_day IS NOT NULL AND (COALESCE(o.path_days, 0) < {PATH_DAYS} OR o.exit_grid IS NULL OR o.post_mortem IS NULL"
+        f" OR (COALESCE(o.post_mortem[{PM_DAYS_AT}], 0) < {GRID_DAYS} AND h.date > CURRENT_DATE - {GRID_PENDING_DAYS})))"
     )
     where = "" if force else f"WHERE o.date IS NULL OR NOT o.complete OR o.plan_v IS DISTINCT FROM {PLAN_VERSION} OR {short_path}"
     return read_df(
@@ -301,8 +315,8 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> tuple[list[list[Any]]
                     if float(tb["l"].iloc[start]) <= stop:
                         lab["exit_grid"] = [-1.0] * EXIT_CELLS  # same-day stop-out, as the engine books it
                     else:
-                        lab["exit_grid"] = exit_grid_r(tb.iloc[start + 1 : start + PATH_DAYS], entry, stop, closes)
-                    lab["post_mortem"] = post_mortem(tb.iloc[start : start + PATH_DAYS], entry, stop, closes)
+                        lab["exit_grid"] = exit_grid_r(tb.iloc[start + 1 : start + GRID_DAYS], entry, stop, closes)
+                    lab["post_mortem"] = post_mortem(tb.iloc[start : start + GRID_DAYS], entry, stop, closes)
             out.append([pyval(r.date), ticker] + [pyval(lab[k]) for k in COLUMNS[2:]])
     return out, paths
 

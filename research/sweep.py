@@ -16,7 +16,7 @@ Exit sweep (1.7.9, R4 of the Python-studies plan): the Auto book's exit
 routine moved over research/replay.py EXIT_GRID (partial day 3/4/5 × exit MA
 10/20 × breakeven on/off) on every boxed Wait deck card the plan entered, read
 from research_outcomes.exit_grid (one R per cell, written by the outcomes job
-on the twenty sessions from the entry — no bars are loaded here). Rows under
+on up to sixty sessions from the entry — no bars are loaded here). Rows under
 param EXIT_GRID (value = the cell's 1-based index in EXIT_GRID) plus the three
 marginals EXIT_PARTIAL_DAY, EXIT_MA, EXIT_BREAKEVEN (value 1/0); hit_rate is
 the win rate, deck_size the row count, sd_r the spread for the bands.

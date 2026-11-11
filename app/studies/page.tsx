@@ -14,6 +14,7 @@ import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
 import {
   EP_NEGLECT_RET_3M,
+  GRID_DAYS,
   PATH_DAYS,
   PATH_SPLITS,
   type PathSplitKey,
@@ -192,7 +193,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
       </Card>
 
       {/* ---------- 3. Exit sweep (1.7.9) ---------- */}
-      <H id="exit" sub={`The Auto book's exit routine moved one knob at a time on the same cards and the same twenty sessions as the paths above: the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the stop goes to breakeven after the partial. Twelve cells, average R with its range; today's routine is boxed. With the paths this decides whether the routine changes — and only then, as one scored rule-change row.`}>
+      <H id="exit" sub={`The Auto book's exit routine moved one knob at a time on the same cards, over up to ${GRID_DAYS} sessions from the entry (the paths above stop at ${PATH_DAYS}; a recent trade is marked to its last close): the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the stop goes to breakeven after the partial. Twelve cells, average R with its range; today's routine is boxed. With the paths this decides whether the routine changes — and only then, as one scored rule-change row.`}>
         Exit routine, swept
       </H>
       <Card className="overflow-x-auto p-0">
@@ -227,7 +228,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
       </Card>
 
       {/* ---------- Stop post-mortem (1.8.9) ---------- */}
-      <H id="postmortem" sub={`Each trade the Auto book would have bought (stop no wider than ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} ADR), run through today's exit routine on the same twenty sessions and taken apart: how it ended, what it made, and what the chart did after the last share was sold. "Ran after" = a later close in the window ${PM_RAN_R}R or more over the entry. A stop here is about 3% under the entry, so one R is a small move. In-sample, raw price, no slippage.`}>
+      <H id="postmortem" sub={`Each trade the Auto book would have bought (stop no wider than ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} ADR), run through today's exit routine over up to ${GRID_DAYS} sessions from the entry and taken apart: how it ended, what it made, and what the chart did after the last share was sold. "Ran after" = a later close in the window ${PM_RAN_R}R or more over the entry. A stop here is about 3% under the entry, so one R is a small move. In-sample, raw price, no slippage.`}>
         Where the R leaks: stop or exit
       </H>
       {pmRead.state === "empty" ? (

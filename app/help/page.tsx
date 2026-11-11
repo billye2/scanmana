@@ -263,17 +263,17 @@ export default async function Help() {
         only then, as a scored rule change.
       </Term>
       <Term name="Where the R leaks: stop or exit">
-        The post-mortem on Studies (1.8.9): every trade the Auto ledger would have bought, run through today&apos;s exit routine on its
-        twenty sessions and taken apart. The table groups the trades by how they ended (the first stop, the breakeven stop after the
-        partial, a close under the average, or still open on day 20) with the average R of each and how many ran after the exit, meaning
+        The post-mortem on Studies (1.8.9): every trade the Auto ledger would have bought, run through today&apos;s exit routine on up to
+        sixty sessions from the entry and taken apart. The table groups the trades by how they ended (the first stop, the breakeven stop after the
+        partial, a close under the average, or still open when the window ends) with the average R of each and how many ran after the exit, meaning
         a later close in the window two R or more over the entry. Two leaks are counted over all trades so they can be compared. Shaken
         out: stopped at the first stop, then it ran. Gave back: the best close while the trade was held reached one R or more and the routine kept
         less than half. The sentence names the larger when they differ by three points of all trades. It is a study and changes nothing:
         the exit routine still changes only through the sweep&apos;s gate.
       </Term>
       <Term name="Exit routine, swept">
-        The grid on Studies (1.7.9): the Auto ledger&apos;s exit routine run twelve ways on the same cards and the same twenty sessions as
-        the follow-through card — the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the
+        The grid on Studies (1.7.9): the Auto ledger&apos;s exit routine run twelve ways on the same cards, over up to sixty
+        sessions from the entry (1.9.1; twenty before that, which marked every runner to its day-20 close) — the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the
         stop moves to breakeven after the partial. Each cell is the average R with its range; today&apos;s routine is boxed. The sentence under
         it applies the gate agreed for the plan: a change is on the table only when the best cell beats today&apos;s with both at thirty rows and
         the two ranges apart, and the follow-through paths do not argue — if the best cell moves the partial day, the day the mean gain

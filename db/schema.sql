@@ -239,14 +239,15 @@ ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS path_days smallint;
 -- from the entry session (day 1 = the entry day, as the replay counts it), with no exit applied.
 -- gain = close / entry - 1 on that day, low = the lowest low so far / entry - 1.
 -- 1.7.9 (R4): exit_grid = the R of every cell of research/replay.py EXIT_GRID on the twenty
--- sessions from the entry, in the grid's order, once the path is full. research/sweep.py reads it.
+-- sessions from the entry (up to sixty since 1.9.1), in the grid's order, once the path is full. research/sweep.py reads it.
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS exit_grid double precision[];
--- 1.8.9: post_mortem = the live routine's trade on those twenty sessions taken apart, in the
+-- 1.8.9: post_mortem = the live routine's trade on those sessions taken apart, in the
 -- order of research/replay.py PM_FIELDS (Postgres arrays count from 1):
 -- [1] reason 0 first stop, 1 breakeven stop, 2 close under the average, 3 still open at the end
 -- [2] exit day (entry day = 1)   [3] risk = (entry - stop) / entry   [4] R
 -- [5] lowest low while held, in R   [6] best close while held, in R
 -- [7] best close of the window, in R   [8] best close after the exit, in R (null when none)
+-- [9] sessions in the window (1.9.1): up to research/outcomes.py GRID_DAYS, re-labelled until it gets there
 -- lib/research.ts getPostMortem reads it for the card on /studies.
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS post_mortem double precision[];
 

@@ -1,6 +1,6 @@
 /**
  * The stop post-mortem (/studies, 1.8.9) in words. research/replay.py
- * post_mortem takes each plan trade apart on its twenty sessions; getPostMortem
+ * post_mortem takes each plan trade apart on up to sixty sessions; getPostMortem
  * (lib/research.ts) groups the rows; this file turns the groups into the
  * card's numbers and one fixed-template sentence. Pure.
  *
@@ -27,7 +27,7 @@ export const PM_REASON_LABEL: Record<PmReasonKey, string> = {
   stop: "First stop",
   breakeven: "Breakeven stop",
   ma: "Close under the average",
-  open: "Still open on day 20",
+  open: "Still open at the window's end",
 };
 
 export interface PmReason {
@@ -104,7 +104,7 @@ export function postMortemRead(pm: PostMortem, minN = 30): PostMortemRead {
     (shakeoutRate === null ? "." : ` (${pc(day1StopShare)} of all trades on the entry day itself), and ${pc(shakeoutRate)} of those closed ${PM_RAN_R}R or more over the entry later in the window.`) +
     (pm.winners.medMaeR === null ? "" : ` The winners went a median of ${rr(pm.winners.medMaeR)} against the entry first.`) +
     (capture === null ? "" : ` Where a held trade reached one R or more, the routine kept ${pc(capture)} of its best close.`) +
-    ` ${pc(openShare)} were still open on day 20, so the window cuts those short.`;
+    ` ${pc(openShare)} were still open when the window ended.`;
   const gap = gaveBackShare - shakenShare;
   const state = gap > PM_LEAK_GAP ? "exit" : gap < -PM_LEAK_GAP ? "stop" : "even";
   const verdict =

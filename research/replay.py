@@ -233,7 +233,7 @@ def _replay_kullamagi(
 
 # How a plan trade ended, as research_outcomes.post_mortem[1] stores it.
 PM_REASONS = ("stop", "breakeven", "ma", "open")
-PM_FIELDS = ("reason", "exit_day", "risk", "r", "mae_r", "peak_r", "window_peak_r", "after_r")
+PM_FIELDS = ("reason", "exit_day", "risk", "r", "mae_r", "peak_r", "window_peak_r", "after_r", "days")
 
 
 def post_mortem(window: pd.DataFrame, entry_price: float, initial_stop: float, pre_closes: list[float], shares: int = 100) -> list[float | None] | None:
@@ -253,6 +253,8 @@ def post_mortem(window: pd.DataFrame, entry_price: float, initial_stop: float, p
       window_peak_r  the best close of the whole window, in R: what was on offer.
       after_r        the best close after the exit day, in R over the entry; None when
                      the exit was the window's last session.
+      days           the sessions in the window. The outcomes job re-labels a trade
+                     until this reaches its GRID_DAYS.
 
     None when the stop is not under the entry."""
     risk = entry_price - initial_stop
@@ -279,6 +281,7 @@ def post_mortem(window: pd.DataFrame, entry_price: float, initial_stop: float, p
         in_r(c[: exit_idx + 1].max()),
         in_r(c.max()),
         in_r(after.max()) if len(after) else None,
+        float(len(window)),
     ]
 
 

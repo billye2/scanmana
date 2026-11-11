@@ -265,6 +265,7 @@ def test_label_frame_path_is_short_while_the_bars_run_out_and_absent_off_the_dec
 
 # ---------- the exit grid on the outcome row (1.7.9, R4) ----------
 from research.outcomes import EXIT_CELLS  # noqa: E402
+from research.outcomes import GRID_DAYS  # noqa: E402
 from research.replay import EXIT_CURRENT, _replay_kullamagi  # noqa: E402
 
 
@@ -273,9 +274,10 @@ def test_label_frame_writes_the_exit_grid_once_the_path_is_full():
     out, _ = label_frame(_path_row(dates), bars)
     grid = out[0][COLUMNS.index("exit_grid")]
     assert isinstance(grid, list) and len(grid) == EXIT_CELLS
-    # The current cell is the live routine run on the 19 sessions after the entry (session 4 opens 108, stop = session 3's low).
+    # The current cell is the live routine run on every session after the entry, up to GRID_DAYS (session 4 opens 108, stop = session 3's low).
     entry, stop = 108.0, 106 * 0.99
-    rest = bars.iloc[5:24]
+    rest = bars.iloc[5 : 4 + GRID_DAYS]
+    assert len(rest) > 19  # past the twenty-session path
     expected = _replay_kullamagi(rest, entry, stop, 100, bars["c"].iloc[0:5].astype(float).tolist())
     assert grid[EXIT_CURRENT] == pytest.approx(expected["r"])
     # Short path: no grid yet.
@@ -320,6 +322,7 @@ def test_label_frame_writes_the_post_mortem_with_the_grid():
     out, _ = label_frame(_path_row(dates), bars)
     pm = dict(zip(PM_FIELDS, out[0][COLUMNS.index("post_mortem")]))
     assert pm["r"] == pytest.approx(out[0][COLUMNS.index("exit_grid")][EXIT_CURRENT])
+    assert pm["days"] == 28  # every session from the entry that exists, short of GRID_DAYS: re-labelled until it gets there
     dates, bars = _path_bars(21)
     out, _ = label_frame(_path_row(dates), bars)
     assert out[0][COLUMNS.index("post_mortem")] is None

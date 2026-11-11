@@ -766,6 +766,8 @@ export interface PathSplit {
 export type PathSplitKey = "all" | "adr" | "tape" | "width";
 
 export const PATH_DAYS = 20;
+/** Mirrors research/outcomes.py GRID_DAYS: the sessions from the entry the exit grid and the post-mortem run on (1.9.1). */
+export const GRID_DAYS = 60;
 export const PATH_SPLITS: Record<PathSplitKey, { title: string; keys: string[] }> = {
   all: { title: "All", keys: ["all"] },
   adr: { title: "By ADR", keys: ["a1", "a2", "a3"] },

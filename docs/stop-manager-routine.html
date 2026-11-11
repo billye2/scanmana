@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Stop manager routine</title>
+<style>
+  @page { size: Letter; margin: 0.5in; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #111; font-size: 10.4pt; line-height: 1.32; }
+  header { display: flex; align-items: baseline; justify-content: space-between; border-bottom: 2.5pt solid #111; padding-bottom: 5pt; }
+  h1 { font-size: 21pt; margin: 0; letter-spacing: -0.3pt; }
+  header span { font-size: 9pt; color: #555; }
+  .lead { margin: 7pt 0 9pt; font-size: 11pt; font-weight: 600; }
+  .cols { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16pt; }
+  h2 { font-size: 9pt; text-transform: uppercase; letter-spacing: 0.9pt; margin: 9pt 0 4pt; padding: 2.5pt 6pt; background: #111; color: #fff; }
+  h2:first-child { margin-top: 0; }
+  ol { margin: 0; padding: 0; list-style: none; counter-reset: none; }
+  li { display: grid; grid-template-columns: 17pt 1fr; gap: 5pt; margin-bottom: 4.5pt; break-inside: avoid; }
+  li .n { font-weight: 700; font-size: 10.5pt; border: 1.2pt solid #111; border-radius: 50%; width: 15.5pt; height: 15.5pt; display: flex; align-items: center; justify-content: center; margin-top: 0.5pt; font-size: 8.5pt; }
+  li b { font-weight: 700; }
+  .where { color: #555; font-size: 8.6pt; }
+  .box { border: 1.2pt solid #111; padding: 6pt 8pt; margin-bottom: 9pt; break-inside: avoid; }
+  .box h3 { margin: 0 0 4pt; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.9pt; }
+  .box ul { margin: 0; padding-left: 12pt; }
+  .box li { display: list-item; margin-bottom: 3pt; }
+  table { width: 100%; border-collapse: collapse; font-size: 9.2pt; }
+  td { padding: 2.2pt 0; border-bottom: 0.5pt solid #bbb; vertical-align: top; }
+  td:last-child { text-align: right; font-weight: 700; white-space: nowrap; padding-left: 6pt; }
+  tr:last-child td { border-bottom: 0; }
+  .formula { font-size: 9.6pt; font-weight: 700; text-align: center; padding: 3pt 0 1pt; white-space: nowrap; }
+  .page { height: 9.85in; display: flex; flex-direction: column; overflow: hidden; }
+  footer { margin-top: auto; border-top: 0.8pt solid #111; padding-top: 4pt; font-size: 8pt; color: #555; }
+</style>
+</head>
+<body>
+<div class="page">
+<header>
+  <h1>Stop manager routine</h1>
+  <span>Scanmana · daily bars · decide at night, act at the open</span>
+</header>
+<p class="lead">The entry does not guarantee success. Take every loss at the stop. Let the winners run to the exit.</p>
+
+<div class="cols">
+  <div>
+    <h2>Every night, after the scan</h2>
+    <ol>
+      <li><span class="n">1</span><div><b>Read the tape first.</b> Bullish or Not bullish. On a weak tape the app cuts size to half or a quarter. <span class="where">Home, market bar · /tape</span></div></li>
+      <li><span class="n">2</span><div><b>Go through the deck.</b> A boxed Wait card resting under its box top is the shape. The pick alone will not carry the trade. <span class="where">Home deck, plan box on each card</span></div></li>
+      <li><span class="n">3</span><div><b>Know the stop before you buy.</b> The stop is the breakout day's low. Wider than one ADR: skip the card. <span class="where">Stop ladder beside Take</span></div></li>
+      <li><span class="n">4</span><div><b>Size from the stop,</b> never the other way round. Then tap <b>Take</b> or <b>Take at open</b>. <span class="where">Deck card · /sim prices a trade opened without a plan</span></div></li>
+    </ol>
+
+    <h2>The entry</h2>
+    <ol>
+      <li><span class="n">5</span><div><b>Buy the open after the first close above the box.</b> No close above it in ten sessions means no trade. <span class="where">"At the open" line · nightly push</span></div></li>
+      <li><span class="n">6</span><div><b>The stop is set the moment you are filled.</b> It never moves down.</div></li>
+    </ol>
+
+    <h2>While the position is open</h2>
+    <ol>
+      <li><span class="n">7</span><div><b>Read the Tomorrow box every night.</b> It gives the action, the stop, and the close that must hold. <span class="where">/paper, under each open position</span></div></li>
+      <li><span class="n">8</span><div><b>A trade at or under the stop sells everything.</b> That is a normal trade at −1R. Do not widen the stop to avoid it.</div></li>
+      <li><span class="n">9</span><div><b>Day 4, if the prior close is above the entry: sell half at the open.</b> Then raise the stop to the entry. The trade can no longer lose. <span class="where">/paper · Sell at next open, then Stop · Raise</span></div></li>
+      <li><span class="n">10</span><div><b>Hold the rest until a close under the 10-day average.</b> Sell at the next open. This is where the profit comes from. <span class="where">/paper · Sell at next open</span></div></li>
+    </ol>
+
+    <h2>Each week</h2>
+    <ol>
+      <li><span class="n">11</span><div><b>Drill.</b> Take or Skip on a covered chart, place the stop, see four stops on one trade. <span class="where">/drill</span></div></li>
+      <li><span class="n">12</span><div><b>Check the routine, not the last trade.</b> Where the R leaks, the exit grid, and the fan. <span class="where">/studies · /paper fan card</span></div></li>
+    </ol>
+  </div>
+
+  <div>
+    <div class="box">
+      <h3>Size</h3>
+      <div class="formula">shares = 1% of cash ÷ (entry − stop)</div>
+    </div>
+
+    <div class="box">
+      <h3>Never</h3>
+      <ul>
+        <li>Move a stop down.</li>
+        <li>Buy when the stop is wider than one ADR.</li>
+        <li>Sell a winner before the day-4 half or the 10-day close.</li>
+        <li>Decide during the session. Decide at night.</li>
+        <li>Judge the routine on fewer than 30 trades.</li>
+      </ul>
+    </div>
+
+    <div class="box">
+      <h3>What to expect <span style="font-weight:400;text-transform:none;letter-spacing:0">(712 history trades)</span></h3>
+      <table>
+        <tr><td>Win rate</td><td>40%</td></tr>
+        <tr><td>End at the first stop</td><td>55%</td></tr>
+        <tr><td>Of all trades, stopped on day 1</td><td>29%</td></tr>
+        <tr><td>Winners go against you first, median</td><td>−0.6R</td></tr>
+        <tr><td>Breakeven stop after the half, average</td><td>+0.4R</td></tr>
+        <tr><td>Close under the 10-day, average</td><td>+2.3R</td></tr>
+        <tr><td>Deck names that never fill</td><td>38%</td></tr>
+        <tr><td>Ran on a Bullish tape / not</td><td>40% / 25%</td></tr>
+        <tr><td>The routine overall</td><td>about 0R</td></tr>
+      </table>
+    </div>
+
+    <div class="box">
+      <h3>Remember</h3>
+      <ul>
+        <li>Three to five losses in a row is normal at 40%.</li>
+        <li>A wide stop survives more and pays fewer R on the same move.</li>
+        <li>One R is what you risked. Count in R, not dollars.</li>
+        <li>The Auto ledger runs steps 9 and 10 by itself. On the Manual ledger they are yours.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<footer>Scanmana's own history as of 2026-11-10, stop no wider than one ADR. In-sample, raw price, no slippage. A process to follow, not a promise of profit.</footer>
+</div>
+</body>
+</html>

@@ -37,6 +37,15 @@ Taken 2026-11-05 on v1.8.3, the night the Auto book armed its first order.
 |---|
 | ![Help: QQQ and SPY with the 10/20/50 averages, following the day at a 30-minute cadence](docs/screenshots/help.png) |
 
+## The routine on one page
+
+[`docs/stop-manager-routine.pdf`](docs/stop-manager-routine.pdf) is a one-page desk card: the twelve steps of
+using the app as a stop manager (the tape first, the stop before the buy, size from the stop, the day-4 half,
+the close under the 10-day), each with the page it lives on, and what the stored history says to expect. The
+numbers on it are one deployment's history as of 2026-11-10, in-sample; yours will differ. It is printed from
+[`docs/stop-manager-routine.html`](docs/stop-manager-routine.html): edit that, then print to PDF from Chrome
+with headers and footers off. A process to follow, not financial advice.
+
 ## How it works
 
 - A nightly Vercel cron (`/api/cron/scan`, weeknights ~midnight ET) pulls the whole

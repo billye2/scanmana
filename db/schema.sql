@@ -416,6 +416,12 @@ CREATE TABLE IF NOT EXISTS drill_answers (
 );
 
 CREATE INDEX IF NOT EXISTS drill_answers_user_time_idx ON drill_answers (user_id, answered_at DESC);
+-- 1.9.2: the drill's second question. After a Take on a boxed card the reader places the stop
+-- (lib/drill-stop.ts STOP_KEYS). stop_r = that stop's R on the book's trade, book_r = the book's
+-- own stop (the breakout day's low) on the same trade. Null r = no fill, or the level was not usable.
+ALTER TABLE drill_answers ADD COLUMN IF NOT EXISTS stop_key text;
+ALTER TABLE drill_answers ADD COLUMN IF NOT EXISTS stop_r double precision;
+ALTER TABLE drill_answers ADD COLUMN IF NOT EXISTS book_r double precision;
 
 CREATE TABLE IF NOT EXISTS research_runs (
   job text PRIMARY KEY,

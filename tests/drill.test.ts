@@ -128,6 +128,22 @@ describe("drillScore — the record against the rule and the base rate", () => {
     expect(s.hitRate).toBeCloseTo(3 / 5);
   });
 
+  it("averages the stops placed against the book's stop on the same trades, and only where both made a trade", () => {
+    const placed: DrillAnswer[] = [
+      { ...answers[0], stopKey: "adr", stopR: 1.5, bookR: -1 },
+      { ...answers[1], stopKey: "box_bottom", stopR: -0.5, bookR: 0.5 },
+      { ...answers[2], stopKey: "low10", stopR: null, bookR: 2 },
+      answers[3],
+    ];
+    const s = drillScore(placed);
+    expect(s.stops).toBe(2);
+    expect(s.stopAvgR).toBeCloseTo(0.5);
+    expect(s.bookAvgR).toBeCloseTo(-0.25);
+    expect(drillScoreText(s)).toContain("2 stops placed, yours +0.50R a trade against the book's −0.25R");
+    expect(drillScore(answers).stops).toBe(0);
+    expect(drillScoreText(drillScore(answers))).not.toContain("placed");
+  });
+
   it("grades the 5-star rule on the same charts the same way", () => {
     const s = drillScore(answers);
     // app: right, right, wrong, wrong, nofill, right → 3 / 5

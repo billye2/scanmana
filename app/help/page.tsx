@@ -604,6 +604,17 @@ export default async function Help() {
         you called in your last thirty calls sits out so a second look is never from memory. &ldquo;Start over&rdquo; at the bottom forgets
         every call.
       </p>
+      <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
+        <span className="font-semibold text-neutral-100">The stop question (1.9.2).</span> A Take on a boxed card resting at or under its
+        box top asks one more thing before the chart is uncovered: where does the stop go. The trade is the Auto ledger&apos;s, the open
+        after the first close above the box, and there are four levels. The breakout day&apos;s low is the ledger&apos;s own stop and has no
+        price yet. One ADR under the entry is set at the fill. Tonight&apos;s 10-session low and the box bottom are on the chart now, and
+        tapping either draws it. &ldquo;Set this stop&rdquo; stores the call. The answer then shows the same trade four times, once per
+        stop, sold by the ledger&apos;s exit routine over up to sixty sessions: the risk under the fill, how it ended and on which day, and
+        the R. Your stop is marked, with the ledger&apos;s stop and the best of the four beside it. Your record adds the stops placed and
+        your average R a trade against the ledger&apos;s stop on the same trades. A tight stop is shaken out more often and pays more R
+        when it holds; a wide one survives and pays fewer. The table is where you see which of the two this chart was.
+      </p>
 
       <H>
         <span id="sim">Stop simulator</span>

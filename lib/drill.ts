@@ -1,4 +1,5 @@
 import { CONFIG } from "./config";
+import type { StopKey } from "./drill-stop";
 import { isFiveStar, type GalleryRow } from "./gallery";
 import type { Bar } from "./types";
 
@@ -68,6 +69,10 @@ export function drillVerdictText(call: DrillCall, row: Pick<GalleryRow, "mfe20" 
 export interface DrillAnswer {
   call: DrillCall;
   row: GalleryRow;
+  /** The stop placed after a Take on a boxed card (1.9.2), its R on that trade and the book's stop's R on the same trade. */
+  stopKey?: StopKey | null;
+  stopR?: number | null;
+  bookR?: number | null;
 }
 
 export interface DrillScore {
@@ -86,6 +91,10 @@ export interface DrillScore {
   appTakeRanShare: number | null;
   /** The share of every chart you saw that ran: what a coin toss would hit. */
   ranShare: number;
+  /** Stops placed on a trade where both the reader's stop and the book's made one (1.9.2), and the average R of each. */
+  stops: number;
+  stopAvgR: number | null;
+  bookAvgR: number | null;
 }
 
 function hit(calls: DrillCall[], outcomes: DrillOutcome[]): { right: number; wrong: number; nofill: number; takes: number; takesRan: number } {
@@ -121,6 +130,8 @@ export function drillScore(answers: readonly DrillAnswer[]): DrillScore {
     outcomes,
   );
   const n = answers.length;
+  const placed = answers.filter((a) => typeof a.stopR === "number" && typeof a.bookR === "number");
+  const mean = (xs: number[]) => (xs.length > 0 ? xs.reduce((s, x) => s + x, 0) / xs.length : null);
   return {
     n,
     right: you.right,
@@ -131,10 +142,14 @@ export function drillScore(answers: readonly DrillAnswer[]): DrillScore {
     takeRanShare: share(you.takesRan, you.takes),
     appTakeRanShare: share(app.takesRan, app.takes),
     ranShare: n > 0 ? outcomes.filter((o) => o === "ran").length / n : 0,
+    stops: placed.length,
+    stopAvgR: mean(placed.map((a) => a.stopR as number)),
+    bookAvgR: mean(placed.map((a) => a.bookR as number)),
   };
 }
 
 const pctInt = (x: number) => `${Math.round(x * 100)}%`;
+const rAvg = (x: number) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}R`;
 
 /** The score in one sentence. Pure. */
 export function drillScoreText(s: DrillScore): string {
@@ -145,5 +160,8 @@ export function drillScoreText(s: DrillScore): string {
   if (s.nofill > 0) parts.push(`${s.nofill} no fill`);
   if (s.takeRanShare !== null) parts.push(`${pctInt(s.takeRanShare)} of your takes ran`);
   parts.push(`${pctInt(s.ranShare)} of all charts ran`);
+  if (s.stops > 0 && s.stopAvgR !== null && s.bookAvgR !== null) {
+    parts.push(`${s.stops} stop${s.stops === 1 ? "" : "s"} placed, yours ${rAvg(s.stopAvgR)} a trade against the book's ${rAvg(s.bookAvgR)}`);
+  }
   return parts.join(" · ");
 }

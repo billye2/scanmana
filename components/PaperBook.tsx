@@ -8,6 +8,7 @@ import { price } from "@/lib/format";
 import type { Book, BookPosition, BookTrack } from "@/lib/paper-db";
 import MorningLine from "@/components/MorningLine";
 import { stopProgress, type ExitReason, type MorningBrief, type Track, type TrailMode } from "@/lib/paper-engine";
+import { positionPlan } from "@/lib/position-plan";
 import FanChart from "@/components/FanChart";
 import type { Fan, ReplayRow } from "@/lib/research";
 import type { Tape } from "@/lib/tape";
@@ -240,6 +241,8 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
           : `no half-off (under water on day ${K.PARTIAL_DAY})`;
   // Amber while the stop still risks money, emerald once the trail (or a raise) has carried it to entry or above.
   const sp = stopProgress(p);
+  // Tomorrow's instruction (1.9.3): the open's action and the exact prices that change it.
+  const plan = positionPlan({ ...p, halved });
   const stopTone = p.currentStop >= p.entryPrice ? "text-emerald-400" : "text-amber-400/80";
 
   return (
@@ -272,6 +275,16 @@ function OpenPosition({ p, editable }: { p: BookPosition; editable: boolean }) {
           </span>
         )}
         {p.splitFlagged && <span className="text-amber-300"> · check for a split</span>}
+      </div>
+      <div className="mt-2 rounded-lg bg-neutral-950/60 px-2 py-1.5">
+        <p className={`text-[12px] font-semibold leading-snug ${plan.action === "hold" ? "text-neutral-100" : "text-sky-300"}`}>{plan.headline}</p>
+        {plan.rules.length > 0 && (
+          <ul className="mt-1 space-y-0.5 text-[11px] leading-snug text-neutral-400">
+            {plan.rules.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        )}
       </div>
       {editable && (
         <div className="mt-2 flex flex-col gap-2">

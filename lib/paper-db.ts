@@ -510,6 +510,8 @@ export interface BookPosition extends EnginePosition {
   unrealizedR: number | null;
   realizedPnl: number;
   realizedR: number;
+  /** The close an open position has to hold tomorrow to stay over its MA-day average (1.9.3); null when closed or short of bars. */
+  maLine: number | null;
   /** Stop suggestions for the manual track: the entry day's low and the box bottom from tonight's deck (if still there). */
   entryDayLow: number | null;
   latestBoxBottom: number | null;
@@ -549,6 +551,21 @@ export async function getBook(userId: string): Promise<Book> {
   }
   const entryLows = new Map<number, number>();
   const openIds = positions.filter((p) => p.status === "open");
+  // The close each open position has to hold tomorrow (lib/position-plan.ts): the mean of its last MA − 1 closes.
+  const maLines = new Map<string, number>();
+  const K = CONFIG.PAPER.KULLAMAGI;
+  if (openIds.length > 0) {
+    const rows = (await sql`
+      SELECT ticker, avg(c)::double precision AS line, count(*)::int AS n
+      FROM (
+        SELECT ticker, c, row_number() OVER (PARTITION BY ticker ORDER BY date DESC) AS rn
+        FROM bars WHERE ticker = ANY(${[...new Set(openIds.map((p) => p.ticker))]}) AND date > CURRENT_DATE - 45
+      ) recent
+      WHERE rn <= ${K.MA - 1}
+      GROUP BY ticker
+    `) as { ticker: string; line: number; n: number }[];
+    for (const r of rows) if (r.n === K.MA - 1) maLines.set(r.ticker, Number(r.line));
+  }
   if (openIds.length > 0) {
     const rows = (await sql`
       SELECT p.id, b.l FROM paper_positions p JOIN bars b ON b.ticker = p.ticker AND b.date = p.entry_date
@@ -604,6 +621,7 @@ export async function getBook(userId: string): Promise<Book> {
       unrealizedR: unrealized !== null && risk > 0 ? unrealized / (risk * p.shares) : null,
       realizedPnl: pnl,
       realizedR: r,
+      maLine: p.status === "open" ? (maLines.get(p.ticker) ?? null) : null,
       entryDayLow: entryLows.get(p.id!) ?? null,
       latestBoxBottom: boxBottoms.get(p.ticker) ?? null,
       tapeAtEntry: tapeAt(p.entryDate),

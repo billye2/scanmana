@@ -461,6 +461,15 @@ export default async function Help() {
         manual Take would risk: the stop it would be given, the risk from entry to that stop in percent, and the whole shares the $500
         notional buys at tonight&apos;s tape size. A symbol outside tonight&apos;s deck shows no box: the Auto book never sees it.
       </Term>
+      <Term name="Tomorrow, per position">
+        The box under each open position on Paper (1.9.3). The first line is what the open does: hold, sell half (day 4 after a close above
+        the entry, and the stop then moves to the entry), or sell everything (it closed under the 10-day, or you asked). Under it are the
+        prices that would change that. The stop, with its distance under the last close: a trade at or under it sells everything. For a
+        ledger on Kullamägi&apos;s routine, the close it has to hold tomorrow: that price is the average of the last nine closes, because
+        tomorrow&apos;s close is under tomorrow&apos;s 10-day average exactly when it is under that number, so it is the real line and not
+        today&apos;s average. And the day count to the day-4 half. A manual position shows its trail instead. It is the same arithmetic the
+        nightly run applies, read one night ahead; nothing here places or changes an order.
+      </Term>
       <Term name="At the open">
         One line under the market strip (and at the top of this page) that says what the paper book does at tomorrow&apos;s open, read
         from the book&apos;s own rows: which market orders fill (with the tape size), which buy-stops are waiting on their trigger, which

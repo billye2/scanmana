@@ -210,7 +210,7 @@ def _replay_kullamagi(
         day = i + 2  # bars start the session after entry
         if pending:
             legs.append((row.o, row.date, held, i + 1))
-            return _combine(entry_price, initial_stop, legs, False)
+            return {**_combine(entry_price, initial_stop, legs, False), "reason": "ma"}
         if day == partial_day and held == shares and prev_close > entry_price:
             sell = int(held * KULLAMAGI_PARTIAL_FRACTION)
             if sell > 0:
@@ -220,7 +220,7 @@ def _replay_kullamagi(
                 stop = max(stop, entry_price)
         if row.l <= stop:
             legs.append((min(row.o, stop), row.date, held, i + 1))
-            return _combine(entry_price, initial_stop, legs, False)
+            return {**_combine(entry_price, initial_stop, legs, False), "reason": "breakeven" if stop > initial_stop else "stop"}
         closes.append(row.c)
         prev_close = row.c
         window = closes[-ma:]
@@ -228,7 +228,58 @@ def _replay_kullamagi(
             pending = True
     last = bars.iloc[-1]
     legs.append((last.c, last.date, held, len(bars)))
-    return _combine(entry_price, initial_stop, legs, True)
+    return {**_combine(entry_price, initial_stop, legs, True), "reason": "open"}
+
+
+# How a plan trade ended, as research_outcomes.post_mortem[1] stores it.
+PM_REASONS = ("stop", "breakeven", "ma", "open")
+PM_FIELDS = ("reason", "exit_day", "risk", "r", "mae_r", "peak_r", "window_peak_r", "after_r")
+
+
+def post_mortem(window: pd.DataFrame, entry_price: float, initial_stop: float, pre_closes: list[float], shares: int = 100) -> list[float | None] | None:
+    """One plan trade taken apart, in PM_FIELDS order. `window` is the sessions from
+    the entry day (first row) on, a fixed length like the exit grid's; `pre_closes`
+    as for _replay_kullamagi. Pure.
+
+      reason         index into PM_REASONS: the first stop, the breakeven stop after
+                     the partial, a close under the average, or still open at the
+                     window's end (marked to the last close).
+      exit_day       the session the last share left on, entry day = 1.
+      risk           (entry - stop) / entry.
+      r              the live routine's R, the same number as the grid's current cell.
+      mae_r          the lowest low from the entry day to the exit day, in R: how far
+                     the trade went against the entry while it was held.
+      peak_r         the best close over the same sessions, in R.
+      window_peak_r  the best close of the whole window, in R: what was on offer.
+      after_r        the best close after the exit day, in R over the entry; None when
+                     the exit was the window's last session.
+
+    None when the stop is not under the entry."""
+    risk = entry_price - initial_stop
+    if not (risk > 0) or window.empty:
+        return None
+    lo = window["l"].to_numpy(dtype=float)
+    c = window["c"].to_numpy(dtype=float)
+    if lo[0] <= initial_stop:
+        reason, exit_idx, r = "stop", 0, -1.0  # same-day stop-out, as the engine books it
+    else:
+        rest = window.iloc[1:]
+        if rest.empty:
+            return None
+        res = _replay_kullamagi(rest, entry_price, initial_stop, shares, pre_closes)
+        reason, exit_idx, r = res["reason"], int(res["hold"]), float(res["r"])
+    in_r = lambda px: float((px - entry_price) / risk)  # noqa: E731
+    after = c[exit_idx + 1 :]
+    return [
+        float(PM_REASONS.index(reason)),
+        float(exit_idx + 1),
+        float(risk / entry_price),
+        r,
+        in_r(lo[: exit_idx + 1].min()),
+        in_r(c[: exit_idx + 1].max()),
+        in_r(c.max()),
+        in_r(after.max()) if len(after) else None,
+    ]
 
 
 def exit_grid_r(bars: pd.DataFrame, entry_price: float, initial_stop: float, pre_closes: list[float], shares: int = 100) -> list[float]:

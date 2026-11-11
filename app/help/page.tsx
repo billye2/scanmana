@@ -262,6 +262,15 @@ export default async function Help() {
         peaks and the day the mean low bottoms. Together with the exit sweep this decides whether the ledger&apos;s routine changes — and
         only then, as a scored rule change.
       </Term>
+      <Term name="Where the R leaks: stop or exit">
+        The post-mortem on Studies (1.8.9): every trade the Auto ledger would have bought, run through today&apos;s exit routine on its
+        twenty sessions and taken apart. The table groups the trades by how they ended (the first stop, the breakeven stop after the
+        partial, a close under the average, or still open on day 20) with the average R of each and how many ran after the exit, meaning
+        a later close in the window 15% or more over the entry. Two leaks are counted over all trades so they can be compared. Shaken
+        out: stopped at the first stop, then it ran. Gave back: the window offered one R or more at its best close and the routine kept
+        less than half. The sentence names the larger when they differ by three points of all trades. It is a study and changes nothing:
+        the exit routine still changes only through the sweep&apos;s gate.
+      </Term>
       <Term name="Exit routine, swept">
         The grid on Studies (1.7.9): the Auto ledger&apos;s exit routine run twelve ways on the same cards and the same twenty sessions as
         the follow-through card — the day the first half comes off (3, 4 or 5), the average it sells under (10- or 20-day) and whether the

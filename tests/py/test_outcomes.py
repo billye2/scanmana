@@ -282,3 +282,44 @@ def test_label_frame_writes_the_exit_grid_once_the_path_is_full():
     dates, bars = _path_bars(21)
     out, _ = label_frame(_path_row(dates), bars)
     assert out[0][COLUMNS.index("exit_grid")] is None
+
+
+from research.replay import PM_FIELDS, PM_REASONS, post_mortem  # noqa: E402
+
+
+def _pm_window(rows):
+    return pd.DataFrame(rows, columns=["date", "o", "h", "l", "c"])
+
+
+def test_post_mortem_takes_a_stopped_trade_apart_and_sees_the_run_after_it():
+    # Entry 100, stop 95 (risk 5). Day 2 trades down to 94: out at the stop, -1R. Day 4 closes 115.
+    w = _pm_window([("d1", 100, 102, 99, 101), ("d2", 100, 101, 94, 96), ("d3", 97, 106, 97, 105), ("d4", 106, 116, 105, 115)])
+    pm = dict(zip(PM_FIELDS, post_mortem(w, 100.0, 95.0, [100.0, 101.0])))
+    assert PM_REASONS[int(pm["reason"])] == "stop" and pm["exit_day"] == 2
+    assert pm["risk"] == pytest.approx(0.05) and pm["r"] == pytest.approx(-1.0)
+    assert pm["mae_r"] == pytest.approx(-1.2)  # the low of 94, six under the entry
+    assert pm["peak_r"] == pytest.approx(0.2)  # day 1's close of 101
+    assert pm["window_peak_r"] == pytest.approx(3.0) and pm["after_r"] == pytest.approx(3.0)
+
+
+def test_post_mortem_books_a_same_day_stop_and_a_trade_still_open():
+    w = _pm_window([("d1", 100, 101, 94, 96), ("d2", 96, 99, 95, 98)])
+    pm = dict(zip(PM_FIELDS, post_mortem(w, 100.0, 95.0, [100.0])))
+    assert PM_REASONS[int(pm["reason"])] == "stop" and pm["exit_day"] == 1 and pm["r"] == -1.0
+    assert pm["after_r"] == pytest.approx(-0.4)
+    # Rising every day: never stopped, never under the average, marked to the last close.
+    w = _pm_window([(f"d{i}", 100 + i, 102 + i, 99.5 + i, 101 + i) for i in range(6)])
+    pm = dict(zip(PM_FIELDS, post_mortem(w, 100.0, 95.0, [98.0, 99.0])))
+    assert PM_REASONS[int(pm["reason"])] == "open" and pm["exit_day"] == 6 and pm["after_r"] is None
+    assert pm["peak_r"] == pm["window_peak_r"] == pytest.approx(1.2)
+    assert post_mortem(w, 100.0, 100.0, []) is None
+
+
+def test_label_frame_writes_the_post_mortem_with_the_grid():
+    dates, bars = _path_bars(32)
+    out, _ = label_frame(_path_row(dates), bars)
+    pm = dict(zip(PM_FIELDS, out[0][COLUMNS.index("post_mortem")]))
+    assert pm["r"] == pytest.approx(out[0][COLUMNS.index("exit_grid")][EXIT_CURRENT])
+    dates, bars = _path_bars(21)
+    out, _ = label_frame(_path_row(dates), bars)
+    assert out[0][COLUMNS.index("post_mortem")] is None

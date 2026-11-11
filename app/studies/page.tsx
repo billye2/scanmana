@@ -8,6 +8,7 @@ import { Card, H, NUM, SUMMARY, TD, TH, n, pc, rr } from "@/components/ResearchP
 import { meanInterval, wilson } from "@/lib/stats";
 import { pathSentence, pathSummary } from "@/lib/paths-read";
 import { EXIT_BREAKEVENS, EXIT_MAS, EXIT_PARTIAL_DAYS, exitCells, exitLabel, exitRead } from "@/lib/exit-read";
+import { PM_REASON_LABEL, postMortemRead } from "@/lib/post-mortem-read";
 import { CONFIG } from "@/lib/config";
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
@@ -22,6 +23,7 @@ import {
   getEpStudy,
   getKullamagiStudy,
   getPaths,
+  getPostMortem,
   getResearchSummary,
   getSweep,
   getThemeStudy,
@@ -44,7 +46,8 @@ const SWEEP_LABEL: Record<string, { title: string; sub: string; fmt: (v: number)
  * that page keeps to the verdict, the scorecard and the rule changes (Billy's
  * call, 2026-11-03). Everything here is a study: it reads the research tables
  * and changes nothing. In order: the plan on history, the follow-through paths
- * (1.7.7, split by ?split=), the exit sweep (1.7.9), breakout rates, the EP
+ * (1.7.7, split by ?split=), the exit sweep (1.7.9), the stop post-mortem
+ * (1.8.9), breakout rates, the EP
  * study, the threshold sweep, breadth, tonight's themes, themes scored. One
  * column throughout: Billy would rather scroll than read three narrow tables
  * side by side (2026-11-03).
@@ -54,7 +57,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const split: PathSplitKey = sp.split && sp.split in PATH_SPLITS ? (sp.split as PathSplitKey) : "all";
   const scan = await latestScanSlim().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
-  const [summary, sweep, clusters, breadth, ep, plan, themeStudy, paths] = await Promise.all([
+  const [summary, sweep, clusters, breadth, ep, plan, themeStudy, paths, pm] = await Promise.all([
     getResearchSummary(),
     getSweep(),
     getClusters(deckTickers),
@@ -63,6 +66,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
     getKullamagiStudy(),
     getThemeStudy(),
     getPaths(),
+    getPostMortem(),
   ]);
   const pathGroups = paths[split];
   const pathMarks = [
@@ -74,6 +78,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const sweepParams = Object.keys(SWEEP_LABEL).filter((p) => sweep.some((s) => s.param === p));
   const headline = sweepHeadline(sweep.filter((s) => s.param in SWEEP_LABEL));
   const cells = exitCells(sweep);
+  const pmRead = postMortemRead(pm, CONFIG.DRILL.RAN_MFE);
   const exit = exitRead(cells, pathSummary(paths.all[0]?.days ?? [], []).peakDay);
   const themes = clusters.filter((c) => c.inDeck.length >= 2).sort((a, b) => b.inDeck.length - a.inDeck.length || b.ret63d - a.ret63d).slice(0, 8);
   const epGroups = [ep.overall, ...ep.byNeglect, ...ep.byVolume, ...ep.byHeld, ...ep.byBoth];
@@ -220,6 +225,45 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
         </table>
         <p className="px-2 py-2 text-[12px] leading-relaxed text-neutral-400">{exit.sentence}</p>
       </Card>
+
+      {/* ---------- Stop post-mortem (1.8.9) ---------- */}
+      <H id="postmortem" sub={`Each trade the Auto book would have bought (stop no wider than ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} ADR), run through today's exit routine on the same twenty sessions and taken apart: how it ended, what it made, and what the chart did after the last share was sold. "Ran after" = a later close in the window ${pc(CONFIG.DRILL.RAN_MFE)} or more over the entry. In-sample, raw price, no slippage.`}>
+        Where the R leaks: stop or exit
+      </H>
+      {pmRead.state === "empty" ? (
+        <Card className="text-xs text-neutral-500">{pmRead.sentence}</Card>
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          <table className="w-full">
+            <thead>
+              <tr>
+                <th className={TH}>Ended at</th>
+                <th className={`${TH} text-right`}>Trades</th>
+                <th className={`${TH} text-right`}>Avg R</th>
+                <th className={`${TH} text-right`}>Median day out</th>
+                <th className={`${TH} text-right`}>Ran after</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pm.reasons.map((r) => (
+                <tr key={r.reason} className="border-t border-neutral-800">
+                  <td className={`${TD} text-neutral-100`}>{PM_REASON_LABEL[r.reason]}</td>
+                  <td className={NUM}>{n(r.n)} <span className="text-neutral-600">· {pc(r.n / pmRead.total)}</span></td>
+                  <td className={`${NUM} ${r.avgR === null || r.n < MIN_AFTER_N ? "text-neutral-500" : r.avgR >= 0 ? "text-emerald-300" : "text-red-300"}`}>{rr(r.avgR)}</td>
+                  <td className={NUM}>{r.medExitDay === null ? "—" : Math.round(r.medExitDay)}</td>
+                  <td className={NUM}>{r.reason === "open" ? "—" : `${n(r.ranAfter)} · ${pc(r.n ? r.ranAfter / r.n : null)}`}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <dl className="grid grid-cols-1 gap-y-1 border-t border-neutral-800 px-2 py-2 text-xs text-neutral-300">
+            <div className="flex justify-between gap-3"><dt className="text-neutral-500">Winners that went half an R or more against the entry first</dt><dd className="font-mono tabular-nums">{n(pm.winners.deep)} of {n(pm.winners.n)} · {pc(pm.winners.n ? pm.winners.deep / pm.winners.n : null)}</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-neutral-500">Trades the window offered one R or more</dt><dd className="font-mono tabular-nums">{n(pm.offered.n)} · kept {pc(pmRead.capture)} of the best close</dd></div>
+            <div className="flex justify-between gap-3"><dt className="text-neutral-500">Of those, kept less than half</dt><dd className="font-mono tabular-nums">{n(pm.offered.gaveBack)} · {pc(pmRead.gaveBackShare)} of all trades</dd></div>
+          </dl>
+          <p className="border-t border-neutral-800 px-2 py-2 text-[12px] leading-relaxed text-neutral-400">{pmRead.sentence}</p>
+        </Card>
+      )}
 
       {/* ---------- 4. Breakout rates ---------- */}
       <H id="outcomes" sub={`Deck names only (the capped nightly deck), ${n(summary.labelled)} of ${n(summary.deckRows)} labelled so far. "Broke out" = a close within ten sessions of the scan above the box top, else above the pivot while it is still overhead, else above the 20-session high.`}>

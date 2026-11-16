@@ -326,3 +326,56 @@ def test_label_frame_writes_the_post_mortem_with_the_grid():
     dates, bars = _path_bars(21)
     out, _ = label_frame(_path_row(dates), bars)
     assert out[0][COLUMNS.index("post_mortem")] is None
+
+
+def test_cleared_high_needs_the_whole_window_and_a_close_above_its_highest_high():
+    from research.outcomes import cleared_high
+
+    highs = np.array([10.0, 12, 11, 11, 11.5, 13])
+    closes = np.array([9.5, 11, 10.5, 10.8, 11.2, 12.5])
+    assert cleared_high(highs, closes, 5, window=5) is True  # 12.5 over the 12 high of the five before
+    assert cleared_high(highs, closes, 4, window=3) is False  # 11.2 under the 12 high: a lower high broke
+    assert cleared_high(highs, closes, 4, window=2) is True  # the same close clears a shorter range
+    assert cleared_high(highs, closes, 3, window=5) is None  # only three sessions before it
+    assert cleared_high(highs, closes, 6, window=5) is None  # no such session
+
+
+def test_new_high_window_mirrors_the_typescript_reader():
+    from pathlib import Path
+    import re
+
+    from research.outcomes import NEW_HIGH_WINDOW
+
+    ts = (Path(__file__).resolve().parents[2] / "lib" / "shadow-read.ts").read_text()
+    assert int(re.search(r"SHADOW_WINDOW = (\d+)", ts).group(1)) == NEW_HIGH_WINDOW
+
+
+def _shadow_bars(old_high):
+    """Sixty quiet sessions, one of them with `old_high`, then the scan night and the path bars' breakout."""
+    dates = pd.date_range("2026-05-01", periods=60 + 32, freq="B")
+    _, tail = _path_bars(32)
+    pre = np.full(60, 100.0)
+    c = np.concatenate([pre, tail["c"].to_numpy()])
+    h = c * 1.01
+    h[20] = old_high  # 41 sessions before the scan night, inside the fifty before the breakout day
+    return dates, pd.DataFrame({"ticker": "AAA", "date": dates, "o": c, "h": h, "l": c * 0.99, "c": c, "v": 1e6})
+
+
+def test_label_frame_flags_a_break_that_clears_the_fifty_session_high():
+    col = COLUMNS.index("k_new_high")
+    dates, bars = _shadow_bars(old_high=101.0)
+    out, _ = label_frame(_path_row(dates[60:]), bars)  # breakout close 106 over a 105 box, nothing higher behind it
+    assert out[0][col] is True
+    dates, bars = _shadow_bars(old_high=107.0)  # an older high above the box top: the 106 close broke a lower high
+    out, _ = label_frame(_path_row(dates[60:]), bars)
+    assert out[0][col] is False
+
+
+def test_label_frame_leaves_the_flag_empty_without_fifty_sessions_or_an_entry():
+    col = COLUMNS.index("k_new_high")
+    dates, bars = _path_bars(32)  # the bars start on the scan night
+    out, _ = label_frame(_path_row(dates), bars)
+    assert out[0][col] is None
+    dates, bars = _shadow_bars(old_high=101.0)
+    out, _ = label_frame(_path_row(dates[60:], box_top=500.0), bars)  # never closes above the box: no entry
+    assert out[0][col] is None

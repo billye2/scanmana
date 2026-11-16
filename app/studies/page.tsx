@@ -9,6 +9,7 @@ import { meanInterval, wilson } from "@/lib/stats";
 import { pathSentence, pathSummary } from "@/lib/paths-read";
 import { EXIT_BREAKEVENS, EXIT_MAS, EXIT_PARTIAL_DAYS, exitCells, exitLabel, exitRead } from "@/lib/exit-read";
 import { PM_RAN_R, PM_REASON_LABEL, postMortemRead } from "@/lib/post-mortem-read";
+import { SHADOW_FOUND_THROUGH, SHADOW_WINDOW, shadowInterval, shadowLive, shadowRead } from "@/lib/shadow-read";
 import { CONFIG } from "@/lib/config";
 import TopNav from "@/components/TopNav";
 import { pct } from "@/lib/format";
@@ -26,6 +27,7 @@ import {
   getPaths,
   getPostMortem,
   getResearchSummary,
+  getShadowStudy,
   getSweep,
   getThemeStudy,
 } from "@/lib/research";
@@ -48,7 +50,7 @@ const SWEEP_LABEL: Record<string, { title: string; sub: string; fmt: (v: number)
  * call, 2026-11-03). Everything here is a study: it reads the research tables
  * and changes nothing. In order: the plan on history, the follow-through paths
  * (1.7.7, split by ?split=), the exit sweep (1.7.9), the stop post-mortem
- * (1.8.9), breakout rates, the EP
+ * (1.8.9), the shadow rule (1.9.4), breakout rates, the EP
  * study, the threshold sweep, breadth, tonight's themes, themes scored. One
  * column throughout: Billy would rather scroll than read three narrow tables
  * side by side (2026-11-03).
@@ -58,7 +60,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const split: PathSplitKey = sp.split && sp.split in PATH_SPLITS ? (sp.split as PathSplitKey) : "all";
   const scan = await latestScanSlim().catch(() => null);
   const deckTickers = scan?.candidates.map((c) => c.ticker) ?? [];
-  const [summary, sweep, clusters, breadth, ep, plan, themeStudy, paths, pm] = await Promise.all([
+  const [summary, sweep, clusters, breadth, ep, plan, themeStudy, paths, pm, shadow] = await Promise.all([
     getResearchSummary(),
     getSweep(),
     getClusters(deckTickers),
@@ -68,6 +70,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
     getThemeStudy(),
     getPaths(),
     getPostMortem(),
+    getShadowStudy(),
   ]);
   const pathGroups = paths[split];
   const pathMarks = [
@@ -80,6 +83,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const headline = sweepHeadline(sweep.filter((s) => s.param in SWEEP_LABEL));
   const cells = exitCells(sweep);
   const pmRead = postMortemRead(pm);
+  const shadowR = shadowRead(shadow);
   const exit = exitRead(cells, pathSummary(paths.all[0]?.days ?? [], []).peakDay);
   const themes = clusters.filter((c) => c.inDeck.length >= 2).sort((a, b) => b.inDeck.length - a.inDeck.length || b.ret63d - a.ret63d).slice(0, 8);
   const epGroups = [ep.overall, ...ep.byNeglect, ...ep.byVolume, ...ep.byHeld, ...ep.byBoth];
@@ -263,6 +267,54 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
             <div className="flex justify-between gap-3"><dt className="text-neutral-500">Of those, kept less than half</dt><dd className="font-mono tabular-nums">{n(pm.offered.gaveBack)} · {pc(pmRead.gaveBackShare)} of all trades</dd></div>
           </dl>
           <p className="border-t border-neutral-800 px-2 py-2 text-[12px] leading-relaxed text-neutral-400">{pmRead.sentence}</p>
+        </Card>
+      )}
+
+      {/* ---------- Shadow rule (1.9.4) ---------- */}
+      <H id="shadow" sub={`The Auto book's arming rule with one more condition, scored beside the live rule and never armed: the close that breaks the box must also be above the highest high of the ${SHADOW_WINDOW} sessions before it. A box top is the most recent ceiling, so an older, higher high can sit above it; the live rule buys the break of that lower high and the shadow rule does not. One row per trade (the scan night right before the breakout day), stop no wider than ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} ADR, sold by today's exit routine over twenty sessions. In-sample, raw price, no slippage.`}>
+        Shadow rule: the break must clear the {SHADOW_WINDOW}-session high
+      </H>
+      {shadowR.state === "empty" ? (
+        <Card className="text-xs text-neutral-500">{shadowR.sentence}</Card>
+      ) : (
+        <Card className="overflow-x-auto p-0">
+          {(
+            [
+              [`Scan nights through ${SHADOW_FOUND_THROUGH} · the history it was found on`, shadow.found],
+              [`Scan nights after ${SHADOW_FOUND_THROUGH} · the test`, shadow.since],
+            ] as const
+          ).map(([title, period]) => (
+            <div key={title} className="border-b border-neutral-800">
+              <div className="px-2 pt-2 text-[11px] font-semibold text-neutral-400">{title}</div>
+              <table className="w-full">
+                <thead><tr><th className={TH}>Trades</th><th className={`${TH} text-right`}>N</th><th className={`${TH} text-right`}>Win</th><th className={`${TH} text-right`}>Avg R</th><th className={`${TH} text-right`}>Total R</th><th className={`${TH} text-right`}>3R+</th></tr></thead>
+                <tbody>
+                  {(
+                    [
+                      ["Live rule: every armed trade", shadowLive(period)],
+                      [`Shadow keeps: also above the ${SHADOW_WINDOW}-session high`, period.kept],
+                      [`Shadow drops: over the box, under the ${SHADOW_WINDOW}-session high`, period.dropped],
+                    ] as const
+                  ).map(([label, g]) => {
+                    const ready = g.n >= MIN_AFTER_N;
+                    return (
+                      <tr key={label} className={`border-t border-neutral-800 ${ready ? "" : "text-neutral-500"}`}>
+                        <td className={`${TD} whitespace-normal ${ready ? "text-neutral-100" : ""}`}>{label}</td>
+                        <td className={NUM}>{n(g.n)}</td>
+                        <td className={NUM}><Band text={pc(g.winRate)} value={g.winRate} interval={wilson(g.winRate, g.n)} kind="rate" tone="" /></td>
+                        <td className={`${NUM} ${ready && g.avgR !== null ? (g.avgR >= 0 ? "text-emerald-300" : "text-red-300") : ""}`}>
+                          <Band text={rr(g.avgR)} value={g.avgR} interval={shadowInterval(g)} kind="r" tone="" />
+                        </td>
+                        <td className={NUM}>{g.n === 0 ? "—" : rr(g.totalR)}</td>
+                        <td className={NUM}>{n(g.big)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+          <p className="px-2 py-2 text-[12px] leading-relaxed text-neutral-400">{shadowR.sentence}</p>
         </Card>
       )}
 

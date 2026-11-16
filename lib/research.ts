@@ -4,6 +4,7 @@
 import { CONFIG } from "./config";
 import { getSql } from "./db";
 import { EMPTY_POST_MORTEM, PM_RAN_R, PM_REASONS, type PostMortem } from "./post-mortem-read";
+import { EMPTY_SHADOW, EMPTY_SHADOW_GROUP, SHADOW_FOUND_THROUGH, type ShadowGroup, type ShadowStudy } from "./shadow-read";
 import { galleryRowFromSql, pickGallery, type GalleryRow, type GalleryRowSql } from "./gallery";
 import {
   type ChangeScore,
@@ -662,6 +663,45 @@ export async function getKullamagiStudy(): Promise<KullamagiStudy> {
   } catch (err) {
     console.error("getKullamagiStudy failed:", err);
     return empty;
+  }
+}
+
+/* ---------- the shadow rule (1.9.4) ---------- */
+
+/**
+ * The Auto book's trades on history, split by the shadow rule's one extra
+ * condition (research_outcomes.k_new_high) and by whether the scan night is in
+ * the history the rule was found on. One row per trade, not per scan night: a
+ * card rests in its box for many nights, so only the night right before the
+ * breakout day counts (k_entry_day = 2), with that night's verdict standing in
+ * for the breakout night's. Complete rows only, so a recent group is not just
+ * its quick stop-outs. lib/shadow-read.ts reads it. Empty before the column
+ * exists or the job has run.
+ */
+export async function getShadowStudy(): Promise<ShadowStudy> {
+  try {
+    const rows = (await getSql()`
+      SELECT (h.date > ${SHADOW_FOUND_THROUGH}::date) AS fresh, o.k_new_high AS kept,
+             count(*)::int AS n, avg((o.k_r > 0)::int) AS win, avg(o.k_r) AS avg_r, stddev_samp(o.k_r) AS sd_r,
+             sum(o.k_r) AS total_r, count(*) FILTER (WHERE o.k_r >= 3)::int AS big
+      FROM scan_history h JOIN research_outcomes o USING (date, ticker)
+      WHERE h.rank IS NOT NULL AND h.boxed AND h.verdict = 'wait' AND h.box_top IS NOT NULL AND h.close <= h.box_top
+        AND o.complete AND o.k_entry_day = 2 AND o.k_r IS NOT NULL
+        AND o.k_stop_adr <= ${CONFIG.PAPER.KULLAMAGI.MAX_STOP_ADR} AND o.k_new_high IS NOT NULL
+      GROUP BY 1, 2
+    `) as { fresh: boolean; kept: boolean; n: number; win: number | null; avg_r: number | null; sd_r: number | null; total_r: number | null; big: number }[];
+    const pick = (fresh: boolean, kept: boolean): ShadowGroup => {
+      const r = rows.find((x) => x.fresh === fresh && x.kept === kept);
+      if (!r) return EMPTY_SHADOW_GROUP;
+      const num = (x: number | null) => (x === null ? null : Number(x));
+      return { n: r.n, winRate: num(r.win), avgR: num(r.avg_r), sdR: num(r.sd_r), totalR: Number(r.total_r ?? 0), big: r.big };
+    };
+    return {
+      found: { kept: pick(false, true), dropped: pick(false, false) },
+      since: { kept: pick(true, true), dropped: pick(true, false) },
+    };
+  } catch {
+    return EMPTY_SHADOW;
   }
 }
 

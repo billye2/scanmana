@@ -220,8 +220,8 @@ export default async function Help() {
       <Term name="Studies page" who="open-book icon">
         <span id="studies" />
         <Link href="/studies" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/studies</Link> holds
-        the deeper reads that used to sit between the scorecard and Maintenance: Kullamägi&apos;s plan on every boxed Wait card, the breakout
-        rates, the episodic-pivot study, the threshold sweep, market breadth, tonight&apos;s themes and the themes scored. Every one is a study —
+        the deeper reads that used to sit between the scorecard and Maintenance: Kullamägi&apos;s plan on every boxed Wait card, the shadow
+        rule, the breakout rates, the episodic-pivot study, the threshold sweep, market breadth, tonight&apos;s themes and the themes scored. Every one is a study —
         it reads the nightly tables and changes nothing. A rule changes only when a study says so, and then the Research page scores it. New
         studies from the Python jobs land here. On the bar when you tick it under the gear.
       </Term>
@@ -270,6 +270,25 @@ export default async function Help() {
         out: stopped at the first stop, then it ran. Gave back: the best close while the trade was held reached one R or more and the routine kept
         less than half. The sentence names the larger when they differ by three points of all trades. It is a study and changes nothing:
         the exit routine still changes only through the sweep&apos;s gate.
+      </Term>
+      <Term name="Shadow rule: the break must clear the 50-session high">
+        <span id="shadow" />
+        A rule that is scored and never armed (Studies, 1.9.4). The Auto ledger buys a boxed Wait card on its first close above the box top.
+        A box top is the most recent ceiling that held, so an older, higher high can sit above it: the close clears the box and is still
+        under the high of the last fifty sessions. The shadow rule adds one condition to the live one — that close must also be above the
+        highest high of the fifty sessions before it — and the card shows the ledger&apos;s trades three ways: every armed trade, the ones
+        the shadow rule keeps, and the ones it drops. Kept and dropped never share a trade, so the two can be compared. Each trade counts
+        once, on the scan night right before its breakout day.
+        <br />
+        <br />
+        It came out of a check on 2026-11-15 of whether the arming rule was missing trades. It was not: cards with no box, bought over their
+        20-session high, made nothing on 661 trades (−0.01R a trade), and dropping the box for every card made +0.05R a trade on 517.
+        What the check did find is that 43 of the ledger&apos;s 118 trades on history broke a lower high and averaged −0.27R, while the other 75
+        averaged +0.68R. That split was found by looking, on eight months, so the card keeps it apart from the test: the top block is
+        the history it was found on (scan nights through 2026-10-16), the bottom block every trade since. The sentence reads only the
+        bottom block and needs thirty new trades on each side with the two ranges apart. Until then the live rule stays as it is; if the
+        gate is met the condition joins the arming rule as one scored rule-change row on Research, and if the new trades run the other way
+        the shadow rule is dropped.
       </Term>
       <Term name="Exit routine, swept">
         The grid on Studies (1.7.9): the Auto ledger&apos;s exit routine run twelve ways on the same cards, over up to sixty
@@ -428,7 +447,8 @@ export default async function Help() {
         scanner&apos;s own history (1,222 boxed Wait cards, March–September 2026) a buy-stop at the trigger filled 979 times and 501 of
         those days closed back inside the box, averaging −0.42R; waiting for the close costs a little on the open and removes them.
         Pass cards and pivot-only cards never arm; a card that broke out days ago is skipped — only a pullback to the box gives an
-        entry then. Orders follow the deck: a card that drops out or closes under its box is cancelled. The book you see is always{" "}
+        entry then. One more condition is scored on Studies without being applied (the <Link href="#shadow" className="underline decoration-neutral-700 underline-offset-4">shadow rule</Link>): that the
+        close also clears the 50-session high. Orders follow the deck: a card that drops out or closes under its box is cancelled. The book you see is always{" "}
         <em>as of the last processed session</em>; nothing changes during the day.
       </Term>
 

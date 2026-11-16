@@ -37,6 +37,13 @@ Exit sweep (1.7.9, R4): on the same rows, once the path is full, exit_grid
 holds the R of every cell of research/replay.py EXIT_GRID (partial day × exit
 MA × breakeven) on the twenty sessions from the entry — the same entry and
 stop as k_r, one list in the grid's order. research/sweep.py aggregates it.
+
+Shadow rule (1.9.4): k_new_high says whether the breakout day's close also cleared
+the highest high of the NEW_HIGH_WINDOW sessions before it, on every row the
+next-open plan entered. A box top is the most recent ceiling, so an older and
+higher high can sit above it: the flag separates a break of the whole range from
+a break of a lower high. /studies scores the Auto book's trades with and without
+it (lib/shadow-read.ts). Nothing is armed from it.
 """
 from __future__ import annotations
 
@@ -62,7 +69,10 @@ PLAN_COLUMNS = ["k_entry_day", "k_stop_adr", "k_r", "bs_entry_day", "bs_stop_adr
 # Bumped when the plan columns' meaning changes: rows written under an older (or no)
 # version are re-labelled by the nightly run, a chunk at a time within its budget, so
 # a new column back-fills the whole history without a forced Refresh.
-PLAN_VERSION = 1
+PLAN_VERSION = 2  # 2 (1.9.4): k_new_high
+# Sessions before the breakout day whose highest high the close must clear for the
+# shadow rule. Mirrored by lib/shadow-read.ts SHADOW_WINDOW (tests/py pins the two).
+NEW_HIGH_WINDOW = 50
 PATH_DAYS = 20
 # The exit grid and the post-mortem run on up to this many sessions from the entry
 # (1.9.1; PATH_DAYS before that, which marked every runner to its day-20 close so the
@@ -73,12 +83,15 @@ GRID_DAYS = 60
 # Calendar days back that a short window is still worth re-labelling: sixty sessions
 # and the ten to the breakout fit well inside. Older rows short of bars stay as they are.
 GRID_PENDING_DAYS = 130
+# Calendar days of bars loaded before the earliest pending row: NEW_HIGH_WINDOW sessions
+# is about 72 calendar days, plus holidays. (35 before 1.9.4, for the 20-session high.)
+BARS_BEFORE_DAYS = 80
 PATH_COLUMNS = ["date", "ticker", "day", "gain", "low"]
 COLUMNS = [
     "date", "ticker", "level", "broke_10d", "broke_day",
     "mfe_5", "mfe_10", "mfe_20", "mae_5", "mae_10", "mae_20",
     "r_at_exit", "filled", "sessions_after", "complete",
-    *PLAN_COLUMNS, "plan_v", "path_days", "exit_grid", "post_mortem",
+    *PLAN_COLUMNS, "plan_v", "path_days", "exit_grid", "post_mortem", "k_new_high",
 ]
 EXIT_CELLS = len(EXIT_GRID)
 PM_DAYS_AT = PM_FIELDS.index("days") + 1  # Postgres arrays count from 1
@@ -96,6 +109,15 @@ def follow_path(frame: pd.DataFrame, entry: float, days: int = PATH_DAYS) -> lis
     c = frame["c"].to_numpy(dtype=float)[:days]
     lo = np.minimum.accumulate(frame["l"].to_numpy(dtype=float)[:days])
     return [(d + 1, float(c[d] / entry - 1), float(lo[d] / entry - 1)) for d in range(len(c))]
+
+
+def cleared_high(highs: np.ndarray, closes: np.ndarray, b: int, window: int = NEW_HIGH_WINDOW) -> bool | None:
+    """Whether the close of session `b` is above the highest high of the `window`
+    sessions before it. None when fewer than `window` sessions exist before `b`
+    (the answer would be about a shorter range) or `b` is out of range. Pure."""
+    if b < window or b >= len(closes):
+        return None
+    return bool(closes[b] > highs[b - window : b].max())
 
 
 def in_path_study(rank: Any, boxed: bool, verdict: Any, close: float, box_top: float | None) -> bool:
@@ -189,7 +211,7 @@ def label_one(
         "level": level, "broke_10d": None, "broke_day": None,
         "mfe_5": None, "mfe_10": None, "mfe_20": None, "mae_5": None, "mae_10": None, "mae_20": None,
         "r_at_exit": None, "filled": None, "sessions_after": int(n), "complete": bool(n >= HORIZON),
-        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION, "path_days": 0, "exit_grid": None, "post_mortem": None,
+        **{k: None for k in PLAN_COLUMNS}, "plan_v": PLAN_VERSION, "path_days": 0, "exit_grid": None, "post_mortem": None, "k_new_high": None,
     }
     if n == 0:
         return out
@@ -274,9 +296,10 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> tuple[list[list[Any]]
     """Label every row of `rows` (one ticker or many) against `bars`. Pure.
     Returns (outcome rows in COLUMNS order, path rows in PATH_COLUMNS order).
 
-    `bars` should start at least HIGH_WINDOW sessions before the earliest row
-    so the fallback level (20-session high) has its history. Paths need `rank`
-    and `verdict` on the rows (rows without them get no path)."""
+    `bars` should start at least NEW_HIGH_WINDOW sessions before the earliest row
+    so the shadow rule's high (and the 20-session fallback level) has its history;
+    with less, k_new_high is None. Paths need `rank` and `verdict` on the rows
+    (rows without them get no path)."""
     out: list[list[Any]] = []
     paths: list[list[Any]] = []
     if rows.empty or bars.empty:
@@ -287,6 +310,8 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> tuple[list[list[Any]]
         if tb.empty:
             continue
         dates = tb["date"].to_numpy(dtype="datetime64[ns]")
+        highs = tb["h"].to_numpy(dtype=float)
+        all_closes = tb["c"].to_numpy(dtype=float)
         for r in grp.itertuples(index=False):
             d = np.datetime64(pd.Timestamp(r.date), "ns")
             i = int(np.searchsorted(dates, d))
@@ -303,6 +328,9 @@ def label_frame(rows: pd.DataFrame, bars: pd.DataFrame) -> tuple[list[list[Any]]
                 after, float(r.close), level, _f(r.box_top) if boxed else None, _f(r.box_bottom) if boxed else None, adr, pre_closes
             )
             entry_day = lab["k_entry_day"]
+            if entry_day is not None:
+                # after[0] is tb[i + 1] and the entry is the session after the breakout day.
+                lab["k_new_high"] = cleared_high(highs, all_closes, i + entry_day - 1)
             if entry_day is not None and in_path_study(getattr(r, "rank", None), boxed, getattr(r, "verdict", None), float(r.close), _f(r.box_top)):
                 start = i + entry_day  # after[0] is tb[i + 1], so entry day d (1-based in after) is tb[i + d]
                 entry = float(tb["o"].iloc[start])
@@ -341,7 +369,7 @@ def run(conn: psycopg.Connection, ctx: JobContext) -> str:
     for i in range(0, len(tickers), CHUNK):
         chunk = tickers[i : i + CHUNK]
         sub = rows[rows["ticker"].isin(chunk)]
-        since: date = sub["date"].min().date() - timedelta(days=35)  # room for the 20-session high
+        since: date = sub["date"].min().date() - timedelta(days=BARS_BEFORE_DAYS)
         bars = load_bars(conn, tickers=chunk, since=since.isoformat())
         labelled, paths = label_frame(sub, bars)
         written += write_rows(conn, "research_outcomes", COLUMNS, labelled, conflict=["date", "ticker"])

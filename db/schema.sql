@@ -250,6 +250,11 @@ ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS exit_grid double precisio
 -- [9] sessions in the window (1.9.1): up to research/outcomes.py GRID_DAYS, re-labelled until it gets there
 -- lib/research.ts getPostMortem reads it for the card on /studies.
 ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS post_mortem double precision[];
+-- 1.9.4: k_new_high = on a row the next-open plan entered, whether the breakout day's close was also
+-- above the highest high of the fifty sessions before it (research/outcomes.py NEW_HIGH_WINDOW).
+-- Null when the plan did not enter or fewer than fifty sessions of bars exist before the breakout.
+-- The shadow rule on /studies reads it (lib/research.ts getShadowStudy). Nothing arms from it.
+ALTER TABLE research_outcomes ADD COLUMN IF NOT EXISTS k_new_high boolean;
 
 CREATE TABLE IF NOT EXISTS research_paths (
   date date NOT NULL,

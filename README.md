@@ -132,6 +132,9 @@ with headers and footers off. A process to follow, not financial advice.
   moved off `/research` so that page keeps to this week's read, the scorecard
   and the rule changes — the plan on every boxed Wait card, breakout rates, the
   EP study, the threshold sweep, breadth, tonight's themes and themes scored.
+  Since 1.9.4 also a shadow rule (`lib/shadow-read.ts`): the arming rule plus
+  "the close also clears the 50-session high", scored beside the live rule on
+  the trades since it was found and never armed.
   Shared table and heading primitives in `components/ResearchPrimitives.tsx`.
 - **Tape** (`/tape`, `lib/tape-read.ts`, `components/TapeCharts.tsx`): the
   index verdict and market breadth over 60 / 120 / 250 sessions — how long the

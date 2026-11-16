@@ -296,3 +296,421 @@ export function Playbook() {
     </Figure>
   );
 }
+
+/* ====================================================================
+ * Second pass (1.9.7): the badges, the market rule, the shadow rule,
+ * fills, tape size, R, the range bar and the drill's three outcomes.
+ * ==================================================================== */
+
+const TWO_UP: [Frame, Frame] = [
+  { left: 4, right: 162, top: 24, bottom: 104 },
+  { left: 178, right: 336, top: 24, bottom: 104 },
+];
+const threeUp = (k: number, top = 24, bottom = 112): Frame => ({ left: 4 + k * 114, right: 104 + k * 114, top, bottom });
+const Divider = ({ x, h }: { x: number; h: number }) => <line x1={x} x2={x} y1={6} y2={h} stroke="#262626" strokeWidth="1" />;
+
+/** Bars with the same wick on every bar, so two panels share one average daily range. */
+function evenBars(closes: readonly number[], wick: number): FigBar[] {
+  return closes.map((c, i) => {
+    const o = i === 0 ? c - 0.3 : closes[i - 1];
+    return [o, Math.max(o, c) + wick, Math.min(o, c) - wick, c] as const;
+  });
+}
+
+/* ---------- tight ---------- */
+
+const LOOSE_BARS = evenBars([36, 37.6, 36.8, 38.9, 38, 40.2, 39.4, 41.5, 42.8, 44], 0.75);
+const TIGHT_BARS = evenBars([42, 42.6, 41.8, 42.5, 41.9, 42.7, 42, 42.6, 41.9, 42.4], 0.9);
+
+/** Range of the bars over their average daily range: the card's "tight" number on made-up bars. */
+function tightRatio(bars: readonly FigBar[]): number {
+  const span = Math.max(...bars.map((b) => b[1])) / Math.min(...bars.map((b) => b[2])) - 1;
+  const adr = bars.reduce((s, b) => s + (b[1] / b[2] - 1), 0) / bars.length;
+  return span / adr;
+}
+
+export function Tightness() {
+  const panels = [
+    { title: "Loose", bars: LOOSE_BARS, frame: TWO_UP[0] },
+    { title: "Tight", bars: TIGHT_BARS, frame: TWO_UP[1] },
+  ];
+  const y = priceScale([...LOOSE_BARS, ...TIGHT_BARS], TWO_UP[0]);
+  return (
+    <Figure
+      label="Two made-up ten-day stretches with the same daily range: one wandering across a wide span, one sitting in a narrow one"
+      caption={
+        <>
+          The same size of daily bar in both. On the left the {CONFIG.TIGHTNESS_WINDOW} days wander, so together they span several days&apos;
+          worth of movement. On the right they sit on top of each other. The shaded band is the {CONFIG.TIGHTNESS_WINDOW}-day range; the
+          number is that range divided by one average day.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 122`} className="block w-full">
+        {panels.map((p) => {
+          const hi = Math.max(...p.bars.map((b) => b[1]));
+          const lo = Math.min(...p.bars.map((b) => b[2]));
+          const mid = (p.frame.left + p.frame.right) / 2;
+          return (
+            <g key={p.title}>
+              <T x={mid} y={12} fill={MARK} anchor="middle">{p.title}</T>
+              <rect x={p.frame.left} y={y(hi)} width={p.frame.right - p.frame.left} height={y(lo) - y(hi)} fill={AMBER} opacity="0.1" />
+              <Candles bars={p.bars} frame={p.frame} y={y} />
+              <T x={mid} y={118} fill={DIM} anchor="middle">tight {tightRatio(p.bars).toFixed(1)}</T>
+            </g>
+          );
+        })}
+        <Divider x={170} h={116} />
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- EP ---------- */
+
+const EP_CLOSES = [20, 20.3, 19.9, 20.2, 20.4, 20.1, 20.3, 20, 20.2, 20.4, 20.1, 20.3, 24.6, 24.9, 24.4, 25.2];
+const EP_GAP = 12;
+const EP_VOLUME = [1, 0.9, 1.1, 1, 0.8, 1, 1.2, 0.9, 1, 1.1, 0.9, 1, 5.2, 2.6, 1.9, 1.7];
+const EP_BARS = barsFromCloses(EP_CLOSES, { [EP_GAP]: { o: 23.3, l: 23.1 } });
+
+export function EpGap() {
+  const frame: Frame = { left: 4, right: 336, top: 12, bottom: 96 };
+  const y = priceScale(EP_BARS, frame);
+  const x = (i: number) => candleX(i, EP_BARS.length, frame);
+  const gapPct = Math.round((EP_BARS[EP_GAP][0] / EP_CLOSES[EP_GAP - 1] - 1) * 100);
+  const vTop = 106;
+  const vBottom = 134;
+  const vMax = Math.max(...EP_VOLUME);
+  const bw = slotWidth(EP_BARS.length, frame) * 0.62;
+  return (
+    <Figure
+      label="A made-up chart of an episodic pivot: a flat stretch, then one day that opens far above the last close on several times the usual volume"
+      caption={
+        <>
+          An episodic pivot: weeks of nothing, then a day that opens at least {CONFIG.EP.MIN_GAP * 100}% over the last close on{" "}
+          {CONFIG.EP.VOL_MULT}× the usual volume or more. The bars under the chart are volume. The badge marks a card with such a day in its
+          last {CONFIG.EP.LOOKBACK} sessions.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 138`} className="block w-full">
+        <Candles bars={EP_BARS} frame={frame} y={y} />
+        <line x1={x(EP_GAP) - 12} x2={x(EP_GAP) - 12} y1={y(EP_BARS[EP_GAP][0])} y2={y(EP_CLOSES[EP_GAP - 1])} stroke={INK} strokeWidth="1" />
+        <T x={x(EP_GAP) - 17} y={(y(EP_BARS[EP_GAP][0]) + y(EP_CLOSES[EP_GAP - 1])) / 2 + 3} anchor="end">gap +{gapPct}%</T>
+        {EP_VOLUME.map((v, i) => (
+          <rect key={i} x={x(i) - bw / 2} y={vBottom - (v / vMax) * (vBottom - vTop)} width={bw} height={(v / vMax) * (vBottom - vTop)} fill={i === EP_GAP ? AMBER : "#404040"} />
+        ))}
+        <T x={x(EP_GAP) - 17} y={vTop + 8} fill={AMBER} anchor="end">{EP_VOLUME[EP_GAP].toFixed(0)}× volume</T>
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- the market rule ---------- */
+
+const wiggle = [0, 0.7, -0.4, 0.5];
+const MKT_LEAD = Array.from({ length: 20 }, (_, i) => 82 + i * 0.9 + wiggle[i % 4]);
+const MKT_UP = Array.from({ length: 22 }, (_, i) => 100 + i * 0.9 + wiggle[i % 4]);
+const MKT_DOWN = [
+  ...Array.from({ length: 9 }, (_, i) => 100 + i * 0.9 + wiggle[i % 4]),
+  ...Array.from({ length: 13 }, (_, i) => 107.5 - i * 1.05 + wiggle[i % 4]),
+];
+
+export function MarketRule() {
+  const panels = [
+    { title: `${CONFIG.SMA_FAST}-day above ${CONFIG.SMA_SLOW}-day`, status: "breakouts work", tone: UP, closes: MKT_UP, frame: TWO_UP[0] },
+    { title: `${CONFIG.SMA_FAST}-day under ${CONFIG.SMA_SLOW}-day`, status: "step aside", tone: DOWN, closes: MKT_DOWN, frame: TWO_UP[1] },
+  ];
+  return (
+    <Figure
+      label="Two made-up index charts: one rising with its fast average above its slow average, one rolling over with the fast average crossing under"
+      legend={[
+        { color: MA_FAST, text: `${CONFIG.SMA_FAST}-day average` },
+        { color: MA_SLOW, text: `${CONFIG.SMA_SLOW}-day average` },
+      ]}
+      caption={
+        <>
+          His first rule on a made-up index. While the {CONFIG.SMA_FAST}-day average is above the {CONFIG.SMA_SLOW}-day, breakouts work.
+          Once it crosses under, they fail until it crosses back. Bullish on the strip asks for more than the cross: price above the
+          20- and 50-day, and all three averages rising, on both indexes.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 122`} className="block w-full">
+        {panels.map((p) => {
+          const bars = barsFromCloses(p.closes);
+          // The slow average lags under the candles: give it room so it does not run into the status line.
+          const slow = rollingMean([...MKT_LEAD, ...p.closes], CONFIG.SMA_SLOW).slice(MKT_LEAD.length).filter((m): m is number => m !== null);
+          const y = priceScale(bars, p.frame, slow);
+          const mid = (p.frame.left + p.frame.right) / 2;
+          return (
+            <g key={p.title}>
+              <T x={mid} y={12} fill={MARK} anchor="middle">{p.title}</T>
+              <Candles bars={bars} frame={p.frame} y={y} />
+              <MaLine closes={p.closes} lead={MKT_LEAD} period={CONFIG.SMA_SLOW} color={MA_SLOW} frame={p.frame} y={y} />
+              <MaLine closes={p.closes} lead={MKT_LEAD} period={CONFIG.SMA_FAST} color={MA_FAST} frame={p.frame} y={y} />
+              <T x={mid} y={118} fill={p.tone} anchor="middle">{p.status}</T>
+            </g>
+          );
+        })}
+        <Divider x={170} h={116} />
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- the shadow rule ---------- */
+
+const SHADOW_KEEP = barsFromCloses([30, 31.5, 33, 34.6, 36.2, 37.6, 38.4, 37.6, 37.1, 37.7, 38, 37.4, 37.8, 38.1, 37.7, 38.2, 39.9], { 6: { h: 39 } });
+const SHADOW_KEEP_TOP = 6;
+const SHADOW_DROP = barsFromCloses([34, 36, 38, 40.2, 41.5, 40, 38.2, 36.8, 36, 37, 37.9, 37.3, 36.9, 37.4, 37.7, 37.2, 37.6, 39.5], { 4: { h: 42.2 }, 10: { h: 38.4 } });
+const SHADOW_DROP_HIGH = 4;
+const SHADOW_DROP_TOP = 10;
+
+export function ShadowRule({ window }: { window: number }) {
+  const frames = TWO_UP.map((f) => ({ ...f, top: 40, bottom: 116 }));
+  const y = priceScale([...SHADOW_KEEP, ...SHADOW_DROP], frames[0]);
+  const panels = [
+    { title: "Clears the whole range", status: "shadow keeps", tone: UP, bars: SHADOW_KEEP, frame: frames[0], top: SHADOW_KEEP_TOP, high: -1 },
+    { title: "Breaks a lower high", status: "shadow drops", tone: DOWN, bars: SHADOW_DROP, frame: frames[1], top: SHADOW_DROP_TOP, high: SHADOW_DROP_HIGH },
+  ];
+  return (
+    <Figure
+      label="Two made-up breakouts: one where the box top is the highest high on the chart, one where an older, higher high sits above the box"
+      caption={
+        <>
+          Both close above the trigger, so the live rule arms both. On the left the box top is also the highest high of the last {window}{" "}
+          sessions, so the close clears everything. On the right an older high sits above the box: the close breaks a lower high and is
+          still under the range&apos;s top. The shadow rule keeps the first and drops the second.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 134`} className="block w-full">
+        {panels.map((p) => {
+          const n = p.bars.length;
+          const mid = (p.frame.left + p.frame.right) / 2;
+          const top = p.bars[p.top][1];
+          return (
+            <g key={p.title}>
+              <T x={mid} y={12} fill={MARK} anchor="middle">{p.title}</T>
+              {p.high >= 0 && (
+                <>
+                  <line x1={candleX(p.high, n, p.frame)} x2={p.frame.right} y1={y(p.bars[p.high][1])} y2={y(p.bars[p.high][1])} stroke={INK} strokeWidth="1.25" strokeDasharray="1.5 3" />
+                  <T x={p.frame.right} y={y(p.bars[p.high][1]) - 5} anchor="end">{window}-session high</T>
+                </>
+              )}
+              <line x1={candleX(p.top, n, p.frame)} x2={p.frame.right} y1={y(top)} y2={y(top)} stroke={AMBER} strokeWidth="1.5" />
+              <Candles bars={p.bars} frame={p.frame} y={y} />
+              <T x={mid} y={130} fill={p.tone} anchor="middle">{p.status}</T>
+            </g>
+          );
+        })}
+        <Divider x={170} h={128} />
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- how fills work ---------- */
+
+const FILL_SLOTS = 6;
+const FILL_PANELS = [
+  { title: "High reaches it", status: "fills at the trigger", level: 39, stop: false, at: 3, bars: barsFromCloses([38, 38.4, 38.1, 39.7, 40.1]), price: (b: FigBar) => Math.min(39, b[1]) },
+  { title: "Opens above it", status: "fills at the open", level: 39, stop: false, at: 3, bars: barsFromCloses([38, 38.4, 38.1, 40.5, 40.9], { 3: { o: 39.9 } }), price: (b: FigBar) => b[0] },
+  { title: "Low hits the stop", status: "sells at the stop", level: 37.5, stop: true, at: 3, bars: barsFromCloses([39.2, 39.6, 38.9, 37, 36.7]), price: () => 37.5 },
+];
+
+export function Fills() {
+  return (
+    <Figure
+      label="Three made-up fills: a bar whose high reaches the trigger, a bar that opens above the trigger, and a bar whose low hits the stop"
+      caption={
+        <>
+          Where the book books a price (the dot). A buy-stop fills at the trigger on the first bar whose high reaches it, or at the open
+          when the stock gapped past it. A stop sells at the stop when a low touches it, or at the open when the stock gapped under.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 136`} className="block w-full">
+        {FILL_PANELS.map((p, k) => {
+          const frame = threeUp(k);
+          const y = priceScale(p.bars, frame, [p.level]);
+          const mid = (frame.left + frame.right) / 2;
+          return (
+            <g key={p.title}>
+              <T x={mid} y={12} fill={MARK} anchor="middle">{p.title}</T>
+              <line x1={frame.left} x2={frame.right} y1={y(p.level)} y2={y(p.level)} stroke={p.stop ? DOWN : AMBER} strokeWidth="1.5" strokeDasharray={p.stop ? "3 2" : undefined} />
+              <Candles bars={p.bars} frame={frame} y={y} slots={FILL_SLOTS} />
+              <circle cx={candleX(p.at, FILL_SLOTS, frame)} cy={y(p.price(p.bars[p.at]))} r="3.5" fill={MARK} stroke="#171717" strokeWidth="1" />
+              <T x={mid} y={130} fill={INK} anchor="middle">{p.status}</T>
+            </g>
+          );
+        })}
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- size by the tape ---------- */
+
+export function TapeSize() {
+  const { NOTIONAL, TAPE } = CONFIG.PAPER;
+  const rows = [
+    { label: `Index Bullish and breadth over ${TAPE.BREADTH_MIN * 100}%`, mult: 1, name: "full" },
+    { label: "One of the two", mult: TAPE.ONE_SIGNAL, name: "half" },
+    { label: "Neither", mult: TAPE.NO_SIGNAL, name: "quarter" },
+  ];
+  return (
+    <figure className="my-3 max-w-md rounded-xl bg-neutral-900 p-3">
+      <div className="space-y-2">
+        {rows.map((r) => (
+          <div key={r.name}>
+            <div className="flex items-baseline justify-between gap-3 text-[11px]">
+              <span className="text-neutral-300">{r.label}</span>
+              <span className="font-mono text-neutral-100">${NOTIONAL * r.mult} · {r.name}</span>
+            </div>
+            <div className="mt-1 h-2 rounded bg-neutral-800">
+              <div className="h-2 rounded bg-emerald-500" style={{ width: `${r.mult * 100}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <figcaption className="mt-2 text-[11px] leading-relaxed text-neutral-500">The dollars a paper position gets at the fill, by how many of the two market signals are on.</figcaption>
+    </figure>
+  );
+}
+
+/* ---------- R, MFE and MAE on one trade ---------- */
+
+const R_ENTRY = 40;
+const R_STOP = 38.4;
+const R_BARS = barsFromCloses([40.4, 39.6, 39.5, 40.6, 41.3, 42.4, 43.2, 43.9, 43.1, 42.6, 42.3], { 0: { o: R_ENTRY }, 2: { l: 39.1 }, 7: { h: 44.5 }, 10: { o: 42.5 } });
+const R_MAE = 2;
+const R_MFE = 7;
+const R_EXIT = 10;
+
+export function RTrade() {
+  const frame: Frame = { left: 4, right: 276, top: 14, bottom: 150 };
+  const risk = R_ENTRY - R_STOP;
+  const y = priceScale(R_BARS, frame, [R_STOP - 0.2, R_ENTRY + 3 * risk]);
+  const x = (i: number) => candleX(i, R_BARS.length, frame);
+  const inR = (p: number) => (p - R_ENTRY) / risk;
+  const signed = (r: number) => `${r >= 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}R`;
+  const exit = R_BARS[R_EXIT][0];
+  return (
+    <Figure
+      label="One made-up trade measured in R: the entry, the stop one R under it, lines at one, two and three R above, the lowest low and highest high while it was open, and the exit"
+      caption={
+        <>
+          One trade in R. The distance from the entry to the first stop is the risk, one R; every other price is counted in that unit. MAE is
+          the lowest low while the trade was open ({signed(inR(R_BARS[R_MAE][2]))} here, short of the stop), MFE the highest high (
+          {signed(inR(R_BARS[R_MFE][1]))}, what was on offer), and the exit is what the rule kept ({signed(inR(exit))}).
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 160`} className="block w-full">
+        {[1, 2, 3].map((r) => (
+          <g key={r}>
+            <line x1={frame.left} x2={frame.right} y1={y(R_ENTRY + r * risk)} y2={y(R_ENTRY + r * risk)} stroke="#333" strokeWidth="1" strokeDasharray="2 3" />
+            <T x={frame.right + 5} y={y(R_ENTRY + r * risk) + 3.5} fill={DIM}>+{r}R</T>
+          </g>
+        ))}
+        <line x1={frame.left} x2={frame.right} y1={y(R_ENTRY)} y2={y(R_ENTRY)} stroke={MARK} strokeWidth="1.25" />
+        <line x1={frame.left} x2={frame.right} y1={y(R_STOP)} y2={y(R_STOP)} stroke={DOWN} strokeWidth="1.25" strokeDasharray="3 2" />
+        <T x={frame.right + 5} y={y(R_ENTRY) + 3.5} fill={MARK}>entry</T>
+        <T x={frame.right + 5} y={y(R_STOP) + 3.5} fill={DOWN}>stop −1R</T>
+        <Candles bars={R_BARS} frame={frame} y={y} />
+        <T x={x(R_MAE)} y={y(R_BARS[R_MAE][2]) + 12} anchor="middle">MAE</T>
+        <T x={x(R_MFE)} y={y(R_BARS[R_MFE][1]) - 5} anchor="middle">MFE</T>
+        <circle cx={x(R_EXIT)} cy={y(exit)} r="3.5" fill={MARK} stroke="#171717" strokeWidth="1" />
+        <T x={x(R_EXIT) - 7} y={y(exit) + 14} fill={MARK} anchor="middle">exit</T>
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- the bar under a number ---------- */
+
+export function RangeBars() {
+  const groups = [
+    { title: "Not yet a finding", note: "the ranges overlap", tone: DIM, left: 8, a: [18, 78, 46], b: [58, 128, 94] },
+    { title: "A finding", note: "the ranges are apart", tone: UP, left: 182, a: [10, 56, 32], b: [88, 140, 114] },
+  ];
+  return (
+    <Figure
+      label="Two pairs of range bars: in the first pair the two ranges overlap, in the second they do not"
+      caption={
+        <>
+          The thin bar under a number is where the true value probably sits (95%); the dot is the number itself. Two numbers differ only when
+          their bars do not overlap, however far apart the dots are.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 74`} className="block w-full">
+        {groups.map((g) => (
+          <g key={g.title}>
+            <T x={g.left + 75} y={12} fill={MARK} anchor="middle">{g.title}</T>
+            {[g.a, g.b].map(([lo, hi, at], i) => (
+              <g key={i}>
+                <line x1={g.left} x2={g.left + 150} y1={28 + i * 16} y2={28 + i * 16} stroke="#262626" strokeWidth="3" strokeLinecap="round" />
+                <line x1={g.left + lo} x2={g.left + hi} y1={28 + i * 16} y2={28 + i * 16} stroke={i === 0 ? MA_FAST : AMBER} strokeWidth="3" strokeLinecap="round" />
+                <circle cx={g.left + at} cy={28 + i * 16} r="3.5" fill={MARK} />
+              </g>
+            ))}
+            <T x={g.left + 75} y={68} fill={g.tone} anchor="middle">{g.note}</T>
+          </g>
+        ))}
+        <Divider x={170} h={70} />
+      </svg>
+    </Figure>
+  );
+}
+
+/* ---------- the drill's three outcomes ---------- */
+
+const DRILL_LEVEL = 39;
+const DRILL_PRE = [37.2, 37.8, 37.4, 38, 37.6, 38.1];
+const DRILL_PANELS = [
+  { title: "Ran", status: "", tone: UP, after: [38.6, 39.8, 41, 42.4, 43.6, 44.8, 45.5, 46.2] },
+  { title: "Fizzled", status: "broke, then faded", tone: AMBER, after: [38.7, 39.6, 40.2, 39.5, 38.8, 38.2, 37.6, 37.9] },
+  { title: "Never filled", status: "never closed above", tone: INK, after: [37.7, 38.2, 37.5, 37.9, 37.3, 37.8, 37.2, 37.5] },
+];
+
+export function DrillOutcomes() {
+  const sets = DRILL_PANELS.map((p) => barsFromCloses([...DRILL_PRE, ...p.after]));
+  const span = { top: 24, bottom: 112 };
+  const y = priceScale(sets.flat(), span);
+  const n = DRILL_PRE.length + DRILL_PANELS[0].after.length;
+  const scanClose = DRILL_PRE[DRILL_PRE.length - 1];
+  const best = Math.max(...DRILL_PANELS[0].after);
+  const ranNote = `best close +${Math.round((best / scanClose - 1) * 100)}%`;
+  return (
+    <Figure
+      label="Three made-up drill charts with the right side uncovered: one that ran, one that closed above its level and faded, one that never closed above it"
+      caption={
+        <>
+          The three answers a drill chart can have. The lighter half is what was covered when you made the call. Ran: a best close{" "}
+          {CONFIG.DRILL.RAN_MFE * 100}% or more over the scan-night close within twenty sessions. Never filled: no close above the level in
+          ten sessions. Anything else fizzled.
+        </>
+      }
+    >
+      <svg viewBox={`0 0 ${W} 136`} className="block w-full">
+        {DRILL_PANELS.map((p, k) => {
+          const frame = threeUp(k);
+          const mid = (frame.left + frame.right) / 2;
+          const cut = frame.left + DRILL_PRE.length * slotWidth(n, frame);
+          return (
+            <g key={p.title}>
+              <T x={mid} y={12} fill={p.tone} anchor="middle">{p.title}</T>
+              <rect x={cut} y={span.top - 4} width={frame.right - cut} height={span.bottom - span.top + 8} fill="#ffffff" opacity="0.05" />
+              <line x1={frame.left} x2={frame.right} y1={y(DRILL_LEVEL)} y2={y(DRILL_LEVEL)} stroke={AMBER} strokeWidth="1.25" />
+              <Candles bars={sets[k]} frame={frame} y={y} />
+              <T x={mid} y={130} fill={DIM} anchor="middle">{k === 0 ? ranNote : p.status}</T>
+            </g>
+          );
+        })}
+      </svg>
+    </Figure>
+  );
+}

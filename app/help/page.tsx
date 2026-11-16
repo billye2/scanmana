@@ -2,7 +2,8 @@ import { BriefcaseIcon, ListIcon, SearchIcon } from "@/components/Icons";
 import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
 import IndexCharts from "@/components/IndexCharts";
-import { ChartAnatomy, NoBox, Playbook, WhatArms } from "@/components/HelpFigures";
+import { ChartAnatomy, DrillOutcomes, EpGap, Fills, MarketRule, NoBox, Playbook, RTrade, RangeBars, ShadowRule, TapeSize, Tightness, WhatArms } from "@/components/HelpFigures";
+import { SHADOW_WINDOW } from "@/lib/shadow-read";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import RunScanButton from "@/components/RunScanButton";
@@ -105,12 +106,14 @@ export default async function Help() {
         days of trading fit inside three ordinary days&apos; worth of movement. The deck is sorted by this — card 1
         is the tightest. Tight ranges after a big run mean sellers are exhausted and holders are sitting still; the
         breakout out of that range is the trade.
+        <Tightness />
       </Term>
       <Term name="EP — episodic pivot" who="Kullamägi">
         A gap up of at least {CONFIG.EP.MIN_GAP * 100}% on {CONFIG.EP.VOL_MULT}× normal volume within the last{" "}
         {CONFIG.EP.LOOKBACK} sessions — usually earnings or news that changes the story. These are bought on the gap
         day itself (the opening range), not after a consolidation, so an EP badge means &ldquo;something just
         happened here&rdquo; rather than &ldquo;wait for the box&rdquo;.
+        <EpGap />
       </Term>
       <Term name="Hard filters you don't see">
         Price ≥ ${CONFIG.MIN_PRICE} on every close of the last {CONFIG.MIN_PRICE_WINDOW} sessions, ≥ $
@@ -184,6 +187,7 @@ export default async function Help() {
           <span className="text-red-300">Not bullish</span> — any condition fails; the strip names it. Breakouts
           fail far more often here, so size down or wait for the indexes to reclaim their averages.
         </span>
+        <MarketRule />
         {market && (
           <span className="mt-2 block">
             Latest scan: <span className={market.verdict === "bullish" ? "text-emerald-300" : "text-red-300"}>
@@ -282,8 +286,7 @@ export default async function Help() {
         highest high of the fifty sessions before it — and the card shows the ledger&apos;s trades three ways: every armed trade, the ones
         the shadow rule keeps, and the ones it drops. Kept and dropped never share a trade, so the two can be compared. Each trade counts
         once, on the scan night right before its breakout day.
-        <br />
-        <br />
+        <ShadowRule window={SHADOW_WINDOW} />
         It came out of a check on 2026-11-15 of whether the arming rule was missing trades. It was not: cards with no box, bought over their
         20-session high, made nothing on 661 trades (−0.01R a trade), and dropping the box for every card made +0.05R a trade on 517.
         What the check did find is that 43 of the ledger&apos;s 118 trades on history broke a lower high and averaged −0.27R, while the other 75
@@ -308,6 +311,7 @@ export default async function Help() {
         reads. A rule-change row turns green or red only once its before and after ranges are apart; amber means they still overlap, and
         this week&apos;s read says so instead of giving a verdict. The ranges are closed-form, not bootstrapped: at thirty rows and up the
         two agree, and the Python budget is kept for the studies that need it.
+        <RangeBars />
       </Term>
       <Term name="Rule changes">
         One row per shipped change, scored on the number it was meant to move — all labelled history before it against
@@ -464,6 +468,7 @@ export default async function Help() {
         unknowable, so the book assumes the worse one. Rule sells (the Auto book&apos;s half-off and 10-day exit) and queued manual
         sells fill at the next open. $500 per position at full size, in whole shares, so a name that costs more than the notional per share is skipped and listed under Skipped.
         No commissions, no slippage, dividends and splits ignored; a 40%+ overnight gap is flagged &ldquo;check for a split&rdquo;.
+        <Fills />
       </Term>
 
       <Term name="Size by the tape">
@@ -473,6 +478,7 @@ export default async function Help() {
         setups averaged +0.11R when the index was Bullish and −0.11R when it was not — no setup rule beat a bad tape. Breadth is read
         from the previous session, since it is computed after the book runs. A signal that is unknown is left out, not counted against
         the trade.
+        <TapeSize />
       </Term>
 
       <Term name="Auto book tonight">
@@ -565,6 +571,7 @@ export default async function Help() {
         <span className="text-neutral-100">By tape at entry</span>, splits the closed trades by whether the index filter read Bullish
         on the day they were entered — Kullamägi&apos;s own first rule, and on the scanner&apos;s history the difference between +0.11R
         and −0.11R a trade — so a run of losses in a weak tape reads as the tape, not the scanner.
+        <RTrade />
       </Term>
 
       <Term name="MFE · MAE">
@@ -638,6 +645,7 @@ export default async function Help() {
         you called in your last thirty calls sits out so a second look is never from memory. &ldquo;Start over&rdquo; at the bottom forgets
         every call.
       </p>
+      <DrillOutcomes />
       <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
         <span className="font-semibold text-neutral-100">The stop question (1.9.2).</span> A Take on a boxed card resting at or under its
         box top asks one more thing before the chart is uncovered: where does the stop go. The trade is the Auto ledger&apos;s, the open

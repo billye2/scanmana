@@ -145,6 +145,10 @@ with headers and footers off. A process to follow, not financial advice.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.
+  Since 1.9.6 thirteen drawn diagrams sit between the paragraphs
+  (`components/HelpFigures.tsx`: server-rendered SVG on made-up candles, the
+  real chart's colours, numbers from `CONFIG`) — the chart lines, what arms,
+  the Auto ledger's routine, the shadow rule, fills, R and the rest.
 - **Analysis (Wait / Pass)** button under each symbol — the label is the
   overall verdict, stamped on the candidate at scan time — opens a rule-based read of the card
   through Kullamägi's breakout rules, Livermore's pivotal point, the Darvas

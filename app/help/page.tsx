@@ -2,6 +2,7 @@ import { BriefcaseIcon, ListIcon, SearchIcon } from "@/components/Icons";
 import { SignOutButton } from "@clerk/nextjs";
 import { APP_VERSION } from "@/lib/version";
 import IndexCharts from "@/components/IndexCharts";
+import { ChartAnatomy, NoBox, Playbook, WhatArms } from "@/components/HelpFigures";
 import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import RunScanButton from "@/components/RunScanButton";
@@ -125,6 +126,7 @@ export default async function Help() {
       </Term>
 
       <H>The chart lines</H>
+      <ChartAnatomy />
       <Term name="Trigger (solid amber)" who="Nicolas Darvas, 1960">
         The top of the <span className="text-neutral-100">Darvas box</span>. Darvas was a touring dancer who made
         $2M in the late 1950s trading by telegram; his book <em>How I Made $2,000,000 in the Stock Market</em>{" "}
@@ -157,6 +159,7 @@ export default async function Help() {
       <Term name="&ldquo;no box&rdquo;">
         The stock is making fresh highs (nothing above it to break) or its range is too tall. It passed the momentum
         screen but there is no clean level to trade — watch it, don&apos;t chase it.
+        <NoBox />
       </Term>
       <Term name="30d / All">
         The pill in the chart&apos;s top-left corner zooms to the last 30 sessions — six trading weeks, enough to see
@@ -450,6 +453,7 @@ export default async function Help() {
         entry then. One more condition is scored on Studies without being applied (the <Link href="#shadow" className="underline decoration-neutral-700 underline-offset-4">shadow rule</Link>): that the
         close also clears the 50-session high. Orders follow the deck: a card that drops out or closes under its box is cancelled. The book you see is always{" "}
         <em>as of the last processed session</em>; nothing changes during the day.
+        <WhatArms />
       </Term>
 
       <Term name="How fills work">
@@ -516,6 +520,7 @@ export default async function Help() {
         playbook to measure — the Auto book exists to show what these rules do on these picks, not to be tuned. Positions opened before
         the change keep the old trail until they close. MFE / MAE on each trade (defined below) show the best and worst price seen while
         it was open, so you can tell what was available versus what the rule captured.
+        <Playbook />
       </Term>
 
       <Term name="Manual ledger">

@@ -39,6 +39,11 @@ describe("shadowRead", () => {
     expect(r.sentence).toContain("kept +1.20R on 40, dropped −0.90R on 12");
   });
 
+  it("says so in words while the test block is empty or one-sided", () => {
+    expect(shadowRead(study({ kept: EMPTY_SHADOW_GROUP, dropped: EMPTY_SHADOW_GROUP })).sentence).toContain("Since 2026-10-16: no new trades yet.");
+    expect(shadowRead(study({ kept: g(2, 0.5), dropped: EMPTY_SHADOW_GROUP })).sentence).toContain("kept +0.50R on 2, dropped no trades yet.");
+  });
+
   it("calls overlapping ranges no finding", () => {
     const r = shadowRead(study({ kept: g(35, 0.3), dropped: g(32, 0.1) }));
     expect(r.state).toBe("overlap");

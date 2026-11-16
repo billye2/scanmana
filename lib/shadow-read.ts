@@ -68,7 +68,7 @@ export function shadowLive(p: ShadowPeriod): ShadowGroup {
 export const shadowInterval = (g: ShadowGroup): Interval | null => meanInterval(g.avgR, g.sdR, g.n);
 
 const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}R`);
-const part = (g: ShadowGroup) => `${rr(g.avgR)} on ${g.n.toLocaleString()}`;
+const part = (g: ShadowGroup) => (g.n === 0 ? "no trades yet" : `${rr(g.avgR)} on ${g.n.toLocaleString()}`);
 
 export interface ShadowRead {
   /**
@@ -91,7 +91,7 @@ export function shadowRead(s: ShadowStudy, minN = 30): ShadowRead {
     return { state: "empty", gateMet: false, sentence: "No trades carry the flag yet. The outcomes job fills it on its next run." };
   }
   const history = found.kept.n + found.dropped.n === 0 ? "" : `On the history it was found on, the trades it keeps made ${part(found.kept)} and the ones it drops ${part(found.dropped)}. That split was found by looking, so it is not a test. `;
-  const fresh = `Since ${SHADOW_FOUND_THROUGH}: kept ${part(since.kept)}, dropped ${part(since.dropped)}`;
+  const fresh = since.kept.n + since.dropped.n === 0 ? `Since ${SHADOW_FOUND_THROUGH}: no new trades yet` : `Since ${SHADOW_FOUND_THROUGH}: kept ${part(since.kept)}, dropped ${part(since.dropped)}`;
   if (since.kept.n < minN || since.dropped.n < minN) {
     return { state: "waiting", gateMet: false, sentence: `${history}${fresh}. It reads at ${minN} new trades on each side; until then the live rule stays as it is.` };
   }

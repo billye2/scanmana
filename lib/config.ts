@@ -98,6 +98,18 @@ export const CONFIG = {
     MIN_BOUNCE: 0.02, // a bounce smaller than this off the low is not reported
     VOL_GAP: 0.2, // up-leg vs down-leg volume gap that earns "heavier on the way…"
     LEAD_GAP: 0.01, // gap in distance to the 50-day before one index is called weaker
+    // Dead zone (1.9.9): a side or a slope changes only once it is this far past
+    // the line, so a close wobbling around an average does not rename the trend.
+    AT_PCT: 0.005, // close within 0.5% of an average reads "at" and keeps its side
+    FLAT_SLOPE: 0.001, // an average that moved under 0.1% in SLOPE_LOOKBACK reads "flat"
+    CROSS_PCT: 0.001, // the 10-day must clear the 20-day by this to count as crossed
+    LATCH_LOOKBACK: 60, // sessions walked to find the side a zone reading came from
+    // Range state (1.9.9): the 20- and 50-day flat and close together.
+    RANGE_GAP: 0.01, // 20-day within 1% of the 50-day
+    RANGE_SLOPE: 0.004, // neither moved more than 0.4% in SLOPE_LOOKBACK
+    RANGE_REACH: 0.02, // and the close is within 2% of the 20-day
+    RANGE_EXIT: 2, // a range ends once one of those limits is doubled, or on a close past its high or low
+    RANGE_LOOKBACK: 20, // the sessions whose high and low name the range
   },
 
   // Per-candidate analysis (lib/analysis.ts) — what each framework considers disqualifying

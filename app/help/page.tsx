@@ -210,7 +210,10 @@ export default async function Help() {
         earlier, how much of the window was Bullish and the size the paper book takes tonight; since 1.9.8 a second card, <em>The trend,
         read</em>, that puts SPY and QQQ against their 10-, 20- and 50-day averages in words (the state of each, how far from each average,
         their order and slope, what the last bounce did, the low or high being tested and the next thing a repair needs), written by fixed
-        rules from the stored daily bars so the same tape always reads the same way; the three breadth lines (above the 20-day,
+        rules from the stored daily bars so the same tape always reads the same way. A close within 0.5% of an average reads &ldquo;at&rdquo;
+        it and keeps the side it came from, an average that has moved less than 0.1% in five sessions reads &ldquo;flat&rdquo;, and when the
+        20- and 50-day are flat and within 1% of each other the card calls a range and names its high and low, which lasts until a close
+        beyond either. Then the three breadth lines (above the 20-day,
         above the 50-day, 10-day over 20-day) on green bands where the verdict was Bullish, with the 50% line the sizing rule reads; new
         highs against new lows per session; the sizing table (full · half · quarter) with tonight&apos;s row lit; and what the deck did under
         each verdict — breakout rate and the Auto plan&apos;s average R by the index call on scan night, and the breakout rate by breadth.
@@ -599,7 +602,8 @@ export default async function Help() {
       <p className="mb-4 text-[13px] leading-relaxed text-neutral-300">
         The icons beside the logo are yours to choose. The gear at the right end opens{" "}
         <Link href="/sections" className="font-semibold text-neutral-100 underline decoration-neutral-700 underline-offset-4">/sections</Link>: every
-        section of the app, ranked by how often Kullamägi&apos;s routine has you open it — the deck list grouped by the open each evening, the paper
+        section of the app, ranked by how often Kullamägi&apos;s routine has you open it — the tape first, since 1.9.9, because the index is read before
+        anything else each day, then the deck list grouped by the open each evening, the paper
         book each morning, the best setups and the research page each week, then the watchlist, the stop simulator, the lookup and this page.
         Tick up to six and the bar carries them in that order, first thing needed first; once six are ticked the rest grey out until one is
         unticked. Each row also opens its section, so whatever you leave off the bar stays two taps away. The choice is kept on this device

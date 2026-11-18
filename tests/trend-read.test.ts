@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { indexLines, nextLine, readIndexTrend, trendRead, trendState } from "../lib/trend-read";
+import { indexLines, latch, nextLine, readIndexTrend, trendRead, trendState } from "../lib/trend-read";
 import type { Bar } from "../lib/types";
 
 /** Bars from closes: open = prior close, a 1% range around the body unless given. Weekday-free dates from 2026-01-01. */
@@ -43,7 +43,7 @@ describe("readIndexTrend", () => {
     expect(lines[0]).toContain("above all three averages");
     expect(lines[1]).toBe("The averages are stacked 10 over 20 over 50, all three rising.");
     expect(lines[2]).toContain("At its high of the stored history");
-    expect(nextLine([t])).toBe("Every check passes on both. The first warning would be a close under the 20-day.");
+    expect(nextLine([t])).toBe("Every check passes on SPY. The first warning would be a close under the 20-day.");
   });
 
   it("reads a steady slide as a downtrend closing under the prior low", () => {
@@ -84,6 +84,64 @@ describe("readIndexTrend", () => {
     expect(t.state).toBe("bounce");
     expect(t.bounce!.running).toBe(true);
     expect(indexLines(t).find((l) => l.startsWith("Up "))).toMatch(/^Up \d\.\d% from the .* low, at its best close since\.$/);
+  });
+});
+
+describe("latch — a side with a dead zone (1.9.9)", () => {
+  const side = (xs: number[], band: number) => latch(0, xs.length - 1, (i) => xs[i], band);
+  it("takes the first value's sign and holds it while later values stay inside the zone", () => {
+    expect(side([0.02, 0.003, -0.003, 0.001, -0.004], 0.005)).toBe(true);
+    expect(side([-0.02, 0.003, -0.003, 0.004], 0.005)).toBe(false);
+  });
+  it("changes side only once a value is past the zone", () => {
+    expect(side([0.02, -0.004, -0.006], 0.005)).toBe(false);
+    expect(side([-0.02, 0.004, 0.006, -0.002], 0.005)).toBe(true);
+  });
+  it("with no zone it is the sign of the last value", () => {
+    expect(side([0.02, -0.001], 0)).toBe(false);
+    expect(side([-0.02, 0.001], 0)).toBe(true);
+  });
+  it("skips bars with no reading", () => {
+    expect(latch(0, 2, (i) => [null, 0.01, null][i], 0.005)).toBe(true);
+  });
+});
+
+describe("dead zone and range (1.9.9)", () => {
+  it("keeps the uptrend and says 'at' when a close dips a few tenths under the 20-day", () => {
+    const closes = ramp(120, 100, 130);
+    // the 20-day sits about 2.4 under the last close: put the close 0.2% under it
+    const base = readIndexTrend("SPY", series(closes))!;
+    const dipped = [...closes.slice(0, -1), base.avgs[1].value * 0.998];
+    const t = readIndexTrend("SPY", series(dipped))!;
+    expect(t.avgs[1].dist).toBeLessThan(0);
+    expect(t.avgs[1].at).toBe(true);
+    expect(t.avgs[1].above).toBe(true);
+    expect(t.state).toBe("uptrend");
+    expect(indexLines(t)[0]).toMatch(/sitting on its 20-day: .* at the 20-day \(\d+\.\d\d, 0\.\d% under\)/);
+  });
+
+  it("calls flat, tangled averages a range and names its high and low", () => {
+    // a climb, then sixty sessions oscillating 1% around 130
+    const closes = [...ramp(80, 100, 130), ...Array.from({ length: 60 }, (_, i) => 130 * (1 + 0.01 * Math.sin(i / 2)))];
+    const t = readIndexTrend("SPY", series(closes))!;
+    expect(t.state).toBe("range");
+    expect(t.range!.low).toBeLessThan(130);
+    expect(t.range!.high).toBeGreaterThan(130);
+    expect(t.avgs[2].flat).toBe(true);
+    expect(indexLines(t).find((l) => l.includes("so this is a range"))).toMatch(/held between \d+\.\d\d \(.*\) and \d+\.\d\d \(.*\)\.$/);
+    expect(nextLine([t])).toMatch(/^SPY is in a range until it closes above \d+\.\d\d or below \d+\.\d\d\.$/);
+    const r = trendRead(new Map([["SPY", series(closes)]]))!;
+    expect(r.headline).toBe("Range on SPY");
+    expect(r.tone).toBe("mixed");
+  });
+
+  it("ends the range on a close past its high", () => {
+    const flat = Array.from({ length: 60 }, (_, i) => 130 * (1 + 0.01 * Math.sin(i / 2)));
+    const closes = [...ramp(80, 100, 130), ...flat, 134];
+    const t = readIndexTrend("SPY", series(closes))!;
+    expect(t.state).not.toBe("range");
+    expect(t.range).toBeNull();
+    expect(t.highTest?.result).toBe("through");
   });
 });
 

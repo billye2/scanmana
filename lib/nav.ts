@@ -21,6 +21,14 @@ export interface NavSection {
 }
 
 export const NAV_SECTIONS: readonly NavSection[] = [
+  // First since 1.9.9 at Billy's request: the tape is read before the deck, every day.
+  {
+    key: "tape",
+    href: "/tape",
+    label: "Tape",
+    cadence: "every evening",
+    why: "His first rule: the index decides whether breakouts work at all. The trend of SPY and QQQ in words, the verdict and breadth over time, the streak, and the size the book takes from them.",
+  },
   {
     key: "deck",
     href: "/deck",
@@ -62,13 +70,6 @@ export const NAV_SECTIONS: readonly NavSection[] = [
     label: "Studies",
     cadence: "weekly",
     why: "The deeper reads behind the rules: the plan on every boxed Wait card, breakout rates, the EP study, the sweep, breadth, themes. A rule changes only when a study says so.",
-  },
-  {
-    key: "tape",
-    href: "/tape",
-    label: "Tape",
-    cadence: "every evening",
-    why: "His first rule: the index decides whether breakouts work at all. The verdict and breadth over time, the streak, and the size the book takes from them.",
   },
   {
     key: "watchlist",

@@ -143,9 +143,13 @@ with headers and footers off. A process to follow, not financial advice.
   row lit, and the deck's breakout rate and Auto-plan R under each verdict. A
   section you can put on the bar from the gear. Since 1.9.8 a second card,
   "The trend, read" (`lib/trend-read.ts`), puts SPY and QQQ against their
-  10/20/50-day averages in words: one of seven states per index, the distance
+  10/20/50-day averages in words: one of eight states per index, the distance
   to each average, their order and slope, the last bounce, the low or high
   being tested and the next thing a repair needs. Fixed rules, no model.
+  Since 1.9.9 a close within 0.5% of an average reads "at" and keeps the side
+  it came from, a slope under 0.1% reads "flat", and flat, tangled 20- and
+  50-day averages read as a range with its high and low named. Tape is the
+  first icon on the bar when it is ticked.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.

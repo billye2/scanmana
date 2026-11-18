@@ -43,6 +43,12 @@ describe("parseNav — the bar's picks from the cookie", () => {
     expect(parseNav([])).toEqual([]);
   });
 
+  it("draws the tape first when it is picked (1.9.9)", () => {
+    expect(NAV_SECTIONS[0].key).toBe("tape");
+    expect(parseNav("deck,paper,gallery,research,studies,tape")).toEqual(["tape", "deck", "paper", "gallery", "research", "studies"]);
+    expect(bottomBarLinks(parseNav("deck,paper,gallery,research,studies,tape")).map((s) => s.key)).toEqual(["tape", "deck", "paper", "gallery"]);
+  });
+
   it("round-trips through the cookie value", () => {
     expect(navCookieValue(["sim", "deck", "nope"])).toBe("deck,sim");
     expect(parseNav(navCookieValue(DEFAULT_NAV))).toEqual(DEFAULT_NAV);

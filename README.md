@@ -141,7 +141,11 @@ with headers and footers off. A process to follow, not financial advice.
   verdict has held, breadth against ten sessions ago, three breadth lines on
   Bullish bands, new highs against new lows, the sizing table with tonight's
   row lit, and the deck's breakout rate and Auto-plan R under each verdict. A
-  section you can put on the bar from the gear.
+  section you can put on the bar from the gear. Since 1.9.8 a second card,
+  "The trend, read" (`lib/trend-read.ts`), puts SPY and QQQ against their
+  10/20/50-day averages in words: one of seven states per index, the distance
+  to each average, their order and slope, the last bounce, the low or high
+  being tested and the next thing a repair needs. Fixed rules, no model.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.

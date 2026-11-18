@@ -7,9 +7,10 @@ import { BucketBars } from "@/components/ResearchCharts";
 import TopNav from "@/components/TopNav";
 import { CONFIG } from "@/lib/config";
 import { getBreadth, getTapeStudy, latestBreadth } from "@/lib/research";
-import { latestScanSlim } from "@/lib/scan";
+import { latestScanSlim, loadBars } from "@/lib/scan";
 import { latestTape, tapeMultiplier } from "@/lib/tape";
 import { tapeSentence, tapeWindow, verdictStreak } from "@/lib/tape-read";
+import { trendRead, type TrendTone } from "@/lib/trend-read";
 
 export const metadata = { title: "Tape — Scanmana" };
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ const H = ({ children, sub }: { children: React.ReactNode; sub?: React.ReactNode
 );
 const pc = (x: number | null) => (x === null ? "—" : `${Math.round(x * 100)}%`);
 const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}R`);
+const TREND_TONE: Record<TrendTone, string> = { up: "text-emerald-300", mixed: "text-amber-300", down: "text-red-300" };
 
 /**
  * /tape — whether to trade at all (1.7.0). Kullamägi's index filter and market
@@ -45,13 +47,15 @@ const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : "−"}$
 export default async function TapePage({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
   const sp = await searchParams;
   const win: Win = sp.d === "60" || sp.d === "250" ? sp.d : DEFAULT_WIN;
-  const [scan, breadthNow, { rows, buckets }, study, tape] = await Promise.all([
+  const [scan, breadthNow, { rows, buckets }, study, tape, indexBars] = await Promise.all([
     latestScanSlim().catch(() => null),
     latestBreadth().catch(() => null),
     getBreadth(Number(win)),
     getTapeStudy(),
     latestTape(),
+    loadBars([...CONFIG.MARKET.LEADERS]).catch(() => null),
   ]);
+  const trend = indexBars ? trendRead(indexBars) : null;
   const streak = verdictStreak(rows);
   const window = tapeWindow(rows);
   const sentence = tapeSentence(streak, window, tape);
@@ -71,6 +75,27 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
         <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">The tape, read</div>
         <p className="mt-0.5 text-xs leading-snug text-neutral-200">{sentence}</p>
       </Card>
+
+      {trend && (
+        <Card className="mt-2">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">
+            The trend, read <span className="font-normal normal-case tracking-normal text-neutral-500">· close of {trend.date}</span>
+          </div>
+          <p className={`mt-0.5 text-sm font-semibold leading-snug ${TREND_TONE[trend.tone]}`}>{trend.headline}</p>
+          {trend.indices.map((ix) => (
+            <div key={ix.ticker} className="mt-2">
+              <div className="text-[11px] font-semibold text-neutral-400">{ix.ticker}</div>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs leading-snug text-neutral-200 marker:text-neutral-600">
+                {ix.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <p className="mt-2 border-t border-neutral-800 pt-2 text-xs leading-snug text-neutral-300">{trend.next}</p>
+          <p className="mt-1 text-[11px] text-neutral-600">Written by fixed rules from the stored daily bars; the same tape always reads the same way.</p>
+        </Card>
+      )}
 
       <p className="mt-3 text-[13px] leading-relaxed text-neutral-300">
         His first rule is that the index decides whether breakouts work at all; breadth says how many names are taking part. The home

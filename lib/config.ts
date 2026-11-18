@@ -87,6 +87,19 @@ export const CONFIG = {
     SLOPE_LOOKBACK: 5,
   },
 
+  // The index trend in words on /tape (lib/trend-read.ts). Wording only: none
+  // of these touch the verdict above.
+  TREND: {
+    MIN_BARS: 80, // the 50-day at every bar of the level window
+    LEVEL_LOOKBACK: 20, // the prior low / high being tested, tonight excluded
+    NEAR_PCT: 0.01, // "within 1% of" that level
+    HIGH_LOOKBACK: 252, // "off the high"
+    VOL_WINDOW: 20, // volume against its prior 20-session average
+    MIN_BOUNCE: 0.02, // a bounce smaller than this off the low is not reported
+    VOL_GAP: 0.2, // up-leg vs down-leg volume gap that earns "heavier on the way…"
+    LEAD_GAP: 0.01, // gap in distance to the 50-day before one index is called weaker
+  },
+
   // Per-candidate analysis (lib/analysis.ts) — what each framework considers disqualifying
   ANALYSIS: {
     MAX_ADR_PCT: PARABOLIC.MAX_ADR_PCT,

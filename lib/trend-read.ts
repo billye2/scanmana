@@ -106,6 +106,13 @@ export interface IndexTrend {
   floors: Floor[];
 }
 
+/** A price the page names, for the index chart to draw (2.0.2). */
+export interface TrendLevel {
+  price: number;
+  label: string;
+  kind: "better" | "worse" | "test" | "range";
+}
+
 export interface Floor {
   price: number;
   what: string;
@@ -126,7 +133,7 @@ export interface TrendRead {
   tone: TrendTone;
   headline: string;
   /** `key` is what the card shows; `lines` is every fact, folded under it (2.0.1). */
-  indices: { ticker: string; state: TrendState; key: string[]; lines: string[] }[];
+  indices: { ticker: string; state: TrendState; key: string[]; lines: string[]; levels: TrendLevel[] }[];
   next: string;
   /** Per index: the next step of the repair and the close tomorrow that passes it (2.0.1). */
   better: string[];
@@ -557,6 +564,46 @@ export function betterLine(t: IndexTrend): string {
     : `${wait}. Within reach tomorrow: a close above ${px(t.needs[j])} (${away(t.needs[j], t.close)}) gives ${LADDER[j].say}.`;
 }
 
+/** The ladder step `betterLine` prices: the first open one a single close can reach. -1 when none. */
+function reachableStep(t: IndexTrend): number {
+  return LADDER.findIndex((step, k) => !step.ok(t) && t.needs[k] / t.close - 1 <= T.ONE_SESSION);
+}
+
+const STEP_SHORT = ["over 10d", "10d up", "over 20d", "10 over 20", "20d up", "over 50d", "50d up"];
+
+/**
+ * The prices the page names for one index, for its chart: the close that gets
+ * better, the supports that are not already a drawn average, a level under test
+ * and a range's two ends. Near-duplicates collapse to the first.
+ */
+export function chartLevels(t: IndexTrend): TrendLevel[] {
+  const out: TrendLevel[] = [];
+  const add = (x: TrendLevel) => {
+    if (!out.some((y) => Math.abs(y.price / x.price - 1) < 0.001)) out.push(x);
+  };
+  if (t.range) {
+    add({ price: t.range.high, label: "range high", kind: "range" });
+    add({ price: t.range.low, label: "range low", kind: "range" });
+  } else {
+    const i = reachableStep(t);
+    if (i >= 0) add({ price: t.needs[i], label: STEP_SHORT[i], kind: "better" });
+  }
+  const drawn = new Set(PERIODS.map((p) => `the ${p}-day`));
+  for (const f of t.floors) if (!drawn.has(f.what)) add({ price: f.price, label: f.what.replace(/^the /, ""), kind: "worse" });
+  if (t.lowTest) add({ price: t.lowTest.price, label: `${day(t.lowTest.date)} low`, kind: "test" });
+  if (t.highTest && t.high.dist < -0.005) add({ price: t.highTest.price, label: `${day(t.highTest.date)} high`, kind: "test" });
+  return out;
+}
+
+/** An average's slope in the card's words, with the card's dead zone. Null without enough bars. */
+export function slopeWord(bars: Bar[], period: number): "rising" | "flat" | "falling" | null {
+  const now = sma(bars, period);
+  const then = sma(bars, period, CONFIG.MARKET.SLOPE_LOOKBACK);
+  if (now === null || then === null || then <= 0) return null;
+  const change = now / then - 1;
+  return Math.abs(change) < T.FLAT_SLOPE ? "flat" : change > 0 ? "rising" : "falling";
+}
+
 /** The supports under one index, nearest first. */
 export function worseLine(t: IndexTrend): string {
   if (t.range) return `${t.ticker}: a close under ${px(t.range.low)} (${away(t.range.low, t.close)}) leaves the range downward.`;
@@ -590,7 +637,7 @@ export function trendRead(barsByTicker: Map<string, Bar[]>): TrendRead | null {
     date: ts.map((t) => t.date).sort().at(-1)!,
     tone: tones.includes("down") ? "down" : tones.every((x) => x === "up") ? "up" : "mixed",
     headline: headline(ts),
-    indices: ts.map((t) => ({ ticker: t.ticker, state: t.state, key: keyLines(t), lines: indexLines(t) })),
+    indices: ts.map((t) => ({ ticker: t.ticker, state: t.state, key: keyLines(t), lines: indexLines(t), levels: chartLevels(t) })),
     next: nextLine(ts),
     better: ts.map(betterLine),
     worse: ts.map(worseLine),

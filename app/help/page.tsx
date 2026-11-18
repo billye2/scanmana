@@ -198,7 +198,10 @@ export default async function Help() {
         )}
         <span className="mt-2 block">
           The charts below follow the day: during the session today&apos;s candle is a provisional bar from a live quote,
-          refreshed at most every 30 minutes when the page loads, and the chips over each chart are recomputed from it.
+          refreshed at most every 30 minutes when the page loads, and the chips over each chart are recomputed from it. Since 2.0.2 each
+          chip also says which way its average is going over five sessions (<span className="font-mono">·up</span>,{" "}
+          <span className="font-mono">·flat</span> under 0.1%, <span className="font-mono">·down</span>), the same words the Tape page&apos;s
+          trend card uses.
           The verdict above, the strip on the other pages, the scan and the paper book stay on the close.
         </span>
         <IndexCharts bars={indexBars} health={indexHealthRows} asOf={indexAsOf} provisional={indexProvisional} />
@@ -220,7 +223,10 @@ export default async function Help() {
         beyond either. Since 2.0.0 the headline changes only after two closes in a row agree (on the first night the card says what
         tonight&apos;s close reads by itself), a <em>Longer term</em> line places each index against its 200-day average, and the SPY and QQQ
         charts from this page sit under the card. The card shows only the lines that carry a decision (where the close sits, a level being
-        tested, the 200-day); every other fact and the seven-step repair order open under <em>All the facts</em>. Then the three breadth lines (above the 20-day,
+        tested, the 200-day); every other fact and the seven-step repair order open under <em>All the facts</em>. Since 2.0.2 the two charts open
+        on the last 30 sessions and carry the prices the box names as lines (green dashed the close that gets better, red dashed a support,
+        amber dotted a level under test, grey a range&apos;s ends), and the sizing table, the study and this explanation fold under{" "}
+        <em>How this is scored</em> at the foot of the page. Then the three breadth lines (above the 20-day,
         above the 50-day, 10-day over 20-day) on green bands where the verdict was Bullish, with the 50% line the sizing rule reads; new
         highs against new lows per session; the sizing table (full · half · quarter) with tonight&apos;s row lit; and what the deck did under
         each verdict — breakout rate and the Auto plan&apos;s average R by the index call on scan night, and the breakout rate by breadth.

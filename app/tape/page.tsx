@@ -15,7 +15,8 @@ import { briefText, morningBrief } from "@/lib/paper-engine";
 import { latestScanSlim } from "@/lib/scan";
 import { latestTape, tapeMultiplier } from "@/lib/tape";
 import { tapeStance, tapeWindow, verdictStreak } from "@/lib/tape-read";
-import { trendRead, type TrendTone } from "@/lib/trend-read";
+import type { ChartLine } from "@/components/Chart";
+import { trendRead, type TrendLevel, type TrendTone } from "@/lib/trend-read";
 
 export const metadata = { title: "Tape — Scanmana" };
 export const dynamic = "force-dynamic";
@@ -41,6 +42,12 @@ const H = ({ children, sub }: { children: React.ReactNode; sub?: React.ReactNode
 const pc = (x: number | null) => (x === null ? "—" : `${Math.round(x * 100)}%`);
 const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}R`);
 const TREND_TONE: Record<TrendTone, string> = { up: "text-emerald-300", mixed: "text-amber-300", down: "text-red-300" };
+const LEVEL_LINE: Record<TrendLevel["kind"], Pick<ChartLine, "color" | "style">> = {
+  better: { color: "#34d399", style: "dashed" },
+  worse: { color: "#f87171", style: "dashed" },
+  test: { color: "#fbbf24", style: "dotted" },
+  range: { color: "#a3a3a3", style: "dashed" },
+};
 const SIZE_TONE = { full: "text-emerald-300", half: "text-amber-300", quarter: "text-red-300" } as const;
 const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
   <div className="mt-2 border-t border-neutral-800 pt-2">
@@ -72,6 +79,10 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
   const streak = verdictStreak(rows);
   const window = tapeWindow(rows);
   const stance = tapeStance(streak, window, tape);
+  // The prices the box and the card name, as lines on that index's chart.
+  const levels: Record<string, ChartLine[]> = Object.fromEntries(
+    (trend?.indices ?? []).map((ix) => [ix.ticker, ix.levels.map((l) => ({ price: l.price, title: l.label, ...LEVEL_LINE[l.kind] }))]),
+  );
   // The reader's own book in one line, as the home page has it. Its own catch: the page renders without it.
   const { userId } = await auth();
   const book = userId
@@ -167,16 +178,20 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
 
       {live && live.bars.size > 0 && (
         <>
-          <H sub="The two index charts from Help, with the 10-, 20- and 50-day averages the read above is written from.">SPY and QQQ</H>
-          <IndexCharts bars={live.bars} health={live.health.length > 0 ? live.health : scan?.market?.indices} asOf={live.asOf} provisional={live.provisional} />
+          <H sub="The last 30 sessions (tap the pill for the full window) with the prices named above drawn on them: green dashed the close that gets better, red dashed a support, amber dotted a level under test, grey a range's ends.">
+            SPY and QQQ
+          </H>
+          <IndexCharts
+            bars={live.bars}
+            health={live.health.length > 0 ? live.health : scan?.market?.indices}
+            asOf={live.asOf}
+            provisional={live.provisional}
+            levels={levels}
+            defaultZoomed
+            compact
+          />
         </>
       )}
-
-      <p className="mt-3 text-[13px] leading-relaxed text-neutral-300">
-        His first rule is that the index decides whether breakouts work at all; breadth says how many names are taking part. The home
-        strip shows tonight&apos;s reading; this page shows the run of them, so a Bullish call can be seen as a streak and not a flicker.
-        Terms in <Link href="/help#tape" className="text-neutral-100 underline underline-offset-4">Help</Link>.
-      </p>
 
       <H sub={`Share of the universe (price ≥ $5, ≥ $5M a day) above its 20-day average (amber), above its 50-day (sky) and with the 10-day over the 20-day (green). Green bands: sessions the index verdict called Bullish. The dashed line is the ${Math.round(T.BREADTH_MIN * 100)}% the sizing rule reads.`}>
         Breadth and the verdict
@@ -200,6 +215,17 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
         <div className="mb-1 text-[11px] font-semibold text-neutral-400">New highs (up) against new lows (down)</div>
         <HighsLows rows={rows} />
       </Card>
+
+      <details className="group mt-6 rounded-xl bg-neutral-900/50 px-3 py-2">
+        <summary className="cursor-pointer list-none text-sm font-semibold tracking-wide text-emerald-400 uppercase active:opacity-70">
+          How this is scored
+          <span className="ml-2 text-[11px] font-normal normal-case tracking-normal text-neutral-500 group-open:hidden">the sizing rule, what the deck did under each verdict</span>
+        </summary>
+      <p className="mt-2 text-[13px] leading-relaxed text-neutral-300">
+        His first rule is that the index decides whether breakouts work at all; breadth says how many names are taking part. The home
+        strip shows tonight&apos;s reading; this page shows the run of them, so a Bullish call can be seen as a streak and not a flicker.
+        Terms in <Link href="/help#tape" className="text-neutral-100 underline underline-offset-4">Help</Link>.
+      </p>
 
       <H sub="The paper book scales its $ notional by how many of the two signals hold at fill time. Breadth is the prior session's, written after the book runs. Sizing changes dollars, not R.">
         Size by the tape
@@ -231,10 +257,10 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
         Tonight: {tapeMultiplier(tape.bullish, tape.breadth).reason}. A signal the app does not know yet is left out, not counted against the trade.
       </p>
 
-      <H sub="Every scored deck row since the history began, by the index verdict on its scan night: how often it closed above its level within ten sessions, and the Auto plan's average R on the boxed Wait rows among them. Right: the same breakout rate by the breadth that night.">
+      <H sub="Every scored deck row since the history began, by the index verdict on its scan night: how often it closed above its level within ten sessions, and the Auto plan's average R on the boxed Wait rows among them. Under it: the same breakout rate by the breadth that night.">
         What the deck did under each verdict
       </H>
-      <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+      <div className="grid gap-3">
         <Card className="overflow-x-auto p-0">
           <table className="w-full">
             <thead>
@@ -273,6 +299,7 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
         In-sample, one tape so far; the research page scores the sizing rule itself under &ldquo;Paper size scaled by the tape&rdquo;. Nothing here changes a scan.
         The highs-and-lows count is the universe&apos;s new 52-week highs and lows per session as the breadth job records them.
       </p>
+      </details>
     </main>
   );
 }

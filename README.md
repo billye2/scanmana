@@ -155,8 +155,11 @@ with headers and footers off. A process to follow, not financial advice.
   "Tomorrow" box: the size the tape gives, the close each index needs
   tomorrow for the next repair step (as a price), the nearest supports under
   it, and your book at the open; the trend card shows only the lines that
-  carry a decision, with every other fact and the repair order folded. Tape
-  is the first icon on the bar when it is ticked.
+  carry a decision, with every other fact and the repair order folded. Since
+  2.0.2 the index charts open on the last 30 sessions with those prices
+  drawn as lines, their chips say up / flat / down like the card, and the
+  sizing table and the study fold under "How this is scored". Tape is the
+  first icon on the bar when it is ticked.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.

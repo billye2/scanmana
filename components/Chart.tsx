@@ -68,6 +68,7 @@ export default function Chart({
   markers,
   zoomed: zoomedProp,
   onZoomChange,
+  defaultZoomed = false,
 }: {
   bars: Bar[];
   box: DarvasBox | null;
@@ -79,10 +80,12 @@ export default function Chart({
   markers?: readonly ChartMarker[];
   zoomed?: boolean;
   onZoomChange?: (zoomed: boolean) => void;
+  /** Uncontrolled charts only: open on the last ZOOM_BARS sessions (the Tape page's index charts, 2.0.2). */
+  defaultZoomed?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const [zoomedLocal, setZoomedLocal] = useState(false);
+  const [zoomedLocal, setZoomedLocal] = useState(defaultZoomed);
   const zoomed = zoomedProp ?? zoomedLocal;
   const setZoomed = onZoomChange ?? setZoomedLocal;
 

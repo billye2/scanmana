@@ -1,20 +1,30 @@
-import Chart from "@/components/Chart";
+import Chart, { type ChartLine } from "@/components/Chart";
 import { CONFIG } from "@/lib/config";
 import { price } from "@/lib/format";
+import { slopeWord } from "@/lib/trend-read";
 import type { Bar, IndexHealth } from "@/lib/types";
 
 const SHOW_BARS = 130;
+// The chips say which way each average is going in the trend card's words (2.0.2): until then any
+// average that was not rising read "flat", so a falling one disagreed with the card beside it.
+const SLOPE_CHIP = { rising: "up", flat: "flat", falling: "down" } as const;
 
 export default function IndexCharts({
   bars,
   health,
   asOf = null,
   provisional = false,
+  levels,
+  defaultZoomed = false,
+  compact = false,
 }: {
   bars: Map<string, Bar[]>;
   health: IndexHealth[] | undefined;
   asOf?: string | null; // time of the live quote the charts carry; null = stored bars only
   provisional?: boolean; // today's bar is built from that quote, not from the nightly scan
+  levels?: Record<string, ChartLine[]>; // per ticker: the prices the Tape page names, drawn as lines
+  defaultZoomed?: boolean; // open on the last 30 sessions
+  compact?: boolean; // shorter charts, for a page that has more than the charts on it
 }) {
   const byTicker = new Map((health ?? []).map((h) => [h.ticker, h]));
   const lastDate = [...bars.values()].reduce<string>((m, b) => (b.length > 0 && b[b.length - 1].date > m ? b[b.length - 1].date : m), "");
@@ -60,15 +70,14 @@ export default function IndexCharts({
                       key={s.period}
                       className={s.above ? (s.rising ? "text-emerald-400" : "text-amber-300") : "text-red-400"}
                     >
-                      {s.period}d {s.above ? "▲" : "▼"}
-                      {s.rising ? "" : "·flat"}
+                      {s.period}d {s.above ? "▲" : "▼"}·{SLOPE_CHIP[slopeWord(all, s.period) ?? (s.rising ? "rising" : "falling")]}
                     </span>
                   ))}
                 </span>
               )}
             </div>
-            <div className="relative mt-1 h-[26rem] overflow-hidden rounded-lg bg-neutral-900/60 lg:h-[34rem]">
-              <Chart bars={shown} box={null} pivot={null} smas={CONFIG.MARKET.SMAS} />
+            <div className={`relative mt-1 overflow-hidden rounded-lg bg-neutral-900/60 ${compact ? "h-[18rem] lg:h-[24rem]" : "h-[26rem] lg:h-[34rem]"}`}>
+              <Chart bars={shown} box={null} pivot={null} smas={CONFIG.MARKET.SMAS} lines={levels?.[t]} defaultZoomed={defaultZoomed} />
             </div>
           </div>
         );

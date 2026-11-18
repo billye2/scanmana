@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { betterLine, indexLines, latch, nextLine, readIndexTrend, stepCloses, trendRead, trendState, worseLine } from "../lib/trend-read";
+import { betterLine, chartLevels, slopeWord, indexLines, latch, nextLine, readIndexTrend, stepCloses, trendRead, trendState, worseLine } from "../lib/trend-read";
 import type { Bar } from "../lib/types";
 
 /** Bars from closes: open = prior close, a 1% range around the body unless given. Weekday-free dates from 2026-01-01. */
@@ -235,6 +235,34 @@ describe("the prices behind 'gets better' and 'gets worse' (2.0.1)", () => {
     expect(r.ladder[0]).toEqual({ say: "a close back above the 10-day", pass: [], fail: ["QQQ"] });
     expect(r.better).toHaveLength(1);
     expect(r.worse).toHaveLength(1);
+  });
+});
+
+describe("chart levels and chip slopes (2.0.2)", () => {
+  it("draws the close that gets better and the low, not the averages the chart already has", () => {
+    const t = readIndexTrend("QQQ", series(ramp(120, 160, 100)))!;
+    const levels = chartLevels(t);
+    expect(levels.map((l) => l.kind)).toEqual(["better", "worse", "test"]);
+    expect(levels[0]).toEqual({ price: t.needs[0], label: "over 10d", kind: "better" });
+    expect(levels[1].label).toMatch(/ low$/);
+    const up = readIndexTrend("SPY", series(ramp(120, 100, 300)))!;
+    expect(chartLevels(up)).toEqual([]); // nothing to repair, and its supports are the drawn averages
+  });
+
+  it("draws a range's two ends and collapses a level named twice", () => {
+    const closes = [...ramp(80, 100, 130), ...Array.from({ length: 60 }, (_, i) => 130 * (1 + 0.01 * Math.sin(i / 2)))];
+    const t = readIndexTrend("SPY", series(closes))!;
+    const levels = chartLevels(t);
+    expect(levels.slice(0, 2).map((l) => l.label)).toEqual(["range high", "range low"]);
+    const prices = levels.map((l) => l.price);
+    expect(new Set(prices.map((p) => p.toFixed(1))).size).toBe(prices.length);
+  });
+
+  it("says rising, flat or falling with the card's dead zone", () => {
+    expect(slopeWord(series(ramp(120, 100, 160)), 20)).toBe("rising");
+    expect(slopeWord(series(ramp(120, 160, 100)), 20)).toBe("falling");
+    expect(slopeWord(series(ramp(120, 100, 100)), 20)).toBe("flat");
+    expect(slopeWord(series(ramp(10, 100, 100)), 20)).toBeNull();
   });
 });
 

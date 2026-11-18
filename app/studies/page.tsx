@@ -90,7 +90,7 @@ export default async function StudiesPage({ searchParams }: { searchParams: Prom
   const epReady = ep.overall.n >= MIN_AFTER_N;
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)] lg:pb-6">
       <TopNav current="/studies" subtitle={summary.lastDate ? `Studies · ${summary.scans} scans · ${summary.firstDate} → ${summary.lastDate}` : "Studies"} />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">

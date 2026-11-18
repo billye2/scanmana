@@ -55,7 +55,7 @@ export default async function GalleryPage({ searchParams }: { searchParams: Prom
   const summary = gallerySummary(rows);
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)] lg:pb-6">
       <TopNav current="/gallery" subtitle="Best setups" />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">

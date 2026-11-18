@@ -436,3 +436,13 @@ CREATE TABLE IF NOT EXISTS research_runs (
   ok boolean,
   note text
 );
+
+-- 2.0.3: the reader's settings per account (lib/settings.ts). nav is the bar's picks in the cookie's
+-- form (comma-separated keys, "none" for an empty bar), text_size one of default, large, larger.
+-- A null column has never been saved and falls back to the device's cookie.
+CREATE TABLE IF NOT EXISTS user_settings (
+  user_id text PRIMARY KEY,
+  nav text,
+  text_size text,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);

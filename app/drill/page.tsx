@@ -39,7 +39,7 @@ export default async function DrillPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-3xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)] lg:pb-6">
       <TopNav current="/drill" subtitle="Drill" />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">

@@ -84,7 +84,7 @@ export default async function ResearchPage() {
   });
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)] lg:pb-6">
       <TopNav current="/research" subtitle={summary.lastDate ? `Research · ${summary.scans} scans · ${summary.firstDate} → ${summary.lastDate}` : "Research"} />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">

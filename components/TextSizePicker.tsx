@@ -6,7 +6,7 @@ import { TEXT_SIZES, type TextSize } from "@/lib/nav";
 
 /**
  * The text-size pills on /sections (1.8.8): Default · Large · Larger. A tap saves
- * at once (POST /api/text → cookie) and the page re-renders with the new size, so
+ * at once (POST /api/text → the account) and the page re-renders with the new size, so
  * the change is visible where it was made.
  */
 export default function TextSizePicker({ initial }: { initial: TextSize }) {
@@ -54,7 +54,7 @@ export default function TextSizePicker({ initial }: { initial: TextSize }) {
         ))}
       </div>
       <p className="mt-2 text-[11px] leading-snug text-neutral-500">
-        Scales every line of text in the app on this device; the charts keep their own small labels. The home-screen app cannot pinch-zoom, so this is the way to make the Help pages readable.
+        Scales every line of text in the app, on every device signed in with your account; the charts keep their own small labels. The home-screen app cannot pinch-zoom, so this is the way to make the Help pages readable.
       </p>
       {error && <div className="mt-2 rounded-lg bg-red-950/60 px-3 py-2 text-xs text-red-300">{error}</div>}
     </div>

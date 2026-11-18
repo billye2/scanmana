@@ -1,17 +1,18 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { NAV_COOKIE, navCookieValue, parseNav } from "@/lib/nav";
+import { NAV_COOKIE, navStoredValue, parseNav } from "@/lib/nav";
+import { readSettings, saveSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
 /**
  * The top bar's picks (1.6.6). GET reads them, POST { keys: string[] } stores
- * them in a cookie for a year — per device by design: the phone and the desktop
- * can carry different bars. Validated by lib/nav.ts; nothing else is stored.
+ * them on the account (2.0.3: one bar for every device signed in with it) and
+ * in this device's cookie, which is only the fallback when the account row
+ * cannot be read. Validated by lib/nav.ts; nothing else is stored.
  */
 export async function GET() {
-  const store = await cookies();
-  return NextResponse.json({ keys: parseNav(store.get(NAV_COOKIE)?.value) });
+  return NextResponse.json({ keys: (await readSettings()).nav });
 }
 
 export async function POST(req: Request) {
@@ -19,9 +20,15 @@ export async function POST(req: Request) {
   if (!body || !Array.isArray(body.keys) || !body.keys.every((k) => typeof k === "string")) {
     return NextResponse.json({ error: "keys: string[] required" }, { status: 400 });
   }
-  const value = navCookieValue(body.keys as string[]);
+  const value = navStoredValue(body.keys as string[]);
   const store = await cookies();
-  // An empty pick is stored as a sentinel so it reads as an empty bar, not the default.
-  store.set(NAV_COOKIE, value === "" ? "none" : value, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", httpOnly: true });
+  store.set(NAV_COOKIE, value, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax", httpOnly: true });
+  const { userId } = await readSettings();
+  if (!userId) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  try {
+    await saveSettings(userId, { nav: value });
+  } catch {
+    return NextResponse.json({ error: "saved on this device only; the account could not be reached" }, { status: 500 });
+  }
   return NextResponse.json({ keys: parseNav(value) });
 }

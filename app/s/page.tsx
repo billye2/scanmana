@@ -2,7 +2,7 @@ import Link from "next/link";
 import TopNav from "@/components/TopNav";
 import SymbolLookup from "@/components/SymbolLookup";
 
-export const dynamic = "force-static";
+// Not static since 2.0.3: a static page reads no cookies and no account, so it drew the default bar and text size whatever the reader had chosen.
 
 export default function LookupPage() {
   return (

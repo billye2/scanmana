@@ -1,10 +1,10 @@
 /**
  * The top bar's sections (1.6.6). Every signed-in page carries the same icons;
- * which six is the reader's choice, made on /sections (the gear) and kept in a
- * cookie, so the bar can be rebuilt around the routine without a redeploy. The
+ * which six is the reader's choice, made on /sections (the gear) and kept on the
+ * account (2.0.3, lib/settings.ts; a cookie per device before that), so the bar can be rebuilt around the routine without a redeploy. The
  * registry below is ranked by how often Kullamägi's process has you open each
  * page (2026-11-03): the bar draws the picks in this order, so the first thing
- * needed each evening is the first icon. Pure; the cookie is read in TopNav and
+ * needed each evening is the first icon. Pure; the stored value is read in TopNav and
  * written by POST /api/nav.
  */
 
@@ -141,8 +141,8 @@ export function navSections(keys: readonly NavKey[]): NavSection[] {
 /* ---------- text size (1.8.8) ---------- */
 
 /**
- * The reader's text size, chosen on /sections and kept in a cookie per device
- * like the bar's picks. The root layout puts it on <html data-text> and
+ * The reader's text size, chosen on /sections and kept on the account
+ * like the bar's picks (2.0.3). The root layout puts it on <html data-text> and
  * globals.css scales every text utility the app uses from it (the viewport
  * forbids pinch zoom in the home-screen app, so this is the only way to make the
  * prose larger). Default means no attribute and no override.
@@ -160,6 +160,42 @@ const TEXT_KEYS = new Set<string>(TEXT_SIZES.map((s) => s.key));
 /** The size a stored value stands for: unknown or absent means default. Pure. */
 export function parseTextSize(raw: string | null | undefined): TextSize {
   return raw && TEXT_KEYS.has(raw) ? (raw as TextSize) : "default";
+}
+
+/* ---------- settings per account (2.0.3) ---------- */
+
+/** Both settings as stored: the cookie's string form, null where nothing was ever saved. */
+export interface StoredSettings {
+  nav: string | null;
+  text: string | null;
+}
+
+export interface Settings {
+  nav: NavKey[];
+  text: TextSize;
+}
+
+/** The stored form of a set of picks: an empty pick is a sentinel, so it reads as an empty bar and not the default. */
+export function navStoredValue(keys: readonly string[]): string {
+  const value = navCookieValue(keys);
+  return value === "" ? "none" : value;
+}
+
+/**
+ * The settings a page draws: the account's saved value wins, setting by
+ * setting, and this device's cookie fills in whatever the account has not
+ * saved yet. Pure.
+ */
+export function resolveSettings(account: StoredSettings | null, device: StoredSettings): Settings {
+  return {
+    nav: parseNav(account?.nav ?? device.nav),
+    text: parseTextSize(account?.text ?? device.text),
+  };
+}
+
+/** One string for a pair of settings, so an open page can tell that another device changed them. Pure. */
+export function settingsSignature(s: Settings): string {
+  return `${s.nav.join(",")}|${s.text}`;
 }
 
 /** The home deck's bottom bar carries this many section links between prev and the counter. */

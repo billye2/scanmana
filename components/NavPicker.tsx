@@ -11,7 +11,7 @@ import { DEFAULT_NAV, MAX_NAV, NAV_SECTIONS, type NavKey } from "@/lib/nav";
  * The sections list behind the gear (1.6.6): every section in routine order,
  * a tick for the ones the top bar shows (at most MAX_NAV; the rest grey out
  * once the bar is full), and the row itself opens the section. A change is
- * saved at once (POST /api/nav → cookie) and the bar on this page redraws.
+ * saved at once (POST /api/nav → the account) and the bar on this page redraws.
  */
 export default function NavPicker({ initial }: { initial: NavKey[] }) {
   const router = useRouter();

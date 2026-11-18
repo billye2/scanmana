@@ -51,7 +51,7 @@ export default async function Help() {
     // DB not configured — the page still renders the text.
   }
   return (
-    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-4xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-4xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)] lg:pb-6">
       <TopNav current="/help" subtitle="Help" />
 
       <p className="text-[13px] leading-relaxed text-neutral-300">
@@ -619,11 +619,11 @@ export default async function Help() {
         anything else each day, then the deck list grouped by the open each evening, the paper
         book each morning, the best setups and the research page each week, then the watchlist, the stop simulator, the lookup and this page.
         Tick up to six and the bar carries them in that order, first thing needed first; once six are ticked the rest grey out until one is
-        unticked. Each row also opens its section, so whatever you leave off the bar stays two taps away. The choice is kept on this device
-        for a year (a cookie), so the phone and the desktop can carry different bars. The suggested six are the deck list, paper, best setups,
+        unticked. Each row also opens its section, so whatever you leave off the bar stays two taps away. The choice is kept on your account
+        (since 2.0.3), so the phone, the home-screen app and the desktop carry the same bar, and an open page picks up a change the next time it comes to the front. The suggested six are the deck list, paper, best setups,
         research, watchlist and lookup. The home deck&apos;s bottom bar follows: previous card · your first four picks · the card counter. The card&apos;s
         watch star sits beside the ticker. The same page carries <span className="font-semibold text-neutral-100">Text size</span>: Default, Large or
-        Larger scales every line of text in the app on this device (the body text here goes from 13 to 16 or 18 pixels; the charts keep their own
+        Larger scales every line of text in the app, on every device you sign in on (the body text here goes from 13 to 16 or 18 pixels; the charts keep their own
         small labels). The home-screen app cannot pinch-zoom, so this is the way to make these pages readable.
       </p>
 

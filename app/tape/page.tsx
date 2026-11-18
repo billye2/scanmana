@@ -97,7 +97,7 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
   ];
 
   return (
-    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[max(env(safe-area-inset-bottom),24px)]">
+    <main className="mx-auto w-full max-w-xl px-4 lg:max-w-5xl lg:px-8 pt-[max(env(safe-area-inset-top),12px)] pb-[calc(env(safe-area-inset-bottom)+80px)] lg:pb-6">
       <TopNav current="/tape" subtitle={scan?.date ? `Tape · as of ${scan.date}` : "Tape"} />
 
       <MarketBar market={scan?.market} breadth={breadthNow} />

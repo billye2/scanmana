@@ -68,8 +68,10 @@ with headers and footers off. A process to follow, not financial advice.
   drawn in the order of Kullamägi's routine (`lib/nav.ts`; the suggested six are
   deck list, paper book, best setups, research, ★ Watchlist, symbol lookup) — with
   the current page's icon lit and a gear last that opens `/sections`: every
-  section ranked, a tick per row (six at most), each row a link. The choice is a
-  cookie on the device (`POST /api/nav`). The symbol page adds its Live toggle
+  section ranked, a tick per row (six at most), each row a link. The choice and
+  the text size are kept on the account since 2.0.3 (`user_settings`,
+  `lib/settings.ts`), so every device signed in with the same email shows the
+  same; an open page re-checks when it returns to the foreground. The symbol page adds its Live toggle
   beside them. The market
   strip's reason line is folded to one line with a chevron; tap to read it all.
 - **Paper trading** (`/paper`, `lib/paper-engine.ts` + `lib/paper-db.ts`): two

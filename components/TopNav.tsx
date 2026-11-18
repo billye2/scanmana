@@ -1,20 +1,20 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import { SettingsIcon } from "@/components/Icons";
 import { NAV_ICONS } from "@/components/NavIcons";
-import { NAV_COOKIE, navSections, parseNav } from "@/lib/nav";
+import { navSections } from "@/lib/nav";
+import { readSettings } from "@/lib/settings";
 
 /**
  * The one top navigation for every signed-in page: the logo ("SCM" — the full
  * word left the icons no room on a phone, 1.3.9) always links home, a page line
  * sits under it, and on the right the sections the reader picked on /sections
- * (the gear, always last; up to six, in routine order — lib/nav.ts, kept in the
- * `scm_nav` cookie since 1.6.6). The current page's icon is lit. `extra` slots
+ * (the gear, always last; up to six, in routine order — lib/nav.ts, kept per
+ * account since 2.0.3, lib/settings.ts). The current page's icon is lit. `extra` slots
  * page-specific controls before the icons (the symbol page's Live toggle).
  */
 export default async function TopNav({ subtitle, current, extra }: { subtitle?: ReactNode; current?: string; extra?: ReactNode }) {
-  const picks = parseNav((await cookies()).get(NAV_COOKIE)?.value);
+  const picks = (await readSettings()).nav;
   const sections = navSections(picks);
   return (
     <header className="mb-3 flex items-center justify-between">

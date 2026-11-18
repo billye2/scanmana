@@ -100,6 +100,15 @@ export interface IndexTrend {
   tonight: TrendState;
   /** The close against the 200-day; null while the history is shorter than that. */
   long: LongRead | null;
+  /** The close tomorrow that would pass each ladder step, in LADDER order (2.0.1). */
+  needs: number[];
+  /** The nearest supports under tonight's close, nearest first (2.0.1). */
+  floors: Floor[];
+}
+
+export interface Floor {
+  price: number;
+  what: string;
 }
 
 export interface LongRead {
@@ -110,14 +119,21 @@ export interface LongRead {
   change: number | null;
 }
 
-type RawTrend = Omit<IndexTrend, "tonight" | "long">;
+type RawTrend = Omit<IndexTrend, "tonight" | "long" | "needs" | "floors">;
 
 export interface TrendRead {
   date: string;
   tone: TrendTone;
   headline: string;
-  indices: { ticker: string; state: TrendState; lines: string[] }[];
+  /** `key` is what the card shows; `lines` is every fact, folded under it (2.0.1). */
+  indices: { ticker: string; state: TrendState; key: string[]; lines: string[] }[];
   next: string;
+  /** Per index: the next step of the repair and the close tomorrow that passes it (2.0.1). */
+  better: string[];
+  /** Per index: the nearest supports and how far under tonight's close they sit (2.0.1). */
+  worse: string[];
+  /** The whole repair order, each step with who has passed it. */
+  ladder: { say: string; pass: string[]; fail: string[] }[];
 }
 
 const LABEL: Record<TrendState, string> = {
@@ -247,7 +263,37 @@ export function readIndexTrend(ticker: string, bars: Bar[]): IndexTrend | null {
     prev = s;
     if (shown === null || run >= T.CONFIRM_CLOSES) shown = s;
   }
-  return { ...t, state: shown!, tonight: t.state, long: readLong(bars) };
+  const long = readLong(bars);
+  return { ...t, state: shown!, tonight: t.state, long, needs: stepCloses(bars), floors: floorsUnder(bars, t, long) };
+}
+
+/**
+ * The close tomorrow that would make each ladder step pass, in LADDER order:
+ * the arithmetic of a simple average with one unknown bar, each with the same
+ * dead zone the read applies, so the price named is the one that changes the card.
+ */
+export function stepCloses(bars: Bar[]): number[] {
+  const back = CONFIG.MARKET.SLOPE_LOOKBACK;
+  const tail = (k: number) => bars.slice(-k).reduce((s, b) => s + b.c, 0);
+  const above = (p: number) => ((1 + T.AT_PCT) * tail(p - 1)) / (p - (1 + T.AT_PCT));
+  const up = (p: number) => p * (1 + T.FLAT_SLOPE) * sma(bars, p, back - 1)! - tail(p - 1);
+  const cross = ((1 + T.CROSS_PCT) * tail(19) - 2 * tail(9)) / (1 - T.CROSS_PCT);
+  return [above(10), up(10), above(20), cross, up(20), above(50), up(50)];
+}
+
+/**
+ * The supports under tonight's close, nearest first, two at most: each average
+ * the close is still over, the 200-day while it holds, and the low of the last
+ * LEVEL_LOOKBACK sessions (the range's low in a range).
+ */
+function floorsUnder(bars: Bar[], t: RawTrend, long: LongRead | null): Floor[] {
+  const out: Floor[] = [];
+  for (const x of t.avgs) if (x.above && x.value < t.close) out.push({ price: x.value, what: `the ${x.period}-day` });
+  if (long && long.value < t.close) out.push({ price: long.value, what: `the ${T.LONG_PERIOD}-day` });
+  let lo = bars[bars.length - 1];
+  for (const b of bars.slice(-T.LEVEL_LOOKBACK)) if (b.l < lo.l) lo = b;
+  if (lo.l < t.close) out.push({ price: lo.l, what: `the ${day(lo.date)} low` });
+  return out.sort((x, y) => y.price - x.price).slice(0, 2);
 }
 
 function readLong(bars: Bar[]): LongRead | null {
@@ -472,6 +518,53 @@ function ladderLine(ts: IndexTrend[], total: number): string {
   return `Next to see: ${first.say} on ${list(first.who)}.${then}`;
 }
 
+/**
+ * The few lines that carry a decision tonight: where the close sits in one
+ * clause, then the held-headline note, the range, any level being tested and
+ * the 200-day. The numbers behind them stay in `indexLines`, folded on the page.
+ */
+export function keyLines(t: IndexTrend): string[] {
+  const on = t.avgs.filter((x) => x.at).map((x) => `${x.period}-day`);
+  const side =
+    on.length > 0 ? `sitting on its ${list(on)}`
+    : t.avgs.every((x) => x.dist > 0) ? "above its 10-, 20- and 50-day"
+    : t.avgs.every((x) => x.dist <= 0) ? "below its 10-, 20- and 50-day"
+    : `over its ${list(t.avgs.filter((x) => x.dist > 0).map((x) => `${x.period}-day`))}, under its ${list(t.avgs.filter((x) => x.dist <= 0).map((x) => `${x.period}-day`))}`;
+  const out = [`Closed ${px(t.close)} (${signed(t.change)}), ${side}, ${t.high.dist >= -0.005 ? "at its high" : `${pc(t.high.dist)} off the ${day(t.high.date)} high`}.`];
+  if (t.tonight !== t.state) out.push(pendingLine(t));
+  if (t.range) out.push(rangeLine(t.range));
+  if (t.lowTest) out.push(levelLine("low", t.lowTest));
+  if (t.highTest && t.high.dist < -0.005) out.push(levelLine("high", t.highTest));
+  if (t.long) out.push(longLine(t, t.long));
+  return out;
+}
+
+const away = (price: number, close: number) => signed(price / close - 1);
+
+/** The next step of the repair for one index, with the close tomorrow that passes it. */
+export function betterLine(t: IndexTrend): string {
+  if (t.range) return `${t.ticker}: a close above ${px(t.range.high)} (${away(t.range.high, t.close)}) leaves the range upward.`;
+  const i = LADDER.findIndex((step) => !step.ok(t));
+  if (i < 0) return `${t.ticker}: nothing to repair, every check passes.`;
+  const reach = (k: number) => t.needs[k] / t.close - 1 <= T.ONE_SESSION;
+  const left = LADDER.slice(i + 1).filter((step) => !step.ok(t)).length;
+  if (reach(i)) return `${t.ticker}: a close above ${px(t.needs[i])} (${away(t.needs[i], t.close)}) gives ${LADDER[i].say}${left ? `, the first of ${left + 1} steps left` : ", the last step left"}.`;
+  // An average cannot turn or cross on one close: say so, and name the first later step a single close can reach.
+  const j = LADDER.findIndex((step, k) => k > i && !step.ok(t) && reach(k));
+  const wait = `${t.ticker}: ${LADDER[i].say} is next and takes more than one close`;
+  return j < 0
+    ? `${wait}; no later step is within a normal session either (${left + 1} left).`
+    : `${wait}. Within reach tomorrow: a close above ${px(t.needs[j])} (${away(t.needs[j], t.close)}) gives ${LADDER[j].say}.`;
+}
+
+/** The supports under one index, nearest first. */
+export function worseLine(t: IndexTrend): string {
+  if (t.range) return `${t.ticker}: a close under ${px(t.range.low)} (${away(t.range.low, t.close)}) leaves the range downward.`;
+  if (t.floors.length === 0) return `${t.ticker}: at the low of the last ${T.LEVEL_LOOKBACK} sessions, nothing named under it.`;
+  const [a, b] = t.floors;
+  return `${t.ticker}: a close under ${px(a.price)} (${a.what}, ${away(a.price, t.close)})${b ? `, then ${px(b.price)} (${b.what}, ${away(b.price, t.close)})` : ""}.`;
+}
+
 function headline(ts: IndexTrend[]): string {
   if (ts.length === 1) return `${LABEL[ts[0].state]} on ${ts[0].ticker}`;
   const same = ts.every((t) => t.state === ts[0].state);
@@ -497,7 +590,10 @@ export function trendRead(barsByTicker: Map<string, Bar[]>): TrendRead | null {
     date: ts.map((t) => t.date).sort().at(-1)!,
     tone: tones.includes("down") ? "down" : tones.every((x) => x === "up") ? "up" : "mixed",
     headline: headline(ts),
-    indices: ts.map((t) => ({ ticker: t.ticker, state: t.state, lines: indexLines(t) })),
+    indices: ts.map((t) => ({ ticker: t.ticker, state: t.state, key: keyLines(t), lines: indexLines(t) })),
     next: nextLine(ts),
+    better: ts.map(betterLine),
+    worse: ts.map(worseLine),
+    ladder: LADDER.map((step) => ({ say: step.say, pass: ts.filter((t) => step.ok(t)).map((t) => t.ticker), fail: ts.filter((t) => !step.ok(t)).map((t) => t.ticker) })),
   };
 }

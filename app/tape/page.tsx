@@ -1,3 +1,4 @@
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import Band from "@/components/Band";
 import MarketBar from "@/components/MarketBar";
@@ -9,9 +10,11 @@ import { CONFIG } from "@/lib/config";
 import { getBreadth, getTapeStudy, latestBreadth } from "@/lib/research";
 import IndexCharts from "@/components/IndexCharts";
 import { liveIndexBars } from "@/lib/intraday";
+import { morningBook } from "@/lib/paper-db";
+import { briefText, morningBrief } from "@/lib/paper-engine";
 import { latestScanSlim } from "@/lib/scan";
 import { latestTape, tapeMultiplier } from "@/lib/tape";
-import { tapeSentence, tapeWindow, verdictStreak } from "@/lib/tape-read";
+import { tapeStance, tapeWindow, verdictStreak } from "@/lib/tape-read";
 import { trendRead, type TrendTone } from "@/lib/trend-read";
 
 export const metadata = { title: "Tape — Scanmana" };
@@ -38,6 +41,13 @@ const H = ({ children, sub }: { children: React.ReactNode; sub?: React.ReactNode
 const pc = (x: number | null) => (x === null ? "—" : `${Math.round(x * 100)}%`);
 const rr = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}R`);
 const TREND_TONE: Record<TrendTone, string> = { up: "text-emerald-300", mixed: "text-amber-300", down: "text-red-300" };
+const SIZE_TONE = { full: "text-emerald-300", half: "text-amber-300", quarter: "text-red-300" } as const;
+const Row = ({ label, children }: { label: string; children: React.ReactNode }) => (
+  <div className="mt-2 border-t border-neutral-800 pt-2">
+    <div className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500">{label}</div>
+    <div className="mt-0.5 space-y-0.5 text-xs leading-snug text-neutral-200">{children}</div>
+  </div>
+);
 
 /**
  * /tape — whether to trade at all (1.7.0). Kullamägi's index filter and market
@@ -61,7 +71,14 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
   const trend = live ? trendRead(live.stored) : null;
   const streak = verdictStreak(rows);
   const window = tapeWindow(rows);
-  const sentence = tapeSentence(streak, window, tape);
+  const stance = tapeStance(streak, window, tape);
+  // The reader's own book in one line, as the home page has it. Its own catch: the page renders without it.
+  const { userId } = await auth();
+  const book = userId
+    ? await morningBook(userId)
+        .then((mb) => briefText(morningBrief(mb.orders, mb.positions, tape.label)))
+        .catch(() => null)
+    : null;
   const sizes: { label: string; signals: string; mult: number }[] = [
     { label: "Full", signals: "index Bullish and breadth at or above " + Math.round(T.BREADTH_MIN * 100) + "%", mult: 1 },
     { label: "Half", signals: "one of the two", mult: T.ONE_SIGNAL },
@@ -75,28 +92,76 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
       <MarketBar market={scan?.market} breadth={breadthNow} />
 
       <Card>
-        <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">The tape, read</div>
-        <p className="mt-0.5 text-xs leading-snug text-neutral-200">{sentence}</p>
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">
+          Tomorrow{trend && <span className="font-normal normal-case tracking-normal text-neutral-500"> · from the {trend.date} close</span>}
+        </div>
+        <p className="mt-0.5 text-base font-semibold leading-snug">
+          <span className={SIZE_TONE[stance.size]}>{stance.title}</span>
+          <span className="ml-2 text-xs font-normal text-neutral-400">{stance.why}</span>
+        </p>
+        <p className="mt-0.5 text-xs leading-snug text-neutral-400">{stance.context}</p>
+        {trend && (
+          <>
+            <Row label="Gets better at">
+              {trend.better.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </Row>
+            <Row label="Gets worse at">
+              {trend.worse.map((line) => (
+                <p key={line}>{line}</p>
+              ))}
+            </Row>
+          </>
+        )}
+        {book && (
+          <Row label="Your book at the open">
+            <p>
+              <Link href="/paper" className="underline decoration-neutral-700 underline-offset-4">{book}</Link>
+            </p>
+          </Row>
+        )}
       </Card>
 
       {trend && (
         <Card className="mt-2">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">
-            The trend, read <span className="font-normal normal-case tracking-normal text-neutral-500">· close of {trend.date}</span>
-          </div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-400">The trend, read</div>
           <p className={`mt-0.5 text-sm font-semibold leading-snug ${TREND_TONE[trend.tone]}`}>{trend.headline}</p>
           {trend.indices.map((ix) => (
             <div key={ix.ticker} className="mt-2">
               <div className="text-[11px] font-semibold text-neutral-400">{ix.ticker}</div>
               <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs leading-snug text-neutral-200 marker:text-neutral-600">
-                {ix.lines.map((line) => (
+                {ix.key.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
               </ul>
             </div>
           ))}
-          <p className="mt-2 border-t border-neutral-800 pt-2 text-xs leading-snug text-neutral-300">{trend.next}</p>
-          <p className="mt-1 text-[11px] text-neutral-600">Written by fixed rules from the stored daily bars; the same tape always reads the same way.</p>
+          <details className="group mt-2 border-t border-neutral-800 pt-2">
+            <summary className="cursor-pointer list-none text-[11px] font-semibold text-neutral-400 active:text-neutral-200">
+              All the facts <span className="font-normal text-neutral-600 group-open:hidden">· averages, the last bounce, the repair order</span>
+            </summary>
+            {trend.indices.map((ix) => (
+              <div key={ix.ticker} className="mt-2">
+                <div className="text-[11px] font-semibold text-neutral-400">{ix.ticker}</div>
+                <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs leading-snug text-neutral-300 marker:text-neutral-600">
+                  {ix.lines.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            <div className="mt-2 text-[11px] font-semibold text-neutral-400">The repair order</div>
+            <ol className="mt-0.5 list-decimal space-y-0.5 pl-5 text-xs leading-snug text-neutral-300 marker:text-neutral-600">
+              {trend.ladder.map((step) => (
+                <li key={step.say}>
+                  {step.say}
+                  {step.fail.length === 0 ? <span className="text-emerald-400"> · done</span> : <span className="text-neutral-500"> · still open on {step.fail.join(" and ")}</span>}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-2 text-[11px] text-neutral-600">Written by fixed rules from the stored daily bars; the same tape always reads the same way.</p>
+          </details>
         </Card>
       )}
 

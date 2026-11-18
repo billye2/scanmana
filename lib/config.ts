@@ -117,6 +117,7 @@ export const CONFIG = {
     LONG_PERIOD: 200,
     LONG_SLOPE_LOOKBACK: 20, // the 200-day against itself a month ago
     LONG_FLAT: 0.005, // under 0.5% in that month reads "flat"
+    ONE_SESSION: 0.03, // a needed close further than this is flagged as more than a normal session (2.0.1)
   },
 
   // Per-candidate analysis (lib/analysis.ts) — what each framework considers disqualifying

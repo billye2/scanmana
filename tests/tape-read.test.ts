@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BreadthRow } from "../lib/research";
-import { tapeSentence, tapeWindow, verdictStreak } from "../lib/tape-read";
+import { tapeStance, tapeWindow, verdictStreak } from "../lib/tape-read";
 
 const row = (date: string, bullish: boolean | null, pct = 0.5, highs = 10, lows = 5): BreadthRow => ({
   date,
@@ -48,19 +48,21 @@ describe("tapeWindow — the window's shape", () => {
   });
 });
 
-describe("tapeSentence — the page's first line", () => {
-  it("reads the streak, the breadth move, the Bullish share and the size", () => {
+describe("tapeStance — the page leads with the size (2.0.1)", () => {
+  it("gives the size, the signals behind it, the streak and the breadth move", () => {
     const rows = days(12, (i) => row(d(i), i >= 9, 0.4 + i * 0.01));
-    const s = tapeSentence(verdictStreak(rows), tapeWindow(rows), { label: "full", reason: "index Bullish, breadth 51%" });
-    expect(s).toBe(
-      "Bullish for 3 sessions (since 2026-10-10) · breadth 51% above the 20-day, up from 41% ten sessions ago · Bullish on 25% of the last 12 sessions (longest run 3) · the book sizes at full size (index Bullish, breadth 51%)",
-    );
+    expect(tapeStance(verdictStreak(rows), tapeWindow(rows), { label: "full", reason: "index Bullish, breadth 51%" })).toEqual({
+      size: "full",
+      title: "Full size",
+      why: "index Bullish, breadth 51%",
+      context: "Bullish for 3 sessions (since 2026-10-10) · breadth 51% above the 20-day, up from 41% ten sessions ago",
+    });
   });
 
   it("says when there is no verdict and when breadth is flat", () => {
     const rows = days(12, (i) => row(d(i), null, 0.5));
-    expect(tapeSentence(verdictStreak(rows), tapeWindow(rows), { label: "half", reason: "breadth 50%" })).toBe(
-      "No index verdict yet · breadth 50% above the 20-day, flat over ten sessions · the book sizes at half size (breadth 50%)",
-    );
+    const s = tapeStance(verdictStreak(rows), tapeWindow(rows), { label: "quarter", reason: "breadth 50%" });
+    expect(s.title).toBe("Quarter size");
+    expect(s.context).toBe("No index verdict yet · breadth 50% above the 20-day, flat over ten sessions");
   });
 });

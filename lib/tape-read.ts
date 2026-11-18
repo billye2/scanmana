@@ -64,8 +64,22 @@ export function tapeWindow(rows: readonly BreadthRow[]): TapeWindow {
 
 const pc = (x: number) => `${Math.round(x * 100)}%`;
 
-/** One sentence for the top of the page. Pure. */
-export function tapeSentence(streak: VerdictStreak, w: TapeWindow, size: { label: SizeLabel; reason: string }): string {
+export interface TapeStance {
+  size: SizeLabel;
+  /** "Quarter size": the answer the page leads with. */
+  title: string;
+  /** Which of the two signals put it there. */
+  why: string;
+  /** How long the verdict has held and where breadth is going. */
+  context: string;
+}
+
+/**
+ * The top of the page since 2.0.1: the size first, because on the page's own
+ * study the verdict moves the breakout rate by six points and the size is the
+ * thing it actually changes. Replaces the one-sentence read. Pure.
+ */
+export function tapeStance(streak: VerdictStreak, w: TapeWindow, size: { label: SizeLabel; reason: string }): TapeStance {
   const parts: string[] = [];
   if (streak.bullish === null) parts.push("No index verdict yet");
   else parts.push(`${streak.bullish ? "Bullish" : "Not bullish"} for ${streak.sessions} session${streak.sessions === 1 ? "" : "s"}${streak.since ? ` (since ${streak.since})` : ""}`);
@@ -73,7 +87,10 @@ export function tapeSentence(streak: VerdictStreak, w: TapeWindow, size: { label
     const move = w.breadthTenAgo === null ? "" : w.breadthNow > w.breadthTenAgo + 0.005 ? `, up from ${pc(w.breadthTenAgo)} ten sessions ago` : w.breadthNow < w.breadthTenAgo - 0.005 ? `, down from ${pc(w.breadthTenAgo)} ten sessions ago` : `, flat over ten sessions`;
     parts.push(`breadth ${pc(w.breadthNow)} above the 20-day${move}`);
   }
-  if (w.bullishShare !== null) parts.push(`Bullish on ${pc(w.bullishShare)} of the last ${w.sessions} sessions (longest run ${w.longestBullish})`);
-  parts.push(`the book sizes at ${size.label === "full" ? "full size" : size.label === "half" ? "half size" : "a quarter"} (${size.reason})`);
-  return parts.join(" · ");
+  return {
+    size: size.label,
+    title: size.label === "full" ? "Full size" : size.label === "half" ? "Half size" : "Quarter size",
+    why: size.reason,
+    context: parts.join(" · "),
+  };
 }

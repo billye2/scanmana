@@ -151,8 +151,12 @@ with headers and footers off. A process to follow, not financial advice.
   50-day averages read as a range with its high and low named. Since 2.0.0
   the headline state changes only after two closes in a row agree, a "Longer
   term" line places each index against its 200-day, and Help's SPY and QQQ
-  charts are drawn under the card. Tape is the first icon on the bar when it
-  is ticked.
+  charts are drawn under the card. Since 2.0.1 the page opens on a
+  "Tomorrow" box: the size the tape gives, the close each index needs
+  tomorrow for the next repair step (as a price), the nearest supports under
+  it, and your book at the open; the trend card shows only the lines that
+  carry a decision, with every other fact and the repair order folded. Tape
+  is the first icon on the bar when it is ticked.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { indexLines, latch, nextLine, readIndexTrend, trendRead, trendState } from "../lib/trend-read";
+import { betterLine, indexLines, latch, nextLine, readIndexTrend, stepCloses, trendRead, trendState, worseLine } from "../lib/trend-read";
 import type { Bar } from "../lib/types";
 
 /** Bars from closes: open = prior close, a 1% range around the body unless given. Weekday-free dates from 2026-01-01. */
@@ -162,6 +162,79 @@ describe("the two-close hold (2.0.0)", () => {
     expect(back.tonight).toBe("uptrend");
     expect(back.state).toBe("uptrend");
     expect(indexLines(back).some((l) => l.startsWith("Tonight's close by itself"))).toBe(false);
+  });
+});
+
+describe("the prices behind 'gets better' and 'gets worse' (2.0.1)", () => {
+  // a slide, so every ladder step is open
+  const down = series(ramp(120, 160, 100));
+  const next = (c: number): Bar => ({ date: "2026-12-31", o: c, h: c, l: c, c, v: 1_000_000 });
+
+  it("names the close that passes each step: a hair over it passes, a hair under does not", () => {
+    const now = readIndexTrend("QQQ", down)!;
+    const needs = stepCloses(down);
+    expect(needs).toHaveLength(7);
+    const checks: ((t: NonNullable<ReturnType<typeof readIndexTrend>>) => boolean)[] = [
+      (t) => t.avgs[0].above,
+      (t) => t.avgs[0].rising,
+      (t) => t.avgs[1].above,
+      (t) => t.fastOverSlow,
+      (t) => t.avgs[1].rising,
+      (t) => t.avgs[2].above,
+      (t) => t.avgs[2].rising,
+    ];
+    checks.forEach((ok, i) => {
+      expect(ok(now)).toBe(false);
+      expect(ok(readIndexTrend("QQQ", [...down, next(needs[i] * 1.0005)])!)).toBe(true);
+      expect(ok(readIndexTrend("QQQ", [...down, next(needs[i] * 0.9995)])!)).toBe(false);
+    });
+  });
+
+  it("writes the next step with its price and how many are left", () => {
+    const t = readIndexTrend("QQQ", down)!;
+    expect(betterLine(t)).toMatch(/^QQQ: a close above \d+\.\d\d \(\+\d+\.\d%\) gives a close back above the 10-day, the first of 7 steps left\.$/);
+    const up = readIndexTrend("SPY", series(ramp(120, 100, 300)))!;
+    expect(betterLine(up)).toBe("SPY: nothing to repair, every check passes.");
+  });
+
+  it("says when the next step takes more than one close, and names a later one within reach if there is one", () => {
+    // a 10% drop on the last bar: every step is far away
+    const far = readIndexTrend("QQQ", series([...ramp(119, 160, 100), 90]))!;
+    expect(betterLine(far)).toBe("QQQ: a close back above the 10-day is next and takes more than one close; no later step is within a normal session either (7 left).");
+    // the same read with the 20-day step put within reach by hand: the slope step is skipped, not priced
+    const near = { ...far, avgs: far.avgs.map((a, k) => (k === 0 ? { ...a, above: true } : a)), needs: far.needs.map((n, k) => (k === 2 ? far.close * 1.01 : n)) };
+    expect(betterLine(near)).toBe(`QQQ: the 10-day turning up is next and takes more than one close. Within reach tomorrow: a close above ${(far.close * 1.01).toFixed(2)} (+1.0%) gives a close above the 20-day.`);
+  });
+
+  it("lists the nearest supports under the close, nearest first", () => {
+    const up = readIndexTrend("SPY", series(ramp(120, 100, 300)))!;
+    expect(up.floors.map((f) => f.what)).toEqual(["the 10-day", "the 20-day"]);
+    expect(up.floors[0].price).toBeGreaterThan(up.floors[1].price);
+    expect(worseLine(up)).toMatch(/^SPY: a close under \d+\.\d\d \(the 10-day, −\d+\.\d%\), then \d+\.\d\d \(the 20-day, −\d+\.\d%\)\.$/);
+    const t = readIndexTrend("QQQ", down)!;
+    expect(t.floors).toHaveLength(1);
+    expect(worseLine(t)).toMatch(/^QQQ: a close under \d+\.\d\d \(the .* low, −\d+\.\d%\)\.$/);
+  });
+
+  it("in a range both lines are the range's ends", () => {
+    const closes = [...ramp(80, 100, 130), ...Array.from({ length: 60 }, (_, i) => 130 * (1 + 0.01 * Math.sin(i / 2)))];
+    const t = readIndexTrend("SPY", series(closes))!;
+    expect(betterLine(t)).toMatch(/leaves the range upward\.$/);
+    expect(worseLine(t)).toMatch(/leaves the range downward\.$/);
+  });
+
+  it("keeps the card to the lines that carry a decision and leaves every fact in the full list", () => {
+    const r = trendRead(new Map([["QQQ", down]]))!;
+    const ix = r.indices[0];
+    expect(ix.key[0]).toMatch(/^Closed 100\.00 \(−\d\.\d%\), below its 10-, 20- and 50-day, \d+\.\d% off the .* high\.$/);
+    expect(ix.key.some((l) => l.startsWith("Closed below"))).toBe(true);
+    expect(ix.key.some((l) => l.startsWith("The averages are stacked"))).toBe(false);
+    expect(ix.lines.some((l) => l.startsWith("The averages are stacked"))).toBe(true);
+    expect(ix.key.length).toBeLessThan(ix.lines.length);
+    expect(r.ladder).toHaveLength(7);
+    expect(r.ladder[0]).toEqual({ say: "a close back above the 10-day", pass: [], fail: ["QQQ"] });
+    expect(r.better).toHaveLength(1);
+    expect(r.worse).toHaveLength(1);
   });
 });
 

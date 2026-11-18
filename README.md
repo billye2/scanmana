@@ -160,7 +160,8 @@ with headers and footers off. A process to follow, not financial advice.
   carry a decision, with every other fact and the repair order folded. Since
   2.0.2 the index charts open on the last 30 sessions with those prices
   drawn as lines, their chips say up / flat / down like the card, and the
-  sizing table and the study fold under "How this is scored". Tape is the
+  sizing table and the study sit under "How this is scored" (folded in 2.0.2,
+  always shown again since 2.0.4). Tape is the
   first icon on the bar when it is ticked.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how

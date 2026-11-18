@@ -216,12 +216,9 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
         <HighsLows rows={rows} />
       </Card>
 
-      <details className="group mt-6 rounded-xl bg-neutral-900/50 px-3 py-2">
-        <summary className="cursor-pointer list-none text-sm font-semibold tracking-wide text-emerald-400 uppercase active:opacity-70">
-          How this is scored
-          <span className="ml-2 text-[11px] font-normal normal-case tracking-normal text-neutral-500 group-open:hidden">the sizing rule, what the deck did under each verdict</span>
-        </summary>
-      <p className="mt-2 text-[13px] leading-relaxed text-neutral-300">
+      {/* Always shown since 2.0.4: 2.0.2 folded this and the page read as cut off on the phone. */}
+      <H>How this is scored</H>
+      <p className="text-[13px] leading-relaxed text-neutral-300">
         His first rule is that the index decides whether breakouts work at all; breadth says how many names are taking part. The home
         strip shows tonight&apos;s reading; this page shows the run of them, so a Bullish call can be seen as a streak and not a flicker.
         Terms in <Link href="/help#tape" className="text-neutral-100 underline underline-offset-4">Help</Link>.
@@ -299,7 +296,6 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
         In-sample, one tape so far; the research page scores the sizing rule itself under &ldquo;Paper size scaled by the tape&rdquo;. Nothing here changes a scan.
         The highs-and-lows count is the universe&apos;s new 52-week highs and lows per session as the breadth job records them.
       </p>
-      </details>
     </main>
   );
 }

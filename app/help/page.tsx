@@ -225,8 +225,8 @@ export default async function Help() {
         charts from this page sit under the card. The card shows only the lines that carry a decision (where the close sits, a level being
         tested, the 200-day); every other fact and the seven-step repair order open under <em>All the facts</em>. Since 2.0.2 the two charts open
         on the last 30 sessions and carry the prices the box names as lines (green dashed the close that gets better, red dashed a support,
-        amber dotted a level under test, grey a range&apos;s ends), and the sizing table, the study and this explanation fold under{" "}
-        <em>How this is scored</em> at the foot of the page. Then the three breadth lines (above the 20-day,
+        amber dotted a level under test, grey a range&apos;s ends), and the sizing table, the study and this explanation sit under{" "}
+        <em>How this is scored</em> at the foot of the page, always shown. Then the three breadth lines (above the 20-day,
         above the 50-day, 10-day over 20-day) on green bands where the verdict was Bullish, with the 50% line the sizing rule reads; new
         highs against new lows per session; the sizing table (full · half · quarter) with tonight&apos;s row lit; and what the deck did under
         each verdict — breakout rate and the Auto plan&apos;s average R by the index call on scan night, and the breakout rate by breadth.

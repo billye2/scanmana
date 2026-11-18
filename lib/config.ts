@@ -110,6 +110,13 @@ export const CONFIG = {
     RANGE_REACH: 0.02, // and the close is within 2% of the 20-day
     RANGE_EXIT: 2, // a range ends once one of those limits is doubled, or on a close past its high or low
     RANGE_LOOKBACK: 20, // the sessions whose high and low name the range
+    // Hold (2.0.0): the headline state changes only after this many closes in a row agree.
+    CONFIRM_CLOSES: 2,
+    CONFIRM_LOOKBACK: 20, // sessions re-read to find the state being held
+    // The 200-day, one context line (2.0.0). Never part of the state.
+    LONG_PERIOD: 200,
+    LONG_SLOPE_LOOKBACK: 20, // the 200-day against itself a month ago
+    LONG_FLAT: 0.005, // under 0.5% in that month reads "flat"
   },
 
   // Per-candidate analysis (lib/analysis.ts) — what each framework considers disqualifying

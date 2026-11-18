@@ -7,7 +7,9 @@ import { BucketBars } from "@/components/ResearchCharts";
 import TopNav from "@/components/TopNav";
 import { CONFIG } from "@/lib/config";
 import { getBreadth, getTapeStudy, latestBreadth } from "@/lib/research";
-import { latestScanSlim, loadBars } from "@/lib/scan";
+import IndexCharts from "@/components/IndexCharts";
+import { liveIndexBars } from "@/lib/intraday";
+import { latestScanSlim } from "@/lib/scan";
 import { latestTape, tapeMultiplier } from "@/lib/tape";
 import { tapeSentence, tapeWindow, verdictStreak } from "@/lib/tape-read";
 import { trendRead, type TrendTone } from "@/lib/trend-read";
@@ -47,15 +49,16 @@ const TREND_TONE: Record<TrendTone, string> = { up: "text-emerald-300", mixed: "
 export default async function TapePage({ searchParams }: { searchParams: Promise<{ d?: string }> }) {
   const sp = await searchParams;
   const win: Win = sp.d === "60" || sp.d === "250" ? sp.d : DEFAULT_WIN;
-  const [scan, breadthNow, { rows, buckets }, study, tape, indexBars] = await Promise.all([
+  const [scan, breadthNow, { rows, buckets }, study, tape, live] = await Promise.all([
     latestScanSlim().catch(() => null),
     latestBreadth().catch(() => null),
     getBreadth(Number(win)),
     getTapeStudy(),
     latestTape(),
-    loadBars([...CONFIG.MARKET.LEADERS]).catch(() => null),
+    liveIndexBars().catch(() => null),
   ]);
-  const trend = indexBars ? trendRead(indexBars) : null;
+  // The words stay on the stored close; the charts under them follow the day like Help's.
+  const trend = live ? trendRead(live.stored) : null;
   const streak = verdictStreak(rows);
   const window = tapeWindow(rows);
   const sentence = tapeSentence(streak, window, tape);
@@ -95,6 +98,13 @@ export default async function TapePage({ searchParams }: { searchParams: Promise
           <p className="mt-2 border-t border-neutral-800 pt-2 text-xs leading-snug text-neutral-300">{trend.next}</p>
           <p className="mt-1 text-[11px] text-neutral-600">Written by fixed rules from the stored daily bars; the same tape always reads the same way.</p>
         </Card>
+      )}
+
+      {live && live.bars.size > 0 && (
+        <>
+          <H sub="The two index charts from Help, with the 10-, 20- and 50-day averages the read above is written from.">SPY and QQQ</H>
+          <IndexCharts bars={live.bars} health={live.health.length > 0 ? live.health : scan?.market?.indices} asOf={live.asOf} provisional={live.provisional} />
+        </>
       )}
 
       <p className="mt-3 text-[13px] leading-relaxed text-neutral-300">

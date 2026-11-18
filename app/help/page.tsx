@@ -213,7 +213,9 @@ export default async function Help() {
         rules from the stored daily bars so the same tape always reads the same way. A close within 0.5% of an average reads &ldquo;at&rdquo;
         it and keeps the side it came from, an average that has moved less than 0.1% in five sessions reads &ldquo;flat&rdquo;, and when the
         20- and 50-day are flat and within 1% of each other the card calls a range and names its high and low, which lasts until a close
-        beyond either. Then the three breadth lines (above the 20-day,
+        beyond either. Since 2.0.0 the headline changes only after two closes in a row agree (on the first night the card says what
+        tonight&apos;s close reads by itself), a <em>Longer term</em> line places each index against its 200-day average, and the SPY and QQQ
+        charts from this page sit under the card. Then the three breadth lines (above the 20-day,
         above the 50-day, 10-day over 20-day) on green bands where the verdict was Bullish, with the 50% line the sizing rule reads; new
         highs against new lows per session; the sizing table (full · half · quarter) with tonight&apos;s row lit; and what the deck did under
         each verdict — breakout rate and the Auto plan&apos;s average R by the index call on scan night, and the breakout rate by breadth.

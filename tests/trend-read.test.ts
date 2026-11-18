@@ -135,13 +135,55 @@ describe("dead zone and range (1.9.9)", () => {
     expect(r.tone).toBe("mixed");
   });
 
-  it("ends the range on a close past its high", () => {
+  it("ends the range on a close past its high, and the headline follows on the second close (2.0.0)", () => {
     const flat = Array.from({ length: 60 }, (_, i) => 130 * (1 + 0.01 * Math.sin(i / 2)));
-    const closes = [...ramp(80, 100, 130), ...flat, 134];
-    const t = readIndexTrend("SPY", series(closes))!;
-    expect(t.state).not.toBe("range");
-    expect(t.range).toBeNull();
-    expect(t.highTest?.result).toBe("through");
+    const first = readIndexTrend("SPY", series([...ramp(80, 100, 130), ...flat, 134]))!;
+    expect(first.tonight).not.toBe("range");
+    expect(first.range).toBeNull();
+    expect(first.highTest?.result).toBe("through");
+    expect(first.state).toBe("range"); // one close is not enough
+    expect(indexLines(first)[0]).toBe(`Tonight's close by itself reads “Uptrend”; the headline holds at “Range” until a second close agrees.`);
+    const second = readIndexTrend("SPY", series([...ramp(80, 100, 130), ...flat, 134, 135]))!;
+    expect(second.tonight).toBe(first.tonight);
+    expect(second.state).toBe(first.tonight);
+    expect(indexLines(second)[0]).toMatch(/^Closed 135\.00/);
+  });
+});
+
+describe("the two-close hold (2.0.0)", () => {
+  it("ignores a state that lasts one session", () => {
+    // a steady climb, one close 3% under everything, then straight back
+    const up = ramp(120, 100, 130);
+    const dip = [...up, 118];
+    const t = readIndexTrend("SPY", series(dip))!;
+    expect(t.tonight).not.toBe("uptrend");
+    expect(t.state).toBe("uptrend");
+    const back = readIndexTrend("SPY", series([...dip, 131]))!;
+    expect(back.tonight).toBe("uptrend");
+    expect(back.state).toBe("uptrend");
+    expect(indexLines(back).some((l) => l.startsWith("Tonight's close by itself"))).toBe(false);
+  });
+});
+
+describe("the 200-day line (2.0.0)", () => {
+  it("is absent while the history is shorter than 200 sessions", () => {
+    const t = readIndexTrend("SPY", series(ramp(150, 100, 160)))!;
+    expect(t.long).toBeNull();
+    expect(indexLines(t).some((l) => l.startsWith("Longer term"))).toBe(false);
+  });
+
+  it("calls a bounce over the short averages under a falling 200-day a rally inside a longer decline", () => {
+    // 230 sessions down from 200 to 100, then 40 up to 120: over the 20- and 50-day, far under the 200-day
+    const t = readIndexTrend("SPY", series([...ramp(230, 200, 100), ...ramp(40, 101, 125)]))!;
+    expect(t.state).toBe("uptrend");
+    expect(t.long!.dist).toBeLessThan(0);
+    expect(indexLines(t).find((l) => l.startsWith("Longer term"))).toMatch(/^Longer term: \d+\.\d% under the 200-day \(\d+\.\d\d\), which is falling, so this is a rally inside a longer decline\.$/);
+  });
+
+  it("calls a slide under the short averages over a rising 200-day a setback inside a longer advance", () => {
+    const t = readIndexTrend("SPY", series([...ramp(230, 100, 200), ...ramp(15, 198, 180)]))!;
+    expect(t.state).toBe("downtrend");
+    expect(indexLines(t).find((l) => l.startsWith("Longer term"))).toMatch(/over the 200-day \(\d+\.\d\d\), which is rising, so this is a setback inside a longer advance\.$/);
   });
 });
 

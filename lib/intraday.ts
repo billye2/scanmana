@@ -179,6 +179,7 @@ export function formatAsOf(t: number, now: number = Date.now()): string {
 
 export interface LiveIndexBundle {
   bars: Map<string, Bar[]>; // stored history + provisional today, per index
+  stored: Map<string, Bar[]>; // the stored history alone, for reads that must stay on the close (/tape's trend card)
   health: IndexHealth[]; // recomputed from those bars (empty when the history is too short)
   asOf: string | null; // newest quote's time, null when no index had a quote
   provisional: boolean; // true when at least one index got today's bar appended
@@ -222,7 +223,7 @@ export async function liveIndexBars(ttlMs: number = LOOKUP_TTL_MS): Promise<Live
   const { bars, provisional } = mergeIndexQuotes(stored, quotes, etToday());
   const health = indices.map((t) => indexHealth(t, bars.get(t) ?? [])).filter((h): h is IndexHealth => h !== null);
   const newest = [...quotes.values()].reduce<number>((m, q) => Math.max(m, q.t), 0);
-  return { bars, health, asOf: quotes.size > 0 ? formatAsOf(newest) : null, provisional };
+  return { bars, stored, health, asOf: quotes.size > 0 ? formatAsOf(newest) : null, provisional };
 }
 
 export interface LiveBundle {

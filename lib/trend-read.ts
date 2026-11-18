@@ -92,7 +92,25 @@ export interface IndexTrend {
   lowTest: LevelTest | null;
   highTest: LevelTest | null;
   bounce: BounceRead | null;
+  /**
+   * The state tonight's close gives by itself. `state` above is the held one
+   * (2.0.0): it changes only after CONFIRM_CLOSES closes in a row agree, so the
+   * two differ on the first night of a change.
+   */
+  tonight: TrendState;
+  /** The close against the 200-day; null while the history is shorter than that. */
+  long: LongRead | null;
 }
+
+export interface LongRead {
+  value: number;
+  dist: number;
+  at: boolean;
+  /** The 200-day against itself LONG_SLOPE_LOOKBACK sessions ago; null when the history does not reach that far. */
+  change: number | null;
+}
+
+type RawTrend = Omit<IndexTrend, "tonight" | "long">;
 
 export interface TrendRead {
   date: string;
@@ -210,8 +228,38 @@ function readBounce(bars: Bar[], lowIdx: number): BounceRead | null {
   };
 }
 
-/** One index against its averages. Null without enough bars. Bars ascending by date. */
+/**
+ * One index against its averages, with the headline state held: a new state
+ * shows only once CONFIRM_CLOSES closes in a row give it, found by reading each
+ * of the last CONFIRM_LOOKBACK sessions the way that night's card did. Every
+ * other fact is tonight's. Null without enough bars. Bars ascending by date.
+ */
 export function readIndexTrend(ticker: string, bars: Bar[]): IndexTrend | null {
+  const t = readOnce(ticker, bars);
+  if (!t) return null;
+  const n = bars.length;
+  let shown: TrendState | null = null;
+  let prev: TrendState | null = null;
+  let run = 0;
+  for (let m = Math.max(T.MIN_BARS, n - T.CONFIRM_LOOKBACK); m <= n; m++) {
+    const s = m === n ? t.state : readOnce(ticker, bars.slice(0, m))!.state;
+    run = s === prev ? run + 1 : 1;
+    prev = s;
+    if (shown === null || run >= T.CONFIRM_CLOSES) shown = s;
+  }
+  return { ...t, state: shown!, tonight: t.state, long: readLong(bars) };
+}
+
+function readLong(bars: Bar[]): LongRead | null {
+  const value = sma(bars, T.LONG_PERIOD);
+  if (value === null) return null;
+  const then = sma(bars, T.LONG_PERIOD, T.LONG_SLOPE_LOOKBACK);
+  const dist = bars[bars.length - 1].c / value - 1;
+  return { value, dist, at: Math.abs(dist) < T.AT_PCT, change: then === null ? null : value / then - 1 };
+}
+
+/** Tonight's close read by itself: every fact, and the state before the hold. */
+function readOnce(ticker: string, bars: Bar[]): RawTrend | null {
   const n = bars.length;
   if (n < T.MIN_BARS) return null;
   const last = bars[n - 1];
@@ -364,8 +412,28 @@ function rangeLine(r: RangeRead): string {
   return `The 20- and 50-day are flat and ${pc(r.gap)} apart, so this is a range: the last ${T.RANGE_LOOKBACK} sessions held between ${px(r.low)} (${day(r.lowDate)}) and ${px(r.high)} (${day(r.highDate)}).`;
 }
 
+function longLine(t: IndexTrend, x: LongRead): string {
+  const where = x.at ? `at the ${T.LONG_PERIOD}-day (${px(x.value)}, ${pc(x.dist)} ${x.dist > 0 ? "over" : "under"})` : `${pc(x.dist)} ${x.dist > 0 ? "over" : "under"} the ${T.LONG_PERIOD}-day (${px(x.value)})`;
+  if (x.change === null) return `Longer term: ${where}.`;
+  const slope = Math.abs(x.change) < T.LONG_FLAT ? "flat" : x.change > 0 ? "rising" : "falling";
+  const tone = TONE[t.state];
+  const read =
+    x.at ? ""
+    : tone === "up" && x.dist < 0 && slope === "falling" ? ", so this is a rally inside a longer decline"
+    : tone === "down" && x.dist > 0 && slope === "rising" ? ", so this is a setback inside a longer advance"
+    : tone === "down" && x.dist < 0 && slope !== "rising" ? ", so the longer trend is down as well"
+    : "";
+  return `Longer term: ${where}, which is ${slope}${read}.`;
+}
+
+function pendingLine(t: IndexTrend): string {
+  return `Tonight's close by itself reads “${LABEL[t.tonight]}”; the headline holds at “${LABEL[t.state]}” until a second close agrees.`;
+}
+
 export function indexLines(t: IndexTrend): string[] {
   const out = [positionLine(t), stackLine(t), highLine(t)];
+  if (t.long) out.push(longLine(t, t.long));
+  if (t.tonight !== t.state) out.unshift(pendingLine(t));
   if (t.range) out.push(rangeLine(t.range));
   if (t.bounce) out.push(bounceLine(t.bounce));
   if (t.lowTest) out.push(levelLine("low", t.lowTest));

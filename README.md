@@ -148,8 +148,11 @@ with headers and footers off. A process to follow, not financial advice.
   being tested and the next thing a repair needs. Fixed rules, no model.
   Since 1.9.9 a close within 0.5% of an average reads "at" and keeps the side
   it came from, a slope under 0.1% reads "flat", and flat, tangled 20- and
-  50-day averages read as a range with its high and low named. Tape is the
-  first icon on the bar when it is ticked.
+  50-day averages read as a range with its high and low named. Since 2.0.0
+  the headline state changes only after two closes in a row agree, a "Longer
+  term" line places each index against its 200-day, and Help's SPY and QQQ
+  charts are drawn under the card. Tape is the first icon on the bar when it
+  is ticked.
 - `/help` explains every badge and chart line (ADR, tightness, EP, Darvas
   trigger/stop, Livermore pivot, the SMAs), who each idea comes from and how
   to trade it — numbers read live from `lib/config.ts`.
